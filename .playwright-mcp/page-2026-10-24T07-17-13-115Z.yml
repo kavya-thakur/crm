@@ -1,0 +1,69 @@
+- generic [active] [ref=f14e1]:
+  - generic [ref=f14e2]:
+    - complementary [ref=f14e3]:
+      - generic [ref=f14e4]:
+        - generic [ref=f14e5]: Q
+        - generic [ref=f14e6]: QA Pipeline Test Org
+      - navigation [ref=f14e7]:
+        - paragraph [ref=f14e8]: Workspace
+        - link [ref=f14e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f14e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f14e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f14e26]:
+        - paragraph [ref=f14e27]: Settings
+        - link [ref=f14e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f14e35] [cursor=pointer]:
+          - /url: /settings/roles
+        - link [ref=f14e40] [cursor=pointer]:
+          - /url: /settings/pipeline
+      - generic [ref=f14e46]:
+        - generic [ref=f14e47]: Q
+        - generic [ref=f14e48]:
+          - paragraph [ref=f14e49]: QA Tester
+          - paragraph [ref=f14e50]: qa-pipeline-test@example.com
+        - button "Log out" [ref=f14e52]
+    - main [ref=f14e57]:
+      - generic [ref=f14e58]:
+        - generic [ref=f14e59]:
+          - heading "Pipeline" [level=1] [ref=f14e66]
+          - generic [ref=f14e84]: "4"
+          - button "New stage" [ref=f14e67]
+        - generic [ref=f14e70]:
+          - heading "Pipeline stages" [level=2] [ref=f14e71]
+          - paragraph [ref=f14e72]: The columns of the deals board, in the order they appear. A won or lost stage marks a deal as closed.
+          - list [ref=f14e85]:
+            - listitem [ref=f14e103]:
+              - generic [ref=f14e104]:
+                - button "Move Qualification up" [disabled] [ref=f14e105]
+                - button "Move Qualification down" [ref=f14e109]
+              - button "Qualification" [ref=f14e113]
+              - button "Delete Qualification" [ref=f14e116]
+            - listitem [ref=f14e120]:
+              - generic [ref=f14e121]:
+                - button "Move Negotiation up" [ref=f14e122]
+                - button "Move Negotiation down" [ref=f14e126]
+              - button "Negotiation" [ref=f14e130]
+              - button "Delete Negotiation" [ref=f14e133]
+            - listitem [ref=f14e137]:
+              - generic [ref=f14e138]:
+                - button "Move Won up" [ref=f14e139]
+                - button "Move Won down" [ref=f14e143]
+              - button "Won Won" [ref=f14e147]:
+                - generic [ref=f14e149]: Won
+                - generic [ref=f14e150]: Won
+              - button "Delete Won" [ref=f14e151]
+            - listitem [ref=f14e155]:
+              - generic [ref=f14e156]:
+                - button "Move Lost up" [ref=f14e157]
+                - button "Move Lost down" [disabled] [ref=f14e161]
+              - button "Lost Lost" [ref=f14e165]:
+                - generic [ref=f14e167]: Lost
+                - generic [ref=f14e168]: Lost
+              - button "Delete Lost" [ref=f14e169]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f14e79] [cursor=pointer]
+  - alert [ref=f14e83]

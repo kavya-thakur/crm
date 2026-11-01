@@ -1,0 +1,40 @@
+- generic [active] [ref=f16e1]:
+  - generic [ref=f16e2]:
+    - complementary [ref=f16e3]:
+      - generic [ref=f16e4]:
+        - generic [ref=f16e5]: Q
+        - generic [ref=f16e6]: QA Pipeline Test Org
+      - navigation [ref=f16e7]:
+        - paragraph [ref=f16e8]: Workspace
+        - link [ref=f16e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f16e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f16e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f16e26]:
+        - paragraph [ref=f16e27]: Settings
+        - link [ref=f16e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f16e35] [cursor=pointer]:
+          - /url: /settings/roles
+        - link [ref=f16e40] [cursor=pointer]:
+          - /url: /settings/pipeline
+      - generic [ref=f16e46]:
+        - generic [ref=f16e47]: Q
+        - generic [ref=f16e48]:
+          - paragraph [ref=f16e49]: QA Tester
+          - paragraph [ref=f16e50]: qa-pipeline-test@example.com
+        - button "Log out" [ref=f16e52]
+    - main [ref=f16e57]:
+      - generic [ref=f16e58]:
+        - generic [ref=f16e59]:
+          - heading "Pipeline" [level=1] [ref=f16e66]
+          - button "New stage" [ref=f16e67]
+        - generic [ref=f16e70]:
+          - heading "Pipeline stages" [level=2] [ref=f16e71]
+          - paragraph [ref=f16e72]: The columns of the deals board, in the order they appear. A won or lost stage marks a deal as closed.
+          - paragraph [ref=f16e73]: Loading stages...
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f16e79] [cursor=pointer]
+  - alert [ref=f16e83]

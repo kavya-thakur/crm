@@ -1,0 +1,132 @@
+- generic [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - complementary [ref=f7e3]:
+      - generic [ref=f7e4]:
+        - generic [ref=f7e5]: Q
+        - generic [ref=f7e6]: QA Convert Test Org
+      - navigation [ref=f7e7]:
+        - paragraph [ref=f7e8]: Workspace
+        - link [ref=f7e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f7e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f7e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f7e26]:
+        - paragraph [ref=f7e27]: Settings
+        - link [ref=f7e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f7e35] [cursor=pointer]:
+          - /url: /settings/roles
+      - generic [ref=f7e40]:
+        - generic [ref=f7e41]: Q
+        - generic [ref=f7e42]:
+          - paragraph [ref=f7e43]: QA Tester
+          - paragraph [ref=f7e44]: qa-convert-test@example.com
+        - button "Log out" [ref=f7e46]
+    - main [ref=f7e51]:
+      - generic [ref=f7e52]:
+        - generic [ref=f7e53]:
+          - heading "Leads" [level=1] [ref=f7e60]
+          - generic [ref=f7e160]: "1"
+          - button "New Lead" [ref=f7e61]
+        - generic [ref=f7e63]:
+          - button "All leads" [ref=f7e65]
+          - generic [ref=f7e70]:
+            - textbox "Search leads" [ref=f7e75]:
+              - /placeholder: Search
+            - button "Filter" [ref=f7e77]
+            - button "Sort" [ref=f7e81]
+        - table [ref=f7e86]:
+          - rowgroup [ref=f7e87]:
+            - row [ref=f7e88]:
+              - columnheader [ref=f7e89]:
+                - checkbox "Select all" [ref=f7e90]
+              - columnheader "Name" [ref=f7e91]
+              - columnheader "Status" [ref=f7e96]
+              - columnheader "Company" [ref=f7e104]
+              - columnheader "Email" [ref=f7e108]
+              - columnheader "Phone" [ref=f7e113]
+              - columnheader "Source" [ref=f7e117]
+              - columnheader "Assigned to" [ref=f7e122]
+              - columnheader "Created" [ref=f7e128]
+              - columnheader [ref=f7e132]
+          - rowgroup [ref=f7e133]:
+            - row [ref=f7e161]:
+              - cell [ref=f7e162]:
+                - checkbox "Select Rahul Mehta" [ref=f7e163]
+              - cell [ref=f7e164]:
+                - button "R Rahul Mehta" [active] [ref=f7e165]:
+                  - generic [ref=f7e166]: R
+                  - generic [ref=f7e167]: Rahul Mehta
+              - cell "New" [ref=f7e168]
+              - cell "Mehta Textiles" [ref=f7e170]
+              - cell [ref=f7e171]:
+                - link "rahul@mehtatextiles.com" [ref=f7e172] [cursor=pointer]:
+                  - /url: mailto:rahul@mehtatextiles.com
+              - cell [ref=f7e173]:
+                - link "+91 90000 11111" [ref=f7e174] [cursor=pointer]:
+                  - /url: tel:+91 90000 11111
+              - cell "Referral" [ref=f7e175]
+              - cell "Q QA Tester" [ref=f7e176]:
+                - generic [ref=f7e177]:
+                  - generic [ref=f7e178]: Q
+                  - generic [ref=f7e179]: QA Tester
+              - cell "Oct 24, 2026" [ref=f7e180]
+              - cell [ref=f7e181]
+            - row [ref=f7e182]:
+              - cell [ref=f7e183]:
+                - button "Add New" [ref=f7e184]
+        - complementary [ref=f7e186]:
+          - generic [ref=f7e187]:
+            - generic [ref=f7e188]: Lead
+            - generic [ref=f7e195]:
+              - button "Convert to Deal" [ref=f7e196]
+              - button "Delete lead" [ref=f7e200]
+              - button "Close" [ref=f7e204]
+          - generic [ref=f7e208]:
+            - generic [ref=f7e209]:
+              - generic [ref=f7e210]: R
+              - generic [ref=f7e211]:
+                - button "Rahul Mehta" [ref=f7e212]
+                - paragraph [ref=f7e214]: Added just now
+            - generic [ref=f7e215]:
+              - generic [ref=f7e216]:
+                - generic [ref=f7e217]: Status
+                - button "New" [ref=f7e226]
+              - generic [ref=f7e230]:
+                - generic [ref=f7e231]: Assigned to
+                - button "Q QA Tester" [ref=f7e238]:
+                  - generic [ref=f7e239]: Q
+                  - generic [ref=f7e240]: QA Tester
+              - generic [ref=f7e241]:
+                - generic [ref=f7e242]: Company
+                - button "Mehta Textiles" [ref=f7e246]
+              - generic [ref=f7e248]:
+                - generic [ref=f7e249]: Contact
+                - generic [ref=f7e253]: Rahul Mehta
+              - generic [ref=f7e254]:
+                - generic [ref=f7e255]: Email
+                - button "rahul@mehtatextiles.com" [ref=f7e260]
+              - generic [ref=f7e262]:
+                - generic [ref=f7e263]: Phone
+                - button "+91 90000 11111" [ref=f7e267]
+              - generic [ref=f7e269]:
+                - generic [ref=f7e270]: Source
+                - button "Referral" [ref=f7e275]
+              - generic [ref=f7e277]:
+                - generic [ref=f7e278]: Created
+                - generic [ref=f7e281]: Oct 24, 2026
+              - generic [ref=f7e282]:
+                - generic [ref=f7e283]: Updated
+                - generic [ref=f7e287]: just now
+            - generic [ref=f7e288]:
+              - heading "Timeline" [level=2] [ref=f7e289]
+              - list [ref=f7e290]:
+                - listitem [ref=f7e291]:
+                  - generic [ref=f7e295]:
+                    - paragraph [ref=f7e296]: QA Tester · Lead created
+                    - time [ref=f7e297]: just now
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f7e155] [cursor=pointer]
+  - alert [ref=f7e159]

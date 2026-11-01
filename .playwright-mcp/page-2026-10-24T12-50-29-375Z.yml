@@ -1,0 +1,112 @@
+- generic [ref=f28e1]:
+  - generic [ref=f28e2]:
+    - complementary [ref=f28e3]:
+      - generic [ref=f28e4]:
+        - generic [ref=f28e5]: Q
+        - generic [ref=f28e6]: QA Refactor Test Org
+      - navigation [ref=f28e7]:
+        - paragraph [ref=f28e8]: Workspace
+        - link [ref=f28e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f28e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f28e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f28e26]:
+        - paragraph [ref=f28e27]: Settings
+        - link [ref=f28e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f28e35] [cursor=pointer]:
+          - /url: /settings/roles
+        - link [ref=f28e40] [cursor=pointer]:
+          - /url: /settings/pipeline
+      - generic [ref=f28e46]:
+        - generic [ref=f28e47]: Q
+        - generic [ref=f28e48]:
+          - paragraph [ref=f28e49]: QA Tester
+          - paragraph [ref=f28e50]: qa-refactor-test@example.com
+        - button "Log out" [ref=f28e52]
+    - main [ref=f28e57]:
+      - generic [ref=f28e58]:
+        - generic [ref=f28e59]:
+          - heading "Leads" [level=1] [ref=f28e66]
+          - generic [ref=f28e162]: "0"
+          - button "New Lead" [ref=f28e67]
+        - generic [ref=f28e69]:
+          - button "All leads" [ref=f28e71]
+          - generic [ref=f28e76]:
+            - textbox "Search leads" [ref=f28e81]:
+              - /placeholder: Search
+            - generic [ref=f28e82]:
+              - button "Filter" [expanded] [ref=f28e83]
+              - generic [ref=f28e180]:
+                - generic [ref=f28e181]:
+                  - paragraph [ref=f28e182]: Saved filters
+                  - paragraph [ref=f28e184]: No saved filters yet
+                - generic [ref=f28e185]:
+                  - generic [ref=f28e186]:
+                    - button "Filters" [active] [ref=f28e187]
+                    - button "Manage fields" [ref=f28e188]
+                  - generic [ref=f28e191]:
+                    - generic [ref=f28e390]:
+                      - generic "Drag to reorder" [ref=f28e391]
+                      - generic [ref=f28e399]:
+                        - paragraph [ref=f28e400]: STATUS
+                        - combobox [ref=f28e401]:
+                          - option "Any status" [selected]
+                          - option "New"
+                          - option "Contacted"
+                          - option "Qualified"
+                          - option "Converted"
+                          - option "Lost"
+                      - button "Remove Status filter" [ref=f28e402]
+                    - generic [ref=f28e407]:
+                      - generic "Drag to reorder" [ref=f28e408]
+                      - generic [ref=f28e416]:
+                        - paragraph [ref=f28e417]: SOURCE
+                        - textbox "e.g. Website" [ref=f28e418]
+                      - button "Remove Source filter" [ref=f28e419]
+                    - generic [ref=f28e424]:
+                      - generic "Drag to reorder" [ref=f28e425]
+                      - generic [ref=f28e433]:
+                        - paragraph [ref=f28e434]: ASSIGNED TO
+                        - combobox [ref=f28e435]:
+                          - option "Anyone" [selected]
+                          - option "Me"
+                          - option "Unassigned"
+                          - option "QA Tester"
+                      - button "Remove Assigned to filter" [ref=f28e436]
+                    - generic [ref=f28e441]:
+                      - generic "Drag to reorder" [ref=f28e442]
+                      - generic [ref=f28e450]:
+                        - paragraph [ref=f28e451]: CREATED
+                        - generic [ref=f28e452]:
+                          - textbox "Created from" [ref=f28e453]
+                          - generic [ref=f28e454]: to
+                          - textbox "Created to" [ref=f28e455]
+                      - button "Remove Created filter" [ref=f28e456]
+            - button "Sort" [ref=f28e87]
+        - generic [ref=f28e91]:
+          - table [ref=f28e92]:
+            - rowgroup [ref=f28e93]:
+              - row [ref=f28e94]:
+                - columnheader [ref=f28e95]:
+                  - checkbox "Select all" [ref=f28e96]
+                - columnheader "Name" [ref=f28e97]
+                - columnheader "Status" [ref=f28e102]
+                - columnheader "Email" [ref=f28e110]
+                - columnheader "Phone" [ref=f28e115]
+                - columnheader "Source" [ref=f28e119]
+                - columnheader "Assigned to" [ref=f28e124]
+                - columnheader "Created" [ref=f28e130]
+                - columnheader [ref=f28e134]
+            - rowgroup [ref=f28e135]:
+              - row [ref=f28e163]:
+                - cell [ref=f28e164]:
+                  - button "Add New" [ref=f28e165]
+          - generic [ref=f28e175]:
+            - paragraph [ref=f28e176]: Add your first lead
+            - paragraph [ref=f28e177]: Leads you create or are assigned to show up here.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f28e157] [cursor=pointer]
+  - alert [ref=f28e161]

@@ -1,0 +1,578 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  roleId         Int
+  name           String
+  email          String   @unique
+  passwordHash   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  role               Role                @relation(fields: [roleId], references: [id])
+  assignedLeads      Lead[]
+  leadTimeline       LeadTimeline[]
+  leadNotes          LeadNote[]
+  assignedDeals      Deal[]              @relation("DealAssignee")
+  dealTimeline       DealTimeline[]
+  dealNotes          DealNote[]
+  contacts           Contact[]
+  contactTimeline    ContactTimeline[]
+  contactNotes       ContactNote[]
+  savedFilters       SavedFilter[]
+  // scheduled calls/meetings — the person it's for, and whoever scheduled it (often the same person)
+  assignedActivities ScheduledActivity[] @relation("ScheduledActivityAssignee")
+  createdActivities  ScheduledActivity[] @relation("ScheduledActivityCreator")
+  // activities this agent is tagged on (not the one it's assigned to), so they show on their schedule too
+  taggedActivities   ScheduledActivity[] @relation("ActivityAttendees")
+  // to-dos — the person who has to do it, and whoever wrote it down
+  assignedTasks      Task[]              @relation("TaskAssignee")
+  createdTasks       Task[]              @relation("TaskCreator")
+
+  @@index([organizationId])
+  @@index([roleId])
+}
+
+model Organization {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                  User[]
+  roles                  Role[]
+  leads                  Lead[]
+  pipelineStages         PipelineStage[]
+  leadStages             LeadStage[]
+  leadSources            LeadSource[]
+  deals                  Deal[]
+  contacts               Contact[]
+  companies              Company[]
+  customFieldDefinitions CustomFieldDefinition[]
+  scheduledActivities    ScheduledActivity[]
+  tasks                  Task[]
+}
+
+model Role {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  users        User[]
+  permissions  RolePermission[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Permission {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model Lead {
+  id             Int  @id @default(autoincrement())
+  organizationId Int
+  assignedToId   Int?
+  // Every lead gets a Contact on creation — either a new one, or an existing
+  // one picked (or matched by phone), so a contact can source several leads.
+  contactId      Int?
+
+  name         String
+  email        String?
+  phone        String?
+  companyName  String?
+  sourceId     Int?
+  stageId      Int
+  // values for this org's CustomFieldDefinition rows (entity "lead"), keyed
+  // by definition.key — e.g. { "budget_range": "50k-100k" }
+  customFields Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization        Organization        @relation(fields: [organizationId], references: [id])
+  assignedTo          User?               @relation(fields: [assignedToId], references: [id])
+  contact             Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  stage               LeadStage           @relation(fields: [stageId], references: [id])
+  source              LeadSource?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  timeline            LeadTimeline[]
+  notes               LeadNote[]
+  scheduledActivities ScheduledActivity[]
+  tasks               Task[]
+  deals               Deal[]
+
+  @@index([organizationId])
+  @@index([assignedToId])
+  @@index([stageId])
+  @@index([sourceId])
+  @@index([email])
+  @@index([contactId])
+}
+
+// Admin-editable, mirroring Deal's PipelineStage — the columns of the leads
+// board, in the order they appear. A converted or lost stage marks a lead as closed.
+model LeadStage {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  order          Int      @default(0)
+  color          String   @default("#64748b")
+  isConverted    Boolean  @default(false)
+  isLost         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        Lead[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, order])
+}
+
+// Admin-editable, picked (not typed) on the lead form — same pattern as
+// LeadStage, just without the converted/lost flags.
+model LeadSource {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  order          Int      @default(0)
+  color          String   @default("#64748b")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        Lead[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, order])
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  BOOLEAN
+  AGENT
+}
+
+// An org-defined extra field on an entity (Lead for now). The definition
+// lives here; the actual values live in that entity's own `customFields`
+// JSON column, keyed by `key`.
+model CustomFieldDefinition {
+  id             Int             @id @default(autoincrement())
+  organizationId Int
+  entity         String // "lead" | "deal" | "contact"
+  key            String // stable machine name used inside the JSON blob
+  label          String
+  type           CustomFieldType
+  // SELECT fields' choices, as a JSON string array
+  options        Json?
+  // optional heading fields with the same group cluster under on forms
+  group          String?
+
+  required     Boolean @default(false)
+  showInFilter Boolean @default(false)
+  showInList   Boolean @default(false)
+  order        Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, entity, key])
+  @@index([organizationId, entity])
+}
+
+// The lead's Timeline tab: an automatic, read-only log (created, stage
+// changed, assigned...). See LeadNote for user-authored comments instead.
+model LeadTimeline {
+  id     Int @id @default(autoincrement())
+  leadId Int
+  userId Int
+
+  type     String
+  message  String
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// A user-written comment on a lead, optionally @-mentioning teammates —
+// unlike LeadTimeline (an automatic, read-only log), notes are authored,
+// editable and deletable by their author.
+model LeadNote {
+  id               Int      @id @default(autoincrement())
+  leadId           Int
+  authorId         Int
+  body             String   @db.Text
+  // ids of agents @-mentioned in `body`, denormalized at write time so
+  // "mentions me" queries don't need to parse the text
+  mentionedUserIds Int[]    @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([leadId, createdAt])
+  @@index([authorId])
+}
+
+model PipelineStage {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  order          Int      @default(0)
+  color          String   @default("#64748b")
+  isWon          Boolean  @default(false)
+  isLost         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deals        Deal[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, order])
+}
+
+model Deal {
+  id              Int  @id @default(autoincrement())
+  organizationId  Int
+  leadId          Int?
+  assignedToId    Int?
+  pipelineStageId Int
+
+  title             String
+  amount            Decimal   @default(0) @db.Decimal(12, 2)
+  probability       Int       @default(0)
+  expectedCloseDate DateTime?
+  description       String?
+  // values for this org's CustomFieldDefinition rows (entity "deal")
+  customFields      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  assignedTo    User?         @relation("DealAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  pipelineStage PipelineStage @relation(fields: [pipelineStageId], references: [id])
+
+  timeline            DealTimeline[]
+  notes               DealNote[]
+  scheduledActivities ScheduledActivity[]
+  tasks               Task[]
+
+  @@index([organizationId])
+  @@index([organizationId, pipelineStageId])
+  @@index([assignedToId])
+  @@index([leadId])
+  @@index([expectedCloseDate])
+}
+
+// The deal's Timeline tab: an automatic, read-only log. See DealNote for
+// user-authored comments instead.
+model DealTimeline {
+  id        Int      @id @default(autoincrement())
+  dealId    Int
+  userId    Int
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([dealId, createdAt])
+  @@index([userId])
+}
+
+// A user-written comment on a deal, optionally @-mentioning teammates —
+// unlike DealTimeline (an automatic, read-only log), notes are authored,
+// editable and deletable by their author.
+model DealNote {
+  id               Int      @id @default(autoincrement())
+  dealId           Int
+  authorId         Int
+  body             String   @db.Text
+  // ids of agents @-mentioned in `body`, denormalized at write time so
+  // "mentions me" queries don't need to parse the text
+  mentionedUserIds Int[]    @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deal   Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([dealId, createdAt])
+  @@index([authorId])
+}
+
+model Contact {
+  id             Int  @id @default(autoincrement())
+  organizationId Int
+  companyId      Int?
+  assignedToId   Int?
+
+  name         String  @db.VarChar(200)
+  email        String? @db.VarChar(255)
+  // required and unique per org — a contact is how leads dedupe by phone,
+  // so two contacts sharing a phone would defeat that entirely
+  phone        String  @db.VarChar(20)
+  jobTitle     String? @db.VarChar(150)
+  description  String? @db.Text
+  // values for this org's CustomFieldDefinition rows (entity "contact")
+  customFields Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company             Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  assignedTo          User?               @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  // every lead sourced from (or linked to) this contact — a contact isn't
+  // limited to a single lead, e.g. the same person re-engaging later
+  leads               Lead[]
+  timeline            ContactTimeline[]
+  notes               ContactNote[]
+  scheduledActivities ScheduledActivity[]
+  tasks               Task[]
+
+  @@unique([organizationId, phone])
+  @@index([organizationId])
+  @@index([organizationId, email])
+  @@index([companyId])
+  @@index([assignedToId])
+  @@index([organizationId, name])
+}
+
+// The contact's Timeline tab: an automatic, read-only log. See ContactNote
+// for user-authored comments instead.
+model ContactTimeline {
+  id        Int      @id @default(autoincrement())
+  contactId Int
+  userId    Int
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([contactId, createdAt])
+  @@index([userId])
+}
+
+// A user-written comment on a contact, optionally @-mentioning teammates —
+// unlike ContactTimeline (an automatic, read-only log), notes are authored,
+// editable and deletable by their author.
+model ContactNote {
+  id               Int      @id @default(autoincrement())
+  contactId        Int
+  authorId         Int
+  body             String   @db.Text
+  // ids of agents @-mentioned in `body`, denormalized at write time so
+  // "mentions me" queries don't need to parse the text
+  mentionedUserIds Int[]    @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+
+  @@index([contactId, createdAt])
+  @@index([authorId])
+}
+
+model Company {
+  id             Int @id @default(autoincrement())
+  organizationId Int
+
+  name        String  @db.VarChar(200)
+  website     String? @db.VarChar(255)
+  industry    String? @db.VarChar(100)
+  phone       String? @db.VarChar(20)
+  description String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts     Contact[]
+
+  @@index([organizationId])
+  @@index([organizationId, name])
+}
+
+// A user's own named filter presets for a list page (Leads, Deals, Contacts).
+// Personal, not shared with the rest of the org.
+model SavedFilter {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  entity String // "lead" | "deal" | "contact"
+  name   String
+
+  // the exact filter object the list page already sends as query params,
+  // e.g. { "status": "NEW", "assignedTo": "me" }
+  filters Json
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, entity])
+}
+
+enum ScheduledActivityType {
+  CALL
+  MEETING
+  OTHER
+}
+
+enum ScheduledActivityStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+// A call/meeting/reminder booked for a specific date and time — distinct from
+// Timeline (an automatic log) and from Notes (freeform, untimed comments).
+// Deliberately one shared table rather than split per entity like
+// LeadTimeline/DealTimeline/ContactTimeline: a reminder scheduler needs to
+// efficiently ask "what's due soon for this user" across every record type
+// in one query, which a 3-table split would make much harder for no benefit.
+model ScheduledActivity {
+  id              Int                     @id @default(autoincrement())
+  organizationId  Int
+  type            ScheduledActivityType
+  status          ScheduledActivityStatus @default(SCHEDULED)
+  title           String
+  description     String?
+  scheduledAt     DateTime
+  durationMinutes Int?
+
+  // who the reminder is for, and who booked it (often the same person)
+  assignedToId Int
+  createdById  Int
+
+  // the record this is about — at most one of these is set; none set = a
+  // general reminder not tied to a specific record
+  leadId    Int?
+  dealId    Int?
+  contactId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedTo   User         @relation("ScheduledActivityAssignee", fields: [assignedToId], references: [id])
+  createdBy    User         @relation("ScheduledActivityCreator", fields: [createdById], references: [id])
+  // other agents tagged on it, e.g. everyone in a meeting; it shows on each of their schedules
+  attendees    User[]       @relation("ActivityAttendees")
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, scheduledAt])
+  @@index([assignedToId, scheduledAt])
+  @@index([leadId])
+  @@index([dealId])
+  @@index([contactId])
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+}
+
+// Declared lowest to highest: Postgres sorts an enum in declaration order,
+// so ordering by priority desc puts the most important first
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// A plain to-do with a deadline day — no time of day, unlike ScheduledActivity,
+// which is a booked slot. Same one-shared-table shape as ScheduledActivity, so
+// "what's on my plate" is a single query across leads, deals and contacts.
+model Task {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  title          String
+  description    String?
+  status         TaskStatus   @default(PENDING)
+  priority       TaskPriority @default(MEDIUM)
+  dueDate        DateTime     @db.Date
+
+  // who has to do it, and who wrote it down (often the same person)
+  assignedToId Int
+  createdById  Int
+
+  // the record this is about — at most one of these is set; none set = a
+  // general to-do not tied to a specific record
+  leadId    Int?
+  dealId    Int?
+  contactId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedTo   User         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdBy    User         @relation("TaskCreator", fields: [createdById], references: [id])
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, dueDate])
+  @@index([assignedToId, status, dueDate])
+  @@index([leadId])
+  @@index([dealId])
+  @@index([contactId])
+}

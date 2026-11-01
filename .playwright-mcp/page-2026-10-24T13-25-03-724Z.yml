@@ -1,0 +1,67 @@
+- generic [active] [ref=f30e1]:
+  - generic [ref=f30e37]:
+    - complementary [ref=f30e38]:
+      - generic [ref=f30e39]:
+        - generic [ref=f30e40]: Q
+        - generic [ref=f30e41]: QA Custom Fields Org
+      - navigation [ref=f30e42]:
+        - paragraph [ref=f30e43]: Workspace
+        - link [ref=f30e44] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f30e52] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f30e56] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f30e61]:
+        - paragraph [ref=f30e62]: Settings
+        - link [ref=f30e63] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f30e70] [cursor=pointer]:
+          - /url: /settings/roles
+        - link [ref=f30e75] [cursor=pointer]:
+          - /url: /settings/pipeline
+        - link [ref=f30e81] [cursor=pointer]:
+          - /url: /settings/custom-fields
+      - generic [ref=f30e86]:
+        - generic [ref=f30e87]: Q
+        - generic [ref=f30e88]:
+          - paragraph [ref=f30e89]: QA Tester
+          - paragraph [ref=f30e90]: qa-customfields@example.com
+        - button "Log out" [ref=f30e92]
+    - main [ref=f30e97]:
+      - generic [ref=f30e98]:
+        - generic [ref=f30e99]:
+          - heading "Leads" [level=1] [ref=f30e106]
+          - generic [ref=f30e107]: "0"
+          - button "New Lead" [ref=f30e108]
+        - generic [ref=f30e110]:
+          - button "All leads" [ref=f30e112]
+          - generic [ref=f30e117]:
+            - textbox "Search leads" [ref=f30e122]:
+              - /placeholder: Search
+            - button "Filter" [ref=f30e124]
+            - button "Sort" [ref=f30e128]
+        - generic [ref=f30e132]:
+          - table [ref=f30e133]:
+            - rowgroup [ref=f30e134]:
+              - row [ref=f30e135]:
+                - columnheader [ref=f30e136]:
+                  - checkbox "Select all" [ref=f30e137]
+                - columnheader "Name" [ref=f30e138]
+                - columnheader "Status" [ref=f30e143]
+                - columnheader "Email" [ref=f30e151]
+                - columnheader "Phone" [ref=f30e156]
+                - columnheader "Source" [ref=f30e160]
+                - columnheader "Assigned to" [ref=f30e165]
+                - columnheader "Created" [ref=f30e171]
+                - columnheader [ref=f30e175]
+            - rowgroup [ref=f30e176]:
+              - row [ref=f30e177]:
+                - cell [ref=f30e178]:
+                  - button "Add New" [ref=f30e179]
+          - generic [ref=f30e189]:
+            - paragraph [ref=f30e190]: Add your first lead
+            - paragraph [ref=f30e191]: Leads you create or are assigned to show up here.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f30e32] [cursor=pointer]
+  - alert [ref=f30e36]: Leads

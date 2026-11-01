@@ -1,0 +1,69 @@
+- generic [active] [ref=f32e1]:
+  - generic [ref=f32e2]:
+    - complementary [ref=f32e3]:
+      - generic [ref=f32e4]:
+        - generic [ref=f32e5]: Q
+        - generic [ref=f32e6]: QA Custom Fields Org
+      - navigation [ref=f32e7]:
+        - paragraph [ref=f32e8]: Workspace
+        - link [ref=f32e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f32e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f32e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f32e26]:
+        - paragraph [ref=f32e27]: Settings
+        - link [ref=f32e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f32e35] [cursor=pointer]:
+          - /url: /settings/roles
+        - link [ref=f32e40] [cursor=pointer]:
+          - /url: /settings/pipeline
+        - link [ref=f32e46] [cursor=pointer]:
+          - /url: /settings/custom-fields
+      - generic [ref=f32e51]:
+        - generic [ref=f32e52]: Q
+        - generic [ref=f32e53]:
+          - paragraph [ref=f32e54]: QA Tester
+          - paragraph [ref=f32e55]: qa-customfields@example.com
+        - button "Log out" [ref=f32e57]
+    - main [ref=f32e62]:
+      - generic [ref=f32e63]:
+        - generic [ref=f32e64]:
+          - heading "Leads" [level=1] [ref=f32e71]
+          - button "New Lead" [ref=f32e72]
+        - generic [ref=f32e74]:
+          - button "All leads" [ref=f32e76]
+          - generic [ref=f32e81]:
+            - textbox "Search leads" [ref=f32e86]:
+              - /placeholder: Search
+            - button "Filter" [ref=f32e88]
+            - button "Sort" [ref=f32e92]
+        - table [ref=f32e97]:
+          - rowgroup [ref=f32e98]:
+            - row [ref=f32e99]:
+              - columnheader [ref=f32e100]:
+                - checkbox "Select all" [ref=f32e101]
+              - columnheader "Name" [ref=f32e102]
+              - columnheader "Status" [ref=f32e107]
+              - columnheader "Email" [ref=f32e115]
+              - columnheader "Phone" [ref=f32e120]
+              - columnheader "Source" [ref=f32e124]
+              - columnheader "Assigned to" [ref=f32e129]
+              - columnheader "Created" [ref=f32e135]
+              - columnheader [ref=f32e139]
+          - rowgroup [ref=f32e140]:
+            - row [ref=f32e141]:
+              - cell [ref=f32e142]
+            - row [ref=f32e144]:
+              - cell [ref=f32e145]
+            - row [ref=f32e147]:
+              - cell [ref=f32e148]
+            - row [ref=f32e150]:
+              - cell [ref=f32e151]
+            - row [ref=f32e153]:
+              - cell [ref=f32e154]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f32e162] [cursor=pointer]
+  - alert [ref=f32e166]

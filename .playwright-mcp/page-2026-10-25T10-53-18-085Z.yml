@@ -1,0 +1,218 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e3]:
+    - navigation [ref=f2e4]:
+      - generic [ref=f2e5]:
+        - link [ref=f2e6] [cursor=pointer]:
+          - /url: /
+        - generic [ref=f2e10]:
+          - link "Product" [ref=f2e11] [cursor=pointer]:
+            - /url: "#product"
+          - generic [ref=f2e12]: "|"
+          - link "How it works" [ref=f2e13] [cursor=pointer]:
+            - /url: "#how-it-works"
+          - generic [ref=f2e14]: "|"
+          - link "Pricing" [ref=f2e15] [cursor=pointer]:
+            - /url: "#pricing"
+        - link "Go to your workspace" [ref=f2e17] [cursor=pointer]:
+          - /url: /leads
+    - banner [ref=f2e18]:
+      - generic [ref=f2e19]:
+        - heading "Run your pipeline, not your inbox" [level=1] [ref=f2e20]
+        - paragraph [ref=f2e21]: Flash keeps every lead, deal and conversation in one workspace your whole team actually uses — set up in minutes, shaped around how you sell.
+        - link "Go to your workspace" [ref=f2e23] [cursor=pointer]:
+          - /url: /leads
+      - generic [ref=f2e25]:
+        - generic [ref=f2e26]:
+          - generic [ref=f2e27]: Leads
+          - generic [ref=f2e34]: Deals
+          - generic [ref=f2e37]: Contacts
+          - generic [ref=f2e41]: Notes
+        - generic [ref=f2e44]:
+          - generic [ref=f2e45]:
+            - generic [ref=f2e46]: Leads
+            - generic [ref=f2e47]: New lead
+          - generic [ref=f2e48]:
+            - generic [ref=f2e49]:
+              - generic [ref=f2e50]: Acme Inc
+              - generic [ref=f2e51]: Qualified
+              - generic [ref=f2e52]:
+                - generic [ref=f2e53]: P
+                - text: Priya
+            - generic [ref=f2e54]:
+              - generic [ref=f2e55]: Globex Corp
+              - generic [ref=f2e56]: Proposal
+              - generic [ref=f2e57]:
+                - generic [ref=f2e58]: R
+                - text: Rahul
+            - generic [ref=f2e59]:
+              - generic [ref=f2e60]: Northwind Traders
+              - generic [ref=f2e61]: New
+              - generic [ref=f2e62]:
+                - generic [ref=f2e63]: P
+                - text: Priya
+            - generic [ref=f2e64]:
+              - generic [ref=f2e65]: Contoso
+              - generic [ref=f2e66]: Won
+              - generic [ref=f2e67]:
+                - generic [ref=f2e68]: M
+                - text: Meera
+    - generic [ref=f2e70]:
+      - paragraph [ref=f2e71]: Loved by fast-moving sales teams
+      - generic [ref=f2e72]:
+        - generic [ref=f2e73]: Acme Inc
+        - generic [ref=f2e74]: Globex Corp
+        - generic [ref=f2e75]: Northwind Traders
+        - generic [ref=f2e76]: Contoso
+        - generic [ref=f2e77]: Initech
+    - generic [ref=f2e78]:
+      - paragraph [ref=f2e79]: The problem
+      - heading "A CRM should fit your team, not the other way around" [level=2] [ref=f2e81]
+      - generic [ref=f2e505]:
+        - generic [ref=f2e506]:
+          - heading "Spreadsheets fall apart" [level=3] [ref=f2e507]
+          - paragraph [ref=f2e508]: A shared sheet works until two people edit the same row, a formula breaks, or someone leaves and takes the only copy with them.
+        - generic [ref=f2e509]:
+          - heading "Enterprise CRMs fight you" [level=3] [ref=f2e510]
+          - paragraph [ref=f2e511]: Built for thousand-seat sales orgs, with a setup process and a price tag to match — most of it sits unused by a small team.
+    - generic [ref=f2e513]:
+      - paragraph [ref=f2e514]: What you get
+      - heading "Everything a sales team needs, nothing it doesn't" [level=2] [ref=f2e516]
+      - generic [ref=f2e517]:
+        - generic [ref=f2e518]:
+          - heading "One pipeline, start to finish" [level=3] [ref=f2e519]
+          - paragraph [ref=f2e830]: Leads, deals and contacts live in the same workspace, so a lead becomes a deal without re-entering a thing.
+        - generic [ref=f2e831]:
+          - heading "Shaped around your process" [level=3] [ref=f2e832]
+          - paragraph [ref=f2e962]: Add the fields your team actually tracks, name your own pipeline stages and lead sources — not someone else's defaults.
+        - generic [ref=f2e963]:
+          - heading "Access that matches your org" [level=3] [ref=f2e964]
+          - paragraph [ref=f2e1387]: Roles decide exactly who can see, assign or delete what, down to whether an agent sees only their own leads.
+    - generic [ref=f2e1388]:
+      - paragraph [ref=f2e1389]: How it works
+      - heading "Set up in three steps, not three weeks" [level=2] [ref=f2e1391]
+      - generic [ref=f2e1392]:
+        - generic [ref=f2e1393]:
+          - generic [ref=f2e1394]:
+            - text: "01"
+            - heading "Shape the pipeline" [level=3] [ref=f2e1395]
+            - paragraph [ref=f2e1396]: Name your own pipeline stages and lead sources, and add the custom fields your team actually fills in.
+          - generic [ref=f2e1398]:
+            - generic [ref=f2e1399]:
+              - generic [ref=f2e1400]: New
+              - generic [ref=f2e1402]: Acme Inc
+            - generic [ref=f2e1404]:
+              - generic [ref=f2e1405]: Qualified
+              - generic [ref=f2e1407]:
+                - generic [ref=f2e1408]: Globex Corp
+                - generic [ref=f2e1409]: Initech
+            - generic [ref=f2e1410]:
+              - generic [ref=f2e1411]: Won
+              - generic [ref=f2e1413]: Contoso
+        - generic [ref=f2e1415]:
+          - generic [ref=f2e1416]:
+            - text: "02"
+            - heading "Bring in the team" [level=3] [ref=f2e1417]
+            - paragraph [ref=f2e1418]: Invite agents, assign a role to each one, and leads start flowing to the right person automatically.
+          - generic [ref=f2e1420]:
+            - generic [ref=f2e1421]:
+              - generic [ref=f2e1422]: P
+              - generic [ref=f2e1423]: Priya
+              - generic [ref=f2e1424]: Manager
+              - generic [ref=f2e1425]: Sees every lead
+            - generic [ref=f2e1426]:
+              - generic [ref=f2e1427]: R
+              - generic [ref=f2e1428]: Rahul
+              - generic [ref=f2e1429]: Agent
+              - generic [ref=f2e1430]: Sees only their own
+            - generic [ref=f2e1431]:
+              - generic [ref=f2e1432]: M
+              - generic [ref=f2e1433]: Meera
+              - generic [ref=f2e1434]: Agent
+              - generic [ref=f2e1435]: Sees only their own
+        - generic [ref=f2e1436]:
+          - generic [ref=f2e1437]:
+            - text: "03"
+            - heading "Work the deals" [level=3] [ref=f2e1438]
+            - paragraph [ref=f2e1439]: Move deals across the board, leave a note and @mention a teammate, and watch the timeline fill in on its own.
+          - generic [ref=f2e1442]:
+            - generic [ref=f2e1443]: P
+            - generic [ref=f2e1444]:
+              - paragraph [ref=f2e1445]:
+                - generic [ref=f2e1446]: Priya
+                - generic [ref=f2e1447]: 2m ago
+              - paragraph [ref=f2e1448]: Budget's approved. @Rahul can you send the contract today?
+    - generic [ref=f2e1450]:
+      - paragraph [ref=f2e1451]: What you get on day one
+      - heading "No ramp-up, just a pipeline that works" [level=2] [ref=f2e1453]
+      - list [ref=f2e1454]:
+        - listitem [ref=f2e1455]: A pipeline that matches how the team already sells, not a template to adapt to
+        - listitem [ref=f2e1458]: Every assignment, stage change and note recorded automatically on the record
+        - listitem [ref=f2e1461]: Roles that limit what each person can see, create or delete — no shared logins
+        - listitem [ref=f2e1464]: A single Notes feed showing everything tagged to you, across every lead, deal and contact
+    - generic [ref=f2e1468]:
+      - paragraph [ref=f2e1469]: Common questions
+      - heading "Answers, before you ask" [level=2] [ref=f2e1471]
+      - generic [ref=f2e1472]:
+        - generic [ref=f2e1473]:
+          - button "Can my whole team work in one workspace?" [expanded] [ref=f2e1474]
+          - paragraph [ref=f2e1477]: Yes. Invite your team, assign each person a role, and everyone works from the same leads, deals and contacts — no per-person silos.
+        - generic [ref=f2e1478]:
+          - button "Can I customize the fields and pipeline stages?" [ref=f2e1479]
+          - paragraph [ref=f2e1482]: Add custom fields to leads, deals or contacts, and set up your own pipeline stages and lead sources to match how your team actually sells.
+        - generic [ref=f2e1483]:
+          - button "How do permissions work?" [ref=f2e1484]
+          - paragraph [ref=f2e1487]: Every role is built from granular permissions — view, create, edit, delete and assign — scoped per area, so an agent can be limited to their own leads while a manager sees everything.
+        - generic [ref=f2e1488]:
+          - button "Can the team leave notes and loop each other in?" [ref=f2e1489]
+          - paragraph [ref=f2e1492]: Every record has a notes thread with @mentions, plus a dedicated Notes feed showing everything tagged to you or written by you.
+        - generic [ref=f2e1493]:
+          - button "Is there a history of what happened on a record?" [ref=f2e1494]
+          - paragraph [ref=f2e1497]: Yes — every stage change, assignment and update is logged automatically on that record's timeline.
+        - generic [ref=f2e1498]:
+          - button "What does it cost?" [ref=f2e1499]
+          - paragraph [ref=f2e1502]: ₹999 per user, per month, billed monthly. No setup fees, no minimum seats.
+    - generic [ref=f2e1504]:
+      - heading "Ready to run a tighter pipeline?" [level=2] [ref=f2e1505]
+      - paragraph [ref=f2e1506]: Set up a workspace for your team in a few minutes.
+      - link "Go to your workspace" [ref=f2e1507] [cursor=pointer]:
+        - /url: /leads
+    - contentinfo [ref=f2e1510]:
+      - generic [ref=f2e1511]:
+        - generic [ref=f2e1515]:
+          - generic [ref=f2e1518]:
+            - paragraph [ref=f2e1521]: Sitemap
+            - list [ref=f2e1522]:
+              - listitem [ref=f2e1523]:
+                - link "Product" [ref=f2e1524] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f2e1525]:
+                - link "Pricing" [ref=f2e1526] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f2e1527]:
+                - link "Notes" [ref=f2e1528] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=f2e1529]:
+            - paragraph [ref=f2e1532]: Help
+            - list [ref=f2e1533]:
+              - listitem [ref=f2e1534]:
+                - link "Documentation" [ref=f2e1535] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f2e1536]:
+                - link "Release notes" [ref=f2e1537] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=f2e1538]:
+            - paragraph [ref=f2e1541]: Legal
+            - list [ref=f2e1542]:
+              - listitem [ref=f2e1543]:
+                - link "Privacy policy" [ref=f2e1544] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f2e1545]:
+                - link "Terms of service" [ref=f2e1546] [cursor=pointer]:
+                  - /url: "#"
+          - paragraph [ref=f2e1550]: Connect
+        - generic [ref=f2e1565]:
+          - generic [ref=f2e1566]: © 2026 — Flash
+          - link "Log in" [ref=f2e1567] [cursor=pointer]:
+            - /url: /login
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f2e1573] [cursor=pointer]

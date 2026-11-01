@@ -1,0 +1,269 @@
+"use client";
+
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { IconAddressBook, IconArrowDown, IconArrowUp } from "@tabler/icons-react";
+
+import { api, errorMessage } from "@/lib/api/client";
+import { showToast } from "@/components/Toast";
+import {
+    AssignMenu,
+    BulkBar,
+    ConfirmDeleteModal,
+    FilterBar,
+    FilterChip,
+    ListHeader,
+    SearchBox,
+    SortMenu,
+} from "@/components/ListPage";
+import {
+    ActiveFilterChips,
+    FilterPanelButton,
+    OptionsMenuButton,
+    createAssignedToField,
+    createCreatedRangeField,
+    useTableColumns,
+} from "@/components/FilterPanel";
+import {
+    refreshContacts,
+    type Agent,
+    type Contact,
+    type ContactFilters,
+    type Permissions,
+} from "./shared";
+import ContactsTable, { CONTACT_COLUMNS, withContactEdits } from "./ContactsTable";
+import ContactPanel from "./ContactPanel";
+import NewContactDialog from "./NewContactDialog";
+import { useListQuery } from "../shared/useListQuery";
+import { createCustomColumn, createCustomFilterField, useCustomFields } from "../shared/customFields";
+import { usePanelEnter } from "../shared/usePanelEnter";
+
+const PAGE_SIZE = 50;
+
+const SORT_FIELDS: { field: ContactFilters["sortBy"]; label: string }[] = [
+    { field: "name", label: "Name" },
+    { field: "email", label: "Email" },
+    { field: "createdAt", label: "Created" },
+    { field: "updatedAt", label: "Last update" },
+];
+
+type BulkAction =
+    | { action: "assign"; assignedToId: number | null }
+    | { action: "delete" };
+
+export default function ContactsView({ can, meId }: { can: Permissions; meId: number }) {
+    const queryClient = useQueryClient();
+    const enterRef = usePanelEnter<HTMLDivElement>();
+
+    const searchParams = useSearchParams();
+    // Lets a link elsewhere (e.g. the Notes feed) land straight on a contact's panel
+    const [openContactId, setOpenContactId] = useState<number | null>(() => {
+        const param = searchParams.get("open");
+        return param ? Number(param) : null;
+    });
+    const [creating, setCreating] = useState(false);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+    const {
+        query: contactsQuery,
+        items: contacts,
+        total,
+        filters,
+        updateFilters,
+        searchInput,
+        setSearchInput,
+        selected,
+        setSelected,
+    } = useListQuery<Contact, ContactFilters>(
+        "contacts",
+        "/contacts",
+        { sortBy: "createdAt", sortOrder: "desc" },
+        { pageSize: PAGE_SIZE, onSearch: (trimmed) => ({ search: trimmed || undefined }) },
+    );
+
+    // For the assignee filter and the assign menus
+    const agents = useQuery({
+        queryKey: ["agents"],
+        queryFn: () => api.get<{ data: Agent[] }>("/agents").then((res) => res.data.data),
+        enabled: can.seeAgents,
+    });
+
+    const customFieldsQuery = useCustomFields("contact");
+    const customFields = customFieldsQuery.data ?? [];
+
+    const bulk = useMutation({
+        mutationFn: (body: BulkAction) => api.patch("/contacts/bulkUpdate", { ...body, contactIds: [...selected] }),
+        onSuccess: () => {
+            setSelected(new Set());
+            setConfirmingDelete(false);
+            refreshContacts(queryClient);
+        },
+        onError: (error) => showToast(errorMessage(error)),
+    });
+
+    // Inline edits from the table — a single-row PUT, same endpoint the
+    // contact panel itself uses. Assignment goes through its own endpoint so
+    // it's logged to the timeline, just like everywhere else.
+    const updateContact = useMutation({
+        mutationFn: ({ id, changes }: { id: number; changes: Record<string, unknown> }) => api.put(`/contacts/${id}`, changes),
+        onSuccess: () => refreshContacts(queryClient),
+        onError: (error) => showToast(errorMessage(error)),
+    });
+
+    const assignContact = useMutation({
+        mutationFn: ({ id, assignedToId }: { id: number; assignedToId: number | null }) =>
+            api.post(`/contacts/${id}/assign`, { assignedToId }),
+        onSuccess: () => refreshContacts(queryClient),
+        onError: (error) => showToast(errorMessage(error)),
+    });
+
+    const isDefaultSort = filters.sortBy === "createdAt" && filters.sortOrder === "desc";
+
+    // Contacts has no built-in field of its own beyond what every entity shares.
+    const FILTER_FIELDS = [
+        createAssignedToField<ContactFilters>({
+            get: (f) => f.assignedTo,
+            set: (value) => ({ assignedTo: value }),
+            agents: can.seeAgents ? agents.data : undefined,
+        }),
+        createCreatedRangeField<ContactFilters>(),
+        ...customFields
+            .filter((field) => field.showInFilter)
+            .map((field) => createCustomFilterField<ContactFilters>(field, { agents: can.seeAgents ? agents.data : undefined })),
+    ];
+
+    const hasFilterBar = FILTER_FIELDS.some((field) => field.isActive(filters)) || !isDefaultSort;
+
+    const contactColumns = [
+        ...withContactEdits(CONTACT_COLUMNS, {
+            canUpdate: can.update,
+            canAssign: can.assign,
+            agents: can.seeAgents ? agents.data : undefined,
+            onUpdate: (contact, changes) => updateContact.mutate({ id: contact.id, changes }),
+            onAssign: (contact, assignedToId) => assignContact.mutate({ id: contact.id, assignedToId }),
+        }),
+        ...customFields
+            .filter((field) => field.showInList)
+            .map((field) => createCustomColumn<Contact>(field, (contact) => contact.customFields, { agents: can.seeAgents ? agents.data : undefined })),
+    ];
+    const { columnPrefs, visibleColumns, getWidth, resize, reorderVisible } = useTableColumns("contacts-columns", contactColumns);
+
+    if (creating) {
+        return (
+            <NewContactDialog
+                open
+                canAssign={can.assign}
+                agents={agents.data}
+                onClose={() => setCreating(false)}
+                onCreated={(contact) => {
+                    setCreating(false);
+                    refreshContacts(queryClient);
+                    setOpenContactId(contact.id);
+                }}
+            />
+        );
+    }
+
+    if (openContactId !== null) {
+        return (
+            <ContactPanel
+                // key: switching contacts starts a fresh panel (no leftover edit state)
+                key={openContactId}
+                contactId={openContactId}
+                can={can}
+                agents={agents.data}
+                meId={meId}
+                onClose={() => setOpenContactId(null)}
+            />
+        );
+    }
+
+    return (
+        <div ref={enterRef} className="flex h-full flex-col">
+            <ListHeader
+                icon={IconAddressBook}
+                title="Contacts"
+                count={total}
+                createLabel="New Contact"
+                onCreate={can.create ? () => setCreating(true) : undefined}
+            />
+
+            {/* Search / filter / sort */}
+            <div className="flex h-10 shrink-0 items-center justify-end gap-1 border-b border-line-light px-2 font-medium text-muted">
+                <SearchBox value={searchInput} ariaLabel="Search contacts" onChange={setSearchInput} />
+
+                <FilterPanelButton
+                    entity="contact"
+                    filters={filters}
+                    onChange={updateFilters}
+                    fields={FILTER_FIELDS}
+                />
+
+                <SortMenu fields={SORT_FIELDS} sortBy={filters.sortBy} sortOrder={filters.sortOrder} onChange={updateFilters} />
+
+                <OptionsMenuButton columns={contactColumns} columnPrefs={columnPrefs} canManageCustomFields={can.manageCustomFields} />
+            </div>
+
+            {/* Active filters and sort, as removable chips */}
+            <FilterBar
+                show={hasFilterBar}
+                onReset={() => updateFilters({
+                    ...FILTER_FIELDS.reduce((acc, field) => ({ ...acc, ...field.clear(filters) }), {}),
+                    sortBy: "createdAt",
+                    sortOrder: "desc",
+                })}
+            >
+                {!isDefaultSort && (
+                    <FilterChip onRemove={() => updateFilters({ sortBy: "createdAt", sortOrder: "desc" })}>
+                        {filters.sortOrder === "asc" ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />}
+                        {SORT_FIELDS.find((s) => s.field === filters.sortBy)?.label}
+                    </FilterChip>
+                )}
+                <ActiveFilterChips fields={FILTER_FIELDS} filters={filters} onChange={updateFilters} />
+            </FilterBar>
+
+            <div className="relative min-h-0 flex-1 overflow-auto">
+                <ContactsTable
+                    contacts={contacts}
+                    columns={visibleColumns}
+                    tableColumns={{ getWidth, resize, reorderVisible }}
+                    loading={contactsQuery.isPending}
+                    failed={contactsQuery.isError}
+                    filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
+                    hasMore={contactsQuery.hasNextPage}
+                    loadingMore={contactsQuery.isFetchingNextPage}
+                    onLoadMore={contactsQuery.fetchNextPage}
+                    selectable={can.update || can.delete}
+                    selected={selected}
+                    onSelect={setSelected}
+                    onOpen={setOpenContactId}
+                    onCreate={can.create ? () => setCreating(true) : undefined}
+                />
+            </div>
+
+            {/* Bulk actions, Twenty's floating bar */}
+            <BulkBar
+                count={selected.size}
+                onClear={() => setSelected(new Set())}
+                onDelete={can.delete ? () => setConfirmingDelete(true) : undefined}
+            >
+                {can.assign && agents.data && (
+                    <AssignMenu
+                        agents={agents.data}
+                        onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                    />
+                )}
+            </BulkBar>
+
+            <ConfirmDeleteModal
+                open={confirmingDelete}
+                count={selected.size}
+                noun="contact"
+                pending={bulk.isPending}
+                onCancel={() => setConfirmingDelete(false)}
+                onConfirm={() => bulk.mutate({ action: "delete" })}
+            />
+        </div>
+    );
+}

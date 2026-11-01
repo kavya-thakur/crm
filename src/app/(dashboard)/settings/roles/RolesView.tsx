@@ -1,0 +1,352 @@
+"use client";
+
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { IconChevronRight, IconLoader2, IconPlus, IconShieldLock, IconUsers } from "@tabler/icons-react";
+
+import { api, errorMessage } from "@/lib/api/client";
+import { SidePanel } from "@/components/SidePanel";
+
+interface Permission {
+    id: number;
+    name: string;
+    description: string | null;
+}
+
+interface Role {
+    id: number;
+    name: string;
+    permissions: { permission: Permission }[];
+    _count: { users: number };
+}
+
+interface Me {
+    roleId: number;
+    permissions: string[];
+}
+
+interface Can {
+    create: boolean;
+    update: boolean;
+    delete: boolean;
+}
+
+// The permission grid in the role editor: one row per area, one column per action
+const AREAS = [
+    { key: "lead", label: "Leads" },
+    { key: "deal", label: "Deals" },
+    { key: "user", label: "Members" },
+    { key: "role", label: "Roles" },
+];
+
+const ACTIONS = [
+    { key: "read", label: "View" },
+    { key: "create", label: "Create" },
+    { key: "update", label: "Edit" },
+    { key: "delete", label: "Delete" },
+];
+
+export default function RolesView({ me, can }: { me: Me; can: Can }) {
+    // null = dialog closed, "new" = creating, a role = editing it
+    const [editing, setEditing] = useState<Role | "new" | null>(null);
+
+    const roles = useQuery({
+        queryKey: ["roles"],
+        queryFn: () => api.get<{ data: Role[] }>("/roles").then((res) => res.data.data),
+    });
+
+    const permissions = useQuery({
+        queryKey: ["permissions"],
+        queryFn: () => api.get<{ data: Permission[] }>("/permissions").then((res) => res.data.data),
+    });
+
+    return (
+        <div className="flex h-full flex-col">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
+                <IconShieldLock size={16} className="text-[#838383]" />
+                <h1 className="font-semibold">Roles</h1>
+                {roles.data && <span className="text-faint">{roles.data.length}</span>}
+
+                {can.create && (
+                    <button
+                        onClick={() => setEditing("new")}
+                        className="ml-auto flex h-6 items-center gap-1 rounded-lg bg-accent px-2 font-medium text-on-accent hover:bg-accent-hover"
+                    >
+                        <IconPlus size={14} />
+                        New role
+                    </button>
+                )}
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="mx-auto max-w-3xl px-6 py-8">
+                    <h2 className="text-lg font-semibold">Roles</h2>
+                    <p className="mt-1 text-muted">
+                        A role decides what its members can do. Everyone with a role gets all of its permissions.
+                    </p>
+
+                    {roles.isPending && <p className="mt-6 text-faint">Loading roles...</p>}
+                    {roles.isError && <p className="mt-6 text-danger">{errorMessage(roles.error)}</p>}
+
+                    {roles.data && (
+                        <ul className="mt-6 overflow-hidden rounded-lg border border-line">
+                            {roles.data.map((role) => (
+                                <li key={role.id} className="border-b border-line-light last:border-b-0">
+                                    <button
+                                        onClick={() => setEditing(role)}
+                                        className="flex h-12 w-full items-center gap-3 px-3 text-left hover:bg-paper"
+                                    >
+                                        <span className="flex size-6 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
+                                            <IconShieldLock size={14} />
+                                        </span>
+                                        <span className="font-medium">{role.name}</span>
+                                        {role.id === me.roleId && (
+                                            <span className="rounded bg-app px-1.5 text-sm text-muted">Your role</span>
+                                        )}
+
+                                        <span className="ml-auto text-faint">
+                                            {role.permissions.length} {role.permissions.length === 1 ? "permission" : "permissions"}
+                                        </span>
+                                        <span className="flex w-14 items-center justify-end gap-1 text-muted" title="Members with this role">
+                                            <IconUsers size={14} />
+                                            {role._count.users}
+                                        </span>
+                                        <IconChevronRight size={16} className="text-light" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+
+            <SidePanel wide open={editing !== null} onClose={() => setEditing(null)}>
+                {editing && permissions.data ? (
+                    <RoleForm
+                        role={editing === "new" ? null : editing}
+                        allPermissions={permissions.data}
+                        me={me}
+                        can={can}
+                        onDone={() => setEditing(null)}
+                    />
+                ) : (
+                    <p className="p-6 text-faint">Loading...</p>
+                )}
+            </SidePanel>
+        </div>
+    );
+}
+
+interface RoleFormProps {
+    role: Role | null;
+    allPermissions: Permission[];
+    me: Me;
+    can: Can;
+    onDone: () => void;
+}
+
+// Create (role = null) or edit a role: its name and its permission grid
+function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
+    const queryClient = useQueryClient();
+
+    const originalIds = new Set(role?.permissions.map(({ permission }) => permission.id) ?? []);
+    const [name, setName] = useState(role?.name ?? "");
+    const [selected, setSelected] = useState(originalIds);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+    // The same rules the API enforces, so we can explain them instead of failing on save
+    const isOwnRole = role?.id === me.roleId;
+    const isStronger = role?.permissions.some(({ permission }) => !me.permissions.includes(permission.name)) ?? false;
+    const canEdit = role ? can.update && !isStronger : can.create;
+    const canEditPermissions = canEdit && !isOwnRole;
+
+    const nameChanged = name.trim() !== (role?.name ?? "");
+    const permissionsChanged = selected.size !== originalIds.size || [...selected].some((id) => !originalIds.has(id));
+
+    function done() {
+        queryClient.invalidateQueries({ queryKey: ["roles"] });
+        // member lists show role names, so refresh those too
+        queryClient.invalidateQueries({ queryKey: ["agents"] });
+        onDone();
+    }
+
+    const save = useMutation({
+        mutationFn: async () => {
+            if (!role) {
+                await api.post("/roles", { name, permissionIds: [...selected] });
+                return;
+            }
+
+            // only send what changed: sending permissions for your own role is refused even if unchanged
+            await api.patch(`/roles/${role.id}`, {
+                ...(nameChanged && { name }),
+                ...(permissionsChanged && { permissionIds: [...selected] }),
+            });
+        },
+        onSuccess: done,
+    });
+
+    const remove = useMutation({
+        mutationFn: () => api.delete(`/roles/${role?.id}`),
+        onSuccess: done,
+    });
+
+    function toggle(id: number) {
+        const next = new Set(selected);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelected(next);
+    }
+
+    // One checkbox of the grid. A plain function (not a component) because it only returns JSX.
+    function permissionCheckbox(permissionName: string) {
+        const permission = allPermissions.find((p) => p.name === permissionName);
+        if (!permission) return null;
+
+        const canGrant = me.permissions.includes(permissionName);
+
+        return (
+            <input
+                type="checkbox"
+                aria-label={permission.description ?? permissionName}
+                title={canGrant ? permission.description ?? undefined : "You can only grant permissions you have yourself"}
+                checked={selected.has(permission.id)}
+                disabled={!canEditPermissions || !canGrant}
+                onChange={() => toggle(permission.id)}
+                className="size-3.5 accent-accent disabled:opacity-40"
+            />
+        );
+    }
+
+    return (
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                if (role && !nameChanged && !permissionsChanged) return onDone();
+                save.mutate();
+            }}
+        >
+            <h2 className="border-b border-line-light px-5 py-4 text-lg font-semibold">
+                {role ? role.name : "New role"}
+            </h2>
+
+            <div className="space-y-5 px-5 py-4">
+                {isStronger && (
+                    <p className="rounded-lg bg-app px-3 py-2 text-muted">
+                        This role has permissions you don&apos;t have, so you can&apos;t change it.
+                    </p>
+                )}
+                {isOwnRole && !isStronger && (
+                    <p className="rounded-lg bg-app px-3 py-2 text-muted">
+                        This is your own role. You can rename it, but not change its permissions.
+                    </p>
+                )}
+
+                <div>
+                    <label htmlFor="role-name" className="mb-1 block text-sm font-medium text-muted">
+                        Name
+                    </label>
+                    <input
+                        id="role-name"
+                        autoFocus={!role}
+                        required
+                        maxLength={100}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        disabled={!canEdit}
+                        placeholder="Sales agent"
+                        className="h-8 w-full rounded-lg border border-line px-2 outline-none placeholder:text-light focus:border-accent focus:ring-3 focus:ring-accent-soft disabled:bg-paper disabled:text-muted"
+                    />
+                </div>
+
+                <div>
+                    <p className="mb-1 text-sm font-medium text-muted">Permissions</p>
+                    <table className="w-full">
+                        <thead>
+                            <tr className="text-sm text-faint">
+                                <th className="py-2 text-left font-medium">Area</th>
+                                {ACTIONS.map((action) => (
+                                    <th key={action.key} className="w-20 font-medium">
+                                        {action.label}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {AREAS.map((area) => (
+                                <tr key={area.key} className="border-t border-line-light">
+                                    <td className="py-2">{area.label}</td>
+                                    {ACTIONS.map((action) => (
+                                        <td key={action.key} className="text-center">
+                                            {permissionCheckbox(`${area.key}:${action.key}`)}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <label className="mt-3 flex items-start gap-2 rounded-lg border border-line-light p-3">
+                        <span className="pt-0.5">{permissionCheckbox("lead:all")}</span>
+                        <span>
+                            <span className="font-medium">See every lead</span>
+                            <span className="block text-faint">
+                                Without this, members only see and work on leads assigned to them. Needed to assign leads.
+                            </span>
+                        </span>
+                    </label>
+
+                    <label className="mt-2 flex items-start gap-2 rounded-lg border border-line-light p-3">
+                        <span className="pt-0.5">{permissionCheckbox("pipeline:manage")}</span>
+                        <span>
+                            <span className="font-medium">Manage pipeline</span>
+                            <span className="block text-faint">
+                                Create, rename, reorder and delete the stages of the deals board.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
+                {(save.isError || remove.isError) && (
+                    <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-danger">
+                        {errorMessage(save.error ?? remove.error)}
+                    </p>
+                )}
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-line-light px-5 py-3">
+                {role && can.delete && !isStronger && (
+                    <button
+                        type="button"
+                        // a role with members can't be deleted (they'd be left without one)
+                        disabled={role._count.users > 0 || remove.isPending}
+                        title={role._count.users > 0 ? `Move its ${role._count.users} member(s) to another role first` : undefined}
+                        onClick={() => (confirmingDelete ? remove.mutate() : setConfirmingDelete(true))}
+                        className="h-8 rounded-lg px-3 font-medium text-danger hover:bg-danger-soft disabled:text-light disabled:hover:bg-transparent"
+                    >
+                        {confirmingDelete ? "Click again to delete" : "Delete role"}
+                    </button>
+                )}
+
+                <button
+                    type="button"
+                    onClick={onDone}
+                    className="ml-auto h-8 rounded-lg border border-fill bg-black/2 px-3 font-medium text-muted hover:bg-app"
+                >
+                    {canEdit ? "Cancel" : "Close"}
+                </button>
+
+                {canEdit && (
+                    <button
+                        type="submit"
+                        disabled={save.isPending}
+                        className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
+                    >
+                        {save.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                        {role ? "Save" : "Create role"}
+                    </button>
+                )}
+            </div>
+        </form>
+    );
+}

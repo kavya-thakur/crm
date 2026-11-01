@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Twenty's light theme (github.com/twentyhq/twenty, packages/twenty-ui).
+   Pages use these names (bg-surface, text-muted, border-line, ...), never raw hex,
+   so a colour change happens here only */
+@theme {
+  /* backgrounds */
+  --color-app: #f1f1f1; /* behind the sidebar and page card */
+  --color-surface: #ffffff; /* page card, panels, inputs */
+  --color-paper: #fcfcfc; /* headers, subtle hover */
+  --color-fill: rgb(0 0 0 / 0.04); /* hover on buttons and menu items */
+  --color-fill-strong: rgb(0 0 0 / 0.08); /* pressed / open */
+
+  /* text */
+  --color-ink: #333333;
+  --color-muted: #666666;
+  --color-faint: #999999;
+  --color-light: #b3b3b3; /* placeholders, empty values */
+
+  /* borders */
+  --color-line: #ebebeb;
+  --color-line-light: #f1f1f1; /* table grid */
+  --color-line-strong: #d6d6d6;
+
+  /* blue accent */
+  --color-accent: #3e63dd;
+  --color-accent-hover: #3358d4;
+  --color-accent-soft: #edf2fe;
+  --color-accent-faint: #f7f9ff; /* selected rows */
+  --color-on-accent: #ffffff;
+
+  /* red */
+  --color-danger: #e5484d;
+  --color-danger-soft: #feebec;
+
+  /* Twenty's app runs at 13px */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --shadow-light: 0 2px 4px rgb(0 0 0 / 0.04), 0 0 4px rgb(0 0 0 / 0.08);
+  --shadow-strong: 2px 4px 16px rgb(0 0 0 / 0.16), 0 2px 4px rgb(0 0 0 / 0.08);
+  --shadow-heavy: 0 0 8px rgb(0 0 0 / 0.16), 0 8px 64px -16px rgb(0 0 0 / 0.48), 0 24px 56px -16px rgb(0 0 0 / 0.08);
 }
 
+/* Fonts come from next/font in layout.tsx */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-host-grotesk);
+  --font-mono: var(--font-azeret-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-app);
+  color: var(--color-ink);
+  font-family: var(--font-inter), sans-serif;
+  font-size: 13px;
 }

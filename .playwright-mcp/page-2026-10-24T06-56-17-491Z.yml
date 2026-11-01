@@ -1,0 +1,94 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - complementary [ref=f3e3]:
+      - generic [ref=f3e4]:
+        - generic [ref=f3e5]: Q
+        - generic [ref=f3e6]: QA Test Org Contacts
+      - navigation [ref=f3e7]:
+        - paragraph [ref=f3e8]: Workspace
+        - link [ref=f3e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f3e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f3e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f3e26]:
+        - paragraph [ref=f3e27]: Settings
+        - link [ref=f3e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f3e35] [cursor=pointer]:
+          - /url: /settings/roles
+      - generic [ref=f3e40]:
+        - generic [ref=f3e41]: Q
+        - generic [ref=f3e42]:
+          - paragraph [ref=f3e43]: QA Tester
+          - paragraph [ref=f3e44]: qa-contacts-test@example.com
+        - button "Log out" [ref=f3e46]
+    - main [ref=f3e51]:
+      - generic [ref=f3e52]:
+        - generic [ref=f3e53]:
+          - heading "Contacts" [level=1] [ref=f3e57]
+          - generic [ref=f3e139]: "0"
+          - button "New Contact" [ref=f3e58]
+        - generic [ref=f3e60]:
+          - textbox "Search contacts" [ref=f3e65]:
+            - /placeholder: Search
+          - button "Filter" [ref=f3e67]
+          - button "Sort" [ref=f3e71]
+        - generic [ref=f3e75]:
+          - table [ref=f3e76]:
+            - rowgroup [ref=f3e77]:
+              - row [ref=f3e78]:
+                - columnheader [ref=f3e79]:
+                  - checkbox "Select all" [ref=f3e80]
+                - columnheader "Name" [ref=f3e81]
+                - columnheader "Email" [ref=f3e86]
+                - columnheader "Phone" [ref=f3e91]
+                - columnheader "Job title" [ref=f3e95]
+                - columnheader "Assigned to" [ref=f3e101]
+                - columnheader "Created" [ref=f3e107]
+                - columnheader [ref=f3e111]
+            - rowgroup [ref=f3e112]:
+              - row [ref=f3e140]:
+                - cell [ref=f3e141]:
+                  - button "Add New" [ref=f3e142]
+          - generic [ref=f3e149]:
+            - paragraph [ref=f3e150]: Add your first contact
+            - paragraph [ref=f3e151]: Contacts you create or are assigned to show up here.
+        - dialog [ref=f3e152]:
+          - generic [ref=f3e153]:
+            - heading "New contact" [level=2] [ref=f3e154]
+            - generic [ref=f3e155]:
+              - generic [ref=f3e156]:
+                - generic [ref=f3e157]: Name *
+                - textbox "Name *" [active] [ref=f3e158]:
+                  - /placeholder: Jane Cooper
+              - generic [ref=f3e159]:
+                - generic [ref=f3e160]:
+                  - generic [ref=f3e161]: Email
+                  - textbox "Email" [ref=f3e162]:
+                    - /placeholder: jane@acme.com
+                - generic [ref=f3e163]:
+                  - generic [ref=f3e164]: Phone
+                  - textbox "Phone" [ref=f3e165]:
+                    - /placeholder: +91 555 0100
+              - generic [ref=f3e166]:
+                - generic [ref=f3e167]: Job title
+                - textbox "Job title" [ref=f3e168]:
+                  - /placeholder: Head of Sales
+              - generic [ref=f3e169]:
+                - generic [ref=f3e170]: Description
+                - textbox "Description" [ref=f3e171]:
+                  - /placeholder: Notes about this contact...
+              - generic [ref=f3e172]:
+                - generic [ref=f3e173]: Assign to
+                - combobox "Assign to" [ref=f3e174]:
+                  - option "Me" [selected]
+                  - option "Unassigned"
+                  - option "QA Tester"
+            - generic [ref=f3e175]:
+              - button "Cancel" [ref=f3e176]
+              - button "Create contact" [ref=f3e177]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f3e134] [cursor=pointer]
+  - alert [ref=f3e138]

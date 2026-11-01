@@ -1,0 +1,85 @@
+- generic [ref=f31e1]:
+  - generic [ref=f31e2]:
+    - complementary [ref=f31e3]:
+      - generic [ref=f31e4]:
+        - generic [ref=f31e5]: Q
+        - generic [ref=f31e6]: QA Custom Fields Org
+      - navigation [ref=f31e7]:
+        - paragraph [ref=f31e8]: Workspace
+        - link [ref=f31e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f31e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f31e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f31e26]:
+        - paragraph [ref=f31e27]: Settings
+        - link [ref=f31e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f31e35] [cursor=pointer]:
+          - /url: /settings/roles
+        - link [ref=f31e40] [cursor=pointer]:
+          - /url: /settings/pipeline
+        - link [ref=f31e46] [cursor=pointer]:
+          - /url: /settings/custom-fields
+      - generic [ref=f31e51]:
+        - generic [ref=f31e52]: Q
+        - generic [ref=f31e53]:
+          - paragraph [ref=f31e54]: QA Tester
+          - paragraph [ref=f31e55]: qa-customfields@example.com
+        - button "Log out" [ref=f31e57]
+    - main [ref=f31e62]:
+      - generic [ref=f31e63]:
+        - generic [ref=f31e64]:
+          - heading "Custom Fields" [level=1] [ref=f31e68]
+          - generic [ref=f31e86]: "0"
+          - button "New field" [ref=f31e69]
+        - generic [ref=f31e72]:
+          - heading "Lead fields" [level=2] [ref=f31e73]
+          - paragraph [ref=f31e74]: Extra fields for leads. Each one can show on the New Lead form, as a table column, and as a filter.
+          - list [ref=f31e87]:
+            - paragraph [ref=f31e88]: No custom fields yet
+        - dialog [ref=f31e89]:
+          - generic [ref=f31e90]:
+            - heading "New field" [level=2] [ref=f31e91]
+            - generic [ref=f31e92]:
+              - generic [ref=f31e93]:
+                - generic [ref=f31e94]: Label
+                - textbox "Label" [ref=f31e95]:
+                  - /placeholder: Budget range
+                  - text: Budget Range
+              - generic [ref=f31e96]:
+                - generic [ref=f31e97]: Key
+                - textbox "Key" [ref=f31e98]:
+                  - /placeholder: budget_range
+                  - text: budget_range
+                - paragraph [ref=f31e99]: How this field is stored internally. Can't be changed later.
+              - generic [ref=f31e100]:
+                - generic [ref=f31e101]: Type
+                - combobox "Type" [ref=f31e102]:
+                  - option "Text"
+                  - option "Number"
+                  - option "Date"
+                  - option "Select" [selected]
+                  - option "Yes / No"
+              - generic [ref=f31e113]:
+                - generic [ref=f31e114]: Options (one per line)
+                - textbox "Options (one per line)" [ref=f31e115]:
+                  - /placeholder: "Small\nMedium\nLarge"
+                  - text: Small Medium Large
+              - generic [ref=f31e103]:
+                - generic [ref=f31e104]:
+                  - checkbox "Required" [ref=f31e105]
+                  - text: Required
+                - generic [ref=f31e106]:
+                  - checkbox "Show in filter" [checked] [ref=f31e107]
+                  - text: Show in filter
+                - generic [ref=f31e108]:
+                  - checkbox "Show in list" [checked] [active] [ref=f31e109]
+                  - text: Show in list
+            - generic [ref=f31e110]:
+              - button "Cancel" [ref=f31e111]
+              - button "Create field" [ref=f31e112]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f31e81] [cursor=pointer]
+  - alert [ref=f31e85]

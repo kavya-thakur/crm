@@ -1,0 +1,64 @@
+- generic [active] [ref=f8e1]:
+  - generic [ref=f8e2]:
+    - complementary [ref=f8e3]:
+      - generic [ref=f8e4]:
+        - generic [ref=f8e5]: Q
+        - generic [ref=f8e6]: QA Convert Test Org
+      - navigation [ref=f8e7]:
+        - paragraph [ref=f8e8]: Workspace
+        - link [ref=f8e9] [cursor=pointer]:
+          - /url: /leads
+        - link [ref=f8e17] [cursor=pointer]:
+          - /url: /deals
+        - link [ref=f8e21] [cursor=pointer]:
+          - /url: /contacts
+      - navigation [ref=f8e26]:
+        - paragraph [ref=f8e27]: Settings
+        - link [ref=f8e28] [cursor=pointer]:
+          - /url: /settings/members
+        - link [ref=f8e35] [cursor=pointer]:
+          - /url: /settings/roles
+      - generic [ref=f8e40]:
+        - generic [ref=f8e41]: Q
+        - generic [ref=f8e42]:
+          - paragraph [ref=f8e43]: QA Tester
+          - paragraph [ref=f8e44]: qa-convert-test@example.com
+        - button "Log out" [ref=f8e46]
+    - main [ref=f8e51]:
+      - generic [ref=f8e52]:
+        - generic [ref=f8e53]:
+          - heading "Deals" [level=1] [ref=f8e56]
+          - button "New Deal" [ref=f8e57]
+        - generic [ref=f8e59]:
+          - button "All deals" [ref=f8e61]
+          - generic [ref=f8e66]:
+            - textbox "Search deals" [ref=f8e71]:
+              - /placeholder: Search
+            - button "Filter" [ref=f8e73]
+            - button "Sort" [ref=f8e77]
+        - table [ref=f8e82]:
+          - rowgroup [ref=f8e83]:
+            - row [ref=f8e84]:
+              - columnheader [ref=f8e85]:
+                - checkbox "Select all deals" [ref=f8e86]
+              - columnheader "Deal" [ref=f8e87]
+              - columnheader "Amount" [ref=f8e95]
+              - columnheader "Pipeline stage" [ref=f8e99]
+              - columnheader "Lead" [ref=f8e107]
+              - columnheader "Assigned to" [ref=f8e112]
+              - columnheader "Probability" [ref=f8e118]
+              - columnheader "Expected close" [ref=f8e126]
+              - columnheader [ref=f8e130]
+          - rowgroup [ref=f8e131]:
+            - row [ref=f8e132]:
+              - cell [ref=f8e133]
+            - row [ref=f8e135]:
+              - cell [ref=f8e136]
+            - row [ref=f8e138]:
+              - cell [ref=f8e139]
+            - row [ref=f8e141]:
+              - cell [ref=f8e142]
+            - row [ref=f8e144]:
+              - cell [ref=f8e145]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f8e153] [cursor=pointer]

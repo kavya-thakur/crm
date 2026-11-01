@@ -1,0 +1,32 @@
+- generic [active] [ref=f24e1]:
+  - main [ref=f24e2]:
+    - generic [ref=f24e3]:
+      - heading "Create your workspace" [level=1] [ref=f24e4]
+      - paragraph [ref=f24e5]: Set up your organization and admin account
+      - generic [ref=f24e6]:
+        - generic [ref=f24e7]:
+          - generic [ref=f24e8]: Organization name
+          - textbox "Organization name" [ref=f24e9]:
+            - /placeholder: Acme Inc.
+        - generic [ref=f24e10]:
+          - generic [ref=f24e11]: Your name
+          - textbox "Your name" [ref=f24e12]:
+            - /placeholder: Jane Doe
+        - generic [ref=f24e13]:
+          - generic [ref=f24e14]: Email
+          - textbox "Email" [ref=f24e15]:
+            - /placeholder: you@company.com
+        - generic [ref=f24e16]:
+          - generic [ref=f24e17]: Password
+          - generic [ref=f24e18]:
+            - textbox "Password" [ref=f24e19]:
+              - /placeholder: At least 8 characters
+            - button "Show password" [ref=f24e20]
+        - button "Create workspace" [ref=f24e24]
+      - paragraph [ref=f24e25]:
+        - text: Already have an account?
+        - link "Sign in" [ref=f24e26] [cursor=pointer]:
+          - /url: /login
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f24e32] [cursor=pointer]
+  - alert [ref=f24e36]

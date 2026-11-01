@@ -1,0 +1,123 @@
+import "dotenv/config";
+import { prisma } from "../src/lib/db/prisma";
+import { DEFAULT_PIPELINE_STAGES } from "../src/lib/pipelineStages";
+import { DEFAULT_LEAD_STAGES } from "../src/lib/leadStages";
+import { DEFAULT_LEAD_SOURCES } from "../src/lib/leadSources";
+
+const resources = ["lead", "deal", "contact", "role", "user"];
+const actions = ["create", "read", "update", "delete"];
+
+async function main() {
+    for (const resource of resources) {
+        for (const action of actions) {
+            const name = `${resource}:${action}`;
+            // upsert so the seed can be re-run safely
+            await prisma.permission.upsert({
+                where: { name },
+                update: {},
+                create: { name, description: `Can ${action} ${resource}s` },
+            });
+        }
+    }
+
+    // Not resource:action shaped: widens the lead:* permissions from "my leads" to "all org leads"
+    await prisma.permission.upsert({
+        where: { name: "lead:all" },
+        update: {},
+        create: { name: "lead:all", description: "Can see and act on every lead, not just assigned ones" },
+    });
+
+    await prisma.permission.upsert({
+        where: { name: "deal:all" },
+        update: {},
+        create: { name: "deal:all", description: "Can see and act on every deal, not just assigned ones" },
+    });
+
+    await prisma.permission.upsert({
+        where: { name: "contact:all" },
+        update: {},
+        create: { name: "contact:all", description: "Can see and act on every contact, not just assigned ones" },
+    });
+
+    // One switch for the whole pipeline setup (create, edit, reorder, delete stages), not CRUD
+    await prisma.permission.upsert({
+        where: { name: "pipeline:manage" },
+        update: {},
+        create: { name: "pipeline:manage", description: "Can create, edit, reorder and delete pipeline stages" },
+    });
+
+    // Same, but for the leads board's stages
+    await prisma.permission.upsert({
+        where: { name: "lead-stages:manage" },
+        update: {},
+        create: { name: "lead-stages:manage", description: "Can create, edit, reorder and delete lead stages" },
+    });
+
+    // Same, but for the leads board's managed source list
+    await prisma.permission.upsert({
+        where: { name: "lead-sources:manage" },
+        update: {},
+        create: { name: "lead-sources:manage", description: "Can create, edit, reorder and delete lead sources" },
+    });
+
+    // One switch for defining custom fields, not CRUD on the fields themselves
+    await prisma.permission.upsert({
+        where: { name: "custom-fields:manage" },
+        update: {},
+        create: { name: "custom-fields:manage", description: "Can create, edit and delete custom field definitions" },
+    });
+
+    // Admin roles only get the permissions that existed when their org registered;
+    // give them any added since. ponytail: matches by name, add Role.isSystem if admins can rename it
+    const [permissions, adminRoles] = await Promise.all([
+        prisma.permission.findMany({ select: { id: true } }),
+        prisma.role.findMany({ where: { name: "Admin" }, select: { id: true } }),
+    ]);
+
+    await prisma.rolePermission.createMany({
+        data: adminRoles.flatMap((role) =>
+            permissions.map((permission) => ({ roleId: role.id, permissionId: permission.id }))
+        ),
+        skipDuplicates: true,
+    });
+
+    // Organizations registered before deals existed have no pipeline stages; give them the defaults
+    const orgsWithoutStages = await prisma.organization.findMany({
+        where: { pipelineStages: { none: {} } },
+        select: { id: true },
+    });
+
+    await prisma.pipelineStage.createMany({
+        data: orgsWithoutStages.flatMap((org) =>
+            DEFAULT_PIPELINE_STAGES.map((stage) => ({ ...stage, organizationId: org.id }))
+        ),
+    });
+
+    // Same backfill, for organizations with no lead stages yet
+    const orgsWithoutLeadStages = await prisma.organization.findMany({
+        where: { leadStages: { none: {} } },
+        select: { id: true },
+    });
+
+    await prisma.leadStage.createMany({
+        data: orgsWithoutLeadStages.flatMap((org) =>
+            DEFAULT_LEAD_STAGES.map((stage) => ({ ...stage, organizationId: org.id }))
+        ),
+    });
+
+    // Same backfill, for organizations with no lead sources yet
+    const orgsWithoutLeadSources = await prisma.organization.findMany({
+        where: { leadSources: { none: {} } },
+        select: { id: true },
+    });
+
+    await prisma.leadSource.createMany({
+        data: orgsWithoutLeadSources.flatMap((org) =>
+            DEFAULT_LEAD_SOURCES.map((source) => ({ ...source, organizationId: org.id }))
+        ),
+    });
+
+    console.log("Permissions:", (await prisma.permission.findMany()).map((p) => p.name));
+}
+
+main().finally(() => prisma.$disconnect());
