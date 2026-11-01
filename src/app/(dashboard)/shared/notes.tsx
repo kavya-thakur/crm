@@ -53,7 +53,7 @@ export function NotesTab({
     }
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+        <div className="flex flex-col gap-4">
             <NoteComposer
                 agents={agents ?? []}
                 submitLabel="Post"

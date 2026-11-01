@@ -59,3 +59,38 @@ body {
   font-family: var(--font-inter), sans-serif;
   font-size: 13px;
 }
+
+/* Every loading placeholder: a soft highlight sweeping across a pale grey bar. One CSS
+   animation (not a script per bar), so all the bars on a page move together, smoothly. */
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+.skeleton {
+  background-color: #eeeeee;
+  background-image: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.75) 50%, transparent 100%);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* placeholders fade in after a beat, so a quick load never flashes them */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

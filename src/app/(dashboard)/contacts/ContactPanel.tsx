@@ -171,7 +171,7 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                 </div>
             </header>
 
-            {contactQuery.isPending && <PageLoader label="Loading contact" />}
+            {contactQuery.isPending && <PageLoader label="Loading contact" variant="record" />}
             {contactQuery.isError && (
                 <ErrorState
                     title="Couldn't load contact"

@@ -131,7 +131,7 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
                 </div>
             </header>
 
-            {activityQuery.isPending && <PageLoader label="Loading activity" />}
+            {activityQuery.isPending && <PageLoader label="Loading activity" variant="record" />}
             {activityQuery.isError && (
                 <ErrorState title="Couldn't load activity" error={activityQuery.error} onRetry={() => activityQuery.refetch()} retrying={activityQuery.isFetching} />
             )}

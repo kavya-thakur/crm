@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconChevronRight, IconPlus, IconShieldLock, IconUsers } from "@tabler/icons-react";
+import { IconChevronRight, IconPlus, IconUsers } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { SectionIcon } from "@/components/SectionIcon";
+import { Pill } from "@/components/Pill";
 import { SidePanel } from "@/components/SidePanel";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
@@ -66,7 +68,7 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
     return (
         <div className="flex h-full flex-col">
             <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
-                <IconShieldLock size={16} className="text-[#838383]" />
+                <SectionIcon section="roles" size="md" />
                 <h1 className="font-semibold">Roles</h1>
                 {roles.data && <span className="text-faint">{roles.data.length}</span>}
 
@@ -83,10 +85,15 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl px-6 py-8">
-                    <h2 className="text-lg font-semibold">Roles</h2>
-                    <p className="mt-1 text-muted">
-                        A role decides what its members can do. Everyone with a role gets all of its permissions.
-                    </p>
+                    <div className="flex items-start gap-4">
+                        <SectionIcon section="roles" size="lg" />
+                        <div className="min-w-0 pt-0.5">
+                            <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em]">Roles</h2>
+                            <p className="mt-0.5 text-muted">
+                            A role decides what its members can do. Everyone with a role gets all of its permissions.
+                        </p>
+                        </div>
+                    </div>
 
                     {roles.isPending && <PageLoader label="Loading roles" />}
                     {roles.isError && (
@@ -99,23 +106,23 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
                     )}
 
                     {roles.data && (
-                        <ul className="mt-6 overflow-hidden rounded-lg border border-line">
+                        <ul className="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
                             {roles.data.map((role) => (
                                 <li key={role.id} className="border-b border-line-light last:border-b-0">
                                     <button
                                         onClick={() => setEditing(role)}
-                                        className="flex h-12 w-full items-center gap-3 px-3 text-left hover:bg-paper"
+                                        className="flex h-13 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-paper"
                                     >
-                                        <span className="flex size-6 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                            <IconShieldLock size={14} />
-                                        </span>
+                                        <SectionIcon section="roles" size="md" />
                                         <span className="font-medium">{role.name}</span>
                                         {role.id === me.roleId && (
-                                            <span className="rounded bg-app px-1.5 text-sm text-muted">Your role</span>
+                                            <Pill tone="rose">Your role</Pill>
                                         )}
 
-                                        <span className="ml-auto text-faint">
-                                            {role.permissions.length} {role.permissions.length === 1 ? "permission" : "permissions"}
+                                        <span className="ml-auto">
+                                            <Pill>
+                                                {role.permissions.length} {role.permissions.length === 1 ? "permission" : "permissions"}
+                                            </Pill>
                                         </span>
                                         <span className="flex w-14 items-center justify-end gap-1 text-muted" title="Members with this role">
                                             <IconUsers size={14} />

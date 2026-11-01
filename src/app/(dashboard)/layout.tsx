@@ -1,9 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { IconAddressBook, IconCalendarEvent, IconChecklist, IconCurrencyRupee, IconLogout, IconNotes, IconShieldLock, IconSettings, IconStack2, IconTag, IconTargetArrow, IconUsers } from "@tabler/icons-react";
+import Link from "next/link";
+import { IconLogout } from "@tabler/icons-react";
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasPermission } from "@/lib/auth/requirePermission";
+import { Avatar } from "@/components/Avatar";
+import { SectionIcon } from "@/components/SectionIcon";
 import NavLink from "./NavLink";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/">) {
@@ -43,111 +46,74 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
                 <nav className="flex flex-col gap-0.5">
                     <p className="flex h-7 items-center px-1 text-xs font-semibold text-light">Workspace</p>
                     <NavLink href="/leads">
-                        {/* tinted icon tile: Twenty colours each object's icon */}
-                        <span className="flex size-4 items-center justify-center rounded border border-[#d2deff] bg-accent-soft text-accent-hover">
-                            <IconTargetArrow size={12} />
-                        </span>
+                        <SectionIcon section="leads" />
                         Leads
                     </NavLink>
                     <NavLink href="/deals">
-                        {/* tinted icon tile: Twenty colours each object's icon */}
-                        <span className="flex size-4 items-center justify-center rounded border border-[#d2deff] bg-accent-soft text-accent-hover">
-                            <IconCurrencyRupee size={12} />
-                        </span>
+                        <SectionIcon section="deals" />
                         Deals
                     </NavLink>
                     <NavLink href="/contacts">
-                        {/* tinted icon tile: Twenty colours each object's icon */}
-                        <span className="flex size-4 items-center justify-center rounded border border-[#d2deff] bg-accent-soft text-accent-hover">
-                            <IconAddressBook size={12} />
-                        </span>
+                        <SectionIcon section="contacts" />
                         Contacts
                     </NavLink>
                     <NavLink href="/activities">
-                        <span className="flex size-4 items-center justify-center rounded border border-[#d2deff] bg-accent-soft text-accent-hover">
-                            <IconCalendarEvent size={12} />
-                        </span>
+                        <SectionIcon section="activities" />
                         Activities
                     </NavLink>
                     <NavLink href="/tasks">
-                        <span className="flex size-4 items-center justify-center rounded border border-[#d2deff] bg-accent-soft text-accent-hover">
-                            <IconChecklist size={12} />
-                        </span>
+                        <SectionIcon section="tasks" />
                         Tasks
                     </NavLink>
                     {canSeeNotes && (
                         <NavLink href="/notes">
-                            <span className="flex size-4 items-center justify-center rounded border border-[#d2deff] bg-accent-soft text-accent-hover">
-                                <IconNotes size={12} />
-                            </span>
+                            <SectionIcon section="notes" />
                             Notes
                         </NavLink>
                     )}
                 </nav>
 
-                {(canSeeMembers || canSeeRoles || canSeePipeline || canSeeLeadStages || canSeeLeadSources || canSeeCustomFields) && (
-                    <nav className="flex flex-col gap-0.5">
-                        <p className="flex h-7 items-center px-1 text-xs font-semibold text-light">Settings</p>
-                        {canSeeMembers && (
-                            <NavLink href="/settings/members">
-                                {/* grey tile: Twenty's colour for system objects */}
-                                <span className="flex size-4 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                    <IconUsers size={12} />
-                                </span>
-                                Members
-                            </NavLink>
-                        )}
-                        {canSeeRoles && (
-                            <NavLink href="/settings/roles">
-                                <span className="flex size-4 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                    <IconShieldLock size={12} />
-                                </span>
-                                Roles
-                            </NavLink>
-                        )}
-                        {canSeePipeline && (
-                            <NavLink href="/settings/pipeline">
-                                <span className="flex size-4 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                    <IconStack2 size={12} />
-                                </span>
-                                Pipeline
-                            </NavLink>
-                        )}
-                        {canSeeLeadStages && (
-                            <NavLink href="/settings/lead-stages">
-                                <span className="flex size-4 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                    <IconStack2 size={12} />
-                                </span>
-                                Lead Stages
-                            </NavLink>
-                        )}
-                        {canSeeLeadSources && (
-                            <NavLink href="/settings/lead-sources">
-                                <span className="flex size-4 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                    <IconTag size={12} />
-                                </span>
-                                Lead Sources
-                            </NavLink>
-                        )}
-                        {canSeeCustomFields && (
-                            <NavLink href="/settings/custom-fields">
-                                <span className="flex size-4 items-center justify-center rounded border border-line-strong bg-app text-[#838383]">
-                                    <IconSettings size={12} />
-                                </span>
-                                Custom Fields
-                            </NavLink>
-                        )}
-                    </nav>
-                )}
+                {/* always shown: everyone has their own profile */}
+                <nav className="flex flex-col gap-0.5">
+                    <p className="flex h-7 items-center px-1 text-xs font-semibold text-light">Settings</p>
+                    <NavLink href="/settings/profile">
+                        <SectionIcon section="profile" />
+                        Profile
+                    </NavLink>
+                    {canSeeMembers && (
+                        <NavLink href="/settings/members">
+                            <SectionIcon section="members" />
+                            Members
+                        </NavLink>
+                    )}
+                    {canSeeRoles && (
+                        <NavLink href="/settings/roles">
+                            <SectionIcon section="roles" />
+                            Roles
+                        </NavLink>
+                    )}
+                    {(canSeePipeline || canSeeLeadStages || canSeeLeadSources) && (
+                        <NavLink href="/settings/stages">
+                            <SectionIcon section="stages" />
+                            Stages & sources
+                        </NavLink>
+                    )}
+                    {canSeeCustomFields && (
+                        <NavLink href="/settings/custom-fields">
+                            <SectionIcon section="customFields" />
+                            Custom Fields
+                        </NavLink>
+                    )}
+                </nav>
 
-                <div className="mt-auto flex items-center gap-2 px-1">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-medium text-accent">
-                        {user.name[0].toUpperCase()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{user.name}</p>
-                        <p className="truncate text-sm text-faint">{user.email}</p>
-                    </div>
+                <div className="mt-auto flex items-center gap-1 px-1">
+                    <Link href="/settings/profile" className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 hover:bg-fill">
+                        <Avatar name={user.name} size="md" />
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{user.name}</p>
+                            <p className="truncate text-sm text-faint">{user.email}</p>
+                        </div>
+                    </Link>
                     <form action={logout}>
                         <button
                             aria-label="Log out"

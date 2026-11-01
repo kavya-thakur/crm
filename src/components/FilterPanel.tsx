@@ -392,7 +392,7 @@ export function OptionsMenuButton<TColumn extends ColumnDef>({
     columns: TColumn[];
     columnPrefs: ColumnPrefs;
     canManageCustomFields?: boolean;
-    /** this entity's other admin-editable lists, e.g. [{ label: "Pipeline stages", href: "/settings/pipeline" }] */
+    /** this entity's other admin-editable lists, e.g. [{ label: "Pipeline stages", href: "/settings/stages" }] */
     extraLinks?: { label: string; href: string }[];
 }) {
     return (

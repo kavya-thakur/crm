@@ -11,9 +11,9 @@ import { LogoBar } from "./components/LogoBar";
 import { ProblemSection } from "./components/ProblemSection";
 import { PillarsSection } from "./components/PillarsSection";
 import { StepsSection } from "./components/StepsSection";
-import { OutcomesSection } from "./components/OutcomesSection";
+import { FeaturesSection } from "./components/FeaturesSection";
+import { UseCasesSection } from "./components/UseCasesSection";
 import { FaqSection } from "./components/FaqSection";
-import { FinalCta } from "./components/FinalCta";
 import { Footer } from "./components/Footer";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
@@ -59,10 +59,10 @@ export default function LandingPage({ loggedIn }: { loggedIn: boolean }) {
             <ProblemSection />
             <PillarsSection />
             <StepsSection />
-            <OutcomesSection />
-            <FaqSection />
-            <FinalCta primaryHref={primaryHref} primaryLabel={primaryLabel} />
-            <Footer />
+            <FeaturesSection />
+            <UseCasesSection />
+            <FaqSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
+            <Footer primaryHref={primaryHref} primaryLabel={primaryLabel} />
         </div>
     );
 }

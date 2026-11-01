@@ -7,7 +7,6 @@ import {
     IconArrowDown,
     IconArrowUp,
     IconProgress,
-    IconTargetArrow,
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
@@ -262,7 +261,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     return (
         <div ref={enterRef} className="flex h-full flex-col">
             <ListHeader
-                icon={IconTargetArrow}
+                section="leads"
                 title="Leads"
                 count={total}
                 createLabel="New Lead"
@@ -298,8 +297,8 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         columnPrefs={columnPrefs}
                         canManageCustomFields={can.manageCustomFields}
                         extraLinks={[
-                            ...(can.manageLeadStages ? [{ label: "Lead stages", href: "/settings/lead-stages" }] : []),
-                            ...(can.manageLeadSources ? [{ label: "Lead sources", href: "/settings/lead-sources" }] : []),
+                            ...(can.manageLeadStages ? [{ label: "Lead stages", href: "/settings/stages" }] : []),
+                            ...(can.manageLeadSources ? [{ label: "Lead sources", href: "/settings/stages" }] : []),
                         ]}
                     />
                 </div>

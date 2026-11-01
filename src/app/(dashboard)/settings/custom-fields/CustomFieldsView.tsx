@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IconPlus, IconSettings, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { SectionIcon } from "@/components/SectionIcon";
+import { Pill } from "@/components/Pill";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { ErrorState } from "@/components/ErrorState";
@@ -49,7 +51,7 @@ export default function CustomFieldsView() {
     return (
         <div className="flex h-full flex-col">
             <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
-                <IconSettings size={16} className="text-[#838383]" />
+                <SectionIcon section="customFields" size="md" />
                 <h1 className="font-semibold">Custom Fields</h1>
                 {fieldsQuery.data && <span className="text-faint">{fieldsQuery.data.length}</span>}
 
@@ -77,10 +79,15 @@ export default function CustomFieldsView() {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl px-6 py-8">
-                    <h2 className="text-lg font-semibold">{current.label} fields</h2>
-                    <p className="mt-1 text-muted">
-                        Extra fields for {current.noun}s. Each one can show on the New {current.label.slice(0, -1)} form, as a table column, and as a filter.
-                    </p>
+                    <div className="flex items-start gap-4">
+                        <SectionIcon section="customFields" size="lg" />
+                        <div className="min-w-0 pt-0.5">
+                            <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em]">{current.label} fields</h2>
+                            <p className="mt-0.5 text-muted">
+                            Extra fields for {current.noun}s. Each one can show on the New {current.label.slice(0, -1)} form, as a table column, and as a filter.
+                        </p>
+                        </div>
+                    </div>
 
                     {fieldsQuery.isPending && <PageLoader label="Loading custom fields" />}
                     {fieldsQuery.isError && (
@@ -101,7 +108,7 @@ export default function CustomFieldsView() {
                                         {fields.map((field) => (
                                             <li
                                                 key={field.id}
-                                                className="flex h-12 items-center gap-3 border-b border-line-light px-3 last:border-b-0"
+                                                className="group flex h-13 items-center gap-3 border-b border-line-light px-4 transition-colors last:border-b-0 hover:bg-paper"
                                             >
                                                 <button
                                                     type="button"
@@ -109,18 +116,16 @@ export default function CustomFieldsView() {
                                                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                                 >
                                                     <span className="truncate font-medium">{field.label}</span>
-                                                    <span className="shrink-0 rounded bg-app px-1.5 text-sm text-muted">
-                                                        {TYPE_LABELS[field.type]}
-                                                    </span>
+                                                    <Pill>{TYPE_LABELS[field.type]}</Pill>
                                                     {field.required && (
-                                                        <span className="shrink-0 rounded bg-app px-1.5 text-sm text-muted">Required</span>
+                                                        <Pill tone="amber">Required</Pill>
                                                     )}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     aria-label={`Delete ${field.label}`}
                                                     onClick={() => setDeleting(field)}
-                                                    className="flex size-7 items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger"
+                                                    className="flex size-7 items-center justify-center rounded-lg text-light transition-colors group-hover:text-muted hover:bg-danger-soft hover:text-danger!"
                                                 >
                                                     <IconTrash size={14} />
                                                 </button>

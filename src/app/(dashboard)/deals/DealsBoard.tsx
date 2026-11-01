@@ -42,7 +42,7 @@ export default function DealsBoard({ filters, canMove, onOpen, onError }: DealsB
     });
 
     if (stagesQuery.isPending) {
-        return <PageLoader label="Loading pipeline" />;
+        return <PageLoader label="Loading pipeline" variant="board" />;
     }
     if (stagesQuery.isError) {
         return (

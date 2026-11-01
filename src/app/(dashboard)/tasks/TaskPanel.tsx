@@ -110,7 +110,7 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
                 </div>
             </header>
 
-            {taskQuery.isPending && <PageLoader label="Loading task" />}
+            {taskQuery.isPending && <PageLoader label="Loading task" variant="record" />}
             {taskQuery.isError && (
                 <ErrorState title="Couldn't load task" error={taskQuery.error} onRetry={() => taskQuery.refetch()} retrying={taskQuery.isFetching} />
             )}
