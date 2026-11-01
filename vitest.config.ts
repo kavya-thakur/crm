@@ -8,7 +8,8 @@ export default defineConfig({
     test: {
         environment: "node",
         env: {
-            DATABASE_URL: "postgresql://mac@localhost:5432/crm_test",
+            // CI points this at its own throwaway database
+            DATABASE_URL: process.env.TEST_DATABASE_URL ?? "postgresql://mac@localhost:5432/crm_test",
         },
         // Integration tests share one Prisma client (one pg connection) against
         // one test database; running files in parallel makes them race on it.

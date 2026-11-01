@@ -209,7 +209,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                 </div>
             </header>
 
-            {leadQuery.isPending && <PageLoader label="Loading lead" />}
+            {leadQuery.isPending && <PageLoader label="Loading lead" variant="record" />}
             {leadQuery.isError && (
                 <ErrorState
                     title="Couldn't load lead"

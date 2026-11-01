@@ -1,94 +1,87 @@
-import Link from "next/link";
-import { StageBadge } from "@/components/StageBadge";
-import { Avatar } from "@/components/Avatar";
-import { IconAddressBook, IconCurrencyRupee, IconNotes, IconTargetArrow } from "@tabler/icons-react";
-import { Halftone } from "./Halftone";
+import { CutButton } from "./CutButton";
+import { DashArt, skyline } from "./DashArt";
+import { HeroPreview } from "./HeroPreview";
+
+const ART_WIDTH = 420;
+const ART_HEIGHT = 800;
+
+// Two skylines either side of the product window, climbing toward it like a chart.
+// Fixed shapes, so they look the same on every visit.
+const LEFT_TOWERS = [
+    { x: 0, width: 42, height: 0.5 },
+    { x: 48, width: 30, height: 0.44 },
+    { x: 84, width: 54, height: 0.62 },
+    { x: 144, width: 36, height: 0.56 },
+    { x: 186, width: 60, height: 0.74 },
+    { x: 252, width: 42, height: 0.68 },
+    { x: 300, width: 120, height: 0.9 },
+];
+const RIGHT_TOWERS = [
+    { x: 0, width: 120, height: 0.94 },
+    { x: 126, width: 48, height: 0.78 },
+    { x: 180, width: 66, height: 0.86 },
+    { x: 252, width: 36, height: 0.66 },
+    { x: 294, width: 60, height: 0.74 },
+    { x: 360, width: 30, height: 0.56 },
+    { x: 396, width: 24, height: 0.62 },
+];
 
 export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolean; primaryHref: string; primaryLabel: string }) {
     return (
-        <header className="relative overflow-hidden bg-[#f4f4f4] pt-40 pb-28">
-            <Halftone shape="bolt" size={260} fade="top" className="pointer-events-none absolute -top-6 -left-10 text-[#4F46E5]/70" />
-            <Halftone shape="diamond" size={220} fade="top" className="pointer-events-none absolute -right-6 bottom-0 text-[#4F46E5]/70" />
+        <section className="relative overflow-clip bg-[#f4f4f4]">
+            {/* a soft warm glow behind the headline */}
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 -inset-x-[20%]"
+                style={{ background: "radial-gradient(80% 60% at 50% 40%, #f5f3f099 0%, #0000 70%)" }}
+            />
+            <DashArt
+                width={ART_WIDTH}
+                height={ART_HEIGHT}
+                sample={skyline(LEFT_TOWERS, ART_HEIGHT)}
+                className="pointer-events-none absolute bottom-0 left-0 hidden text-[#4a38f5] min-[921px]:block"
+            />
+            <DashArt
+                width={ART_WIDTH}
+                height={ART_HEIGHT}
+                sample={skyline(RIGHT_TOWERS, ART_HEIGHT)}
+                className="pointer-events-none absolute right-0 bottom-0 hidden text-[#4a38f5] min-[921px]:block"
+            />
 
-            <div className="relative mx-auto max-w-4xl px-6 text-center">
-                <h1
-                    data-hero-line
-                    className="font-(family-name:--font-aleo) text-[42px] leading-[1.1] font-light tracking-tight text-[#1c1c1c] sm:text-[60px] sm:leading-[66px]"
-                >
-                    Run your pipeline, <span className="font-normal">not your inbox</span>
-                </h1>
-                <p data-hero-line className="mx-auto mt-6 max-w-lg font-(family-name:--font-host-grotesk) text-base text-[#1c1c1c]/60">
-                    Flash keeps every lead, deal and conversation in one workspace your whole team actually uses — set up in minutes, shaped around how you sell.
-                </p>
-
-                <div data-hero-line className="mt-8 flex items-center justify-center gap-3 font-(family-name:--font-azeret-mono) text-xs font-medium tracking-wide uppercase">
-                    <Link href={primaryHref} className="flex h-11 items-center rounded-lg bg-[#1c1c1c] px-5 text-white hover:bg-black">
-                        {primaryLabel}
-                    </Link>
-                    {!loggedIn && (
-                        <a href="#how-it-works" className="flex h-11 items-center rounded-lg border border-[#1c1c1c] px-5 text-[#1c1c1c] hover:bg-white">
-                            See how it works
-                        </a>
-                    )}
-                </div>
-            </div>
-
-            <div data-hero-mockup className="relative mt-16 px-6">
-                <HeroMockup />
-            </div>
-        </header>
-    );
-}
-
-// A static mockup of the real app (same sidebar tiles, same StageBadge pills) —
-// illustrative, not a live screenshot.
-function HeroMockup() {
-    const rows = [
-        { name: "Acme Inc", stage: { name: "Qualified", color: "#0284C7" }, owner: "Priya" },
-        { name: "Globex Corp", stage: { name: "Proposal", color: "#CA8A04" }, owner: "Rahul" },
-        { name: "Northwind Traders", stage: { name: "New", color: "#475569" }, owner: "Priya" },
-        { name: "Contoso", stage: { name: "Won", color: "#059669" }, owner: "Meera" },
-    ];
-
-    return (
-        <div className="mx-auto flex max-w-4xl overflow-hidden rounded-xl border border-line bg-white text-left shadow-[2px_4px_24px_rgb(0_0_0/0.1)]">
-            <div className="hidden w-44 shrink-0 flex-col gap-1 border-r border-line bg-paper p-3 sm:flex">
-                {[
-                    { icon: IconTargetArrow, label: "Leads", active: true },
-                    { icon: IconCurrencyRupee, label: "Deals" },
-                    { icon: IconAddressBook, label: "Contacts" },
-                    { icon: IconNotes, label: "Notes" },
-                ].map((item) => (
-                    <span
-                        key={item.label}
-                        className={`flex h-8 items-center gap-2 rounded-lg px-2 text-[13px] ${item.active ? "bg-[#edf2fe] text-[#3e63dd]" : "text-muted"}`}
-                    >
-                        <item.icon size={14} />
-                        {item.label}
-                    </span>
-                ))}
-            </div>
-            <div className="min-w-0 flex-1 p-4">
-                <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-medium text-[#1c1c1c]">Leads</span>
-                    <span className="rounded-lg bg-[#1c1c1c] px-3 py-1.5 text-[12px] font-medium text-white">New lead</span>
-                </div>
-                <div className="mt-3 overflow-hidden rounded-lg border border-line-light">
-                    {rows.map((row, index) => (
-                        <div
-                            key={row.name}
-                            className={`flex items-center gap-3 px-3 py-2.5 text-[13px] ${index !== rows.length - 1 ? "border-b border-line-light" : ""}`}
-                        >
-                            <span className="min-w-0 flex-1 truncate font-medium text-[#1c1c1c]">{row.name}</span>
-                            <StageBadge name={row.stage.name} color={row.stage.color} />
-                            <span className="flex w-20 shrink-0 items-center gap-1.5 text-muted">
-                                <Avatar name={row.owner} />
-                                {row.owner}
-                            </span>
+            <div className="relative mx-auto flex w-full max-w-378 flex-col px-4 pt-12 pb-10 min-[921px]:px-10">
+                <div className="flex w-full flex-col items-center text-center [&>*+*]:mt-8">
+                    <div className="grid w-full justify-items-center [&>*+*]:mt-3">
+                        <div className="w-full max-w-168">
+                            <h1
+                                data-hero-line
+                                className="font-(family-name:--font-aleo) text-[clamp(2.5rem,1.5819rem+3.7665vw,3.75rem)] leading-[clamp(2.875rem,1.9569rem+3.7665vw,4.125rem)] font-light tracking-[-0.02em] text-balance text-[#1c1c1c]"
+                            >
+                                Run your pipeline,{" "}
+                                {/* the second half of the headline switches to the sans face, as on twenty.com */}
+                                <span className="font-(family-name:--font-host-grotesk) tracking-[-0.04em]">not your inbox</span>
+                            </h1>
                         </div>
-                    ))}
+                        <div className="mx-auto max-w-147.75">
+                            <p data-hero-line className="font-(family-name:--font-host-grotesk) text-[16px] leading-[1.55] font-normal text-[#1c1c1c]/60">
+                                Flash keeps every lead, deal and conversation in one workspace your whole team actually uses, set up in minutes and shaped around how you sell.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div data-hero-line className="flex flex-wrap justify-center gap-3">
+                        <CutButton href={primaryHref}>{primaryLabel}</CutButton>
+                        {!loggedIn && (
+                            <CutButton href="#how-it-works" variant="outlined">
+                                See how it works
+                            </CutButton>
+                        )}
+                    </div>
+                </div>
+
+                <div data-hero-mockup className="relative z-10 mt-17 w-full">
+                    <HeroPreview />
                 </div>
             </div>
-        </div>
+        </section>
     );
 }

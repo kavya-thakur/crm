@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconChecklist, IconChevronDown, IconFlag, IconUserCircle } from "@tabler/icons-react";
+import { IconChevronDown, IconFlag, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
@@ -104,7 +104,7 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
 
     return (
         <div ref={enterRef} className="flex h-full flex-col">
-            <ListHeader icon={IconChecklist} title="Tasks" count={total} createLabel="New Task" onCreate={() => setCreating(true)} />
+            <ListHeader section="tasks" title="Tasks" count={total} createLabel="New Task" onCreate={() => setCreating(true)} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
                 {SCOPES.map((item) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
     IconArrowDown,
     IconArrowUp,
@@ -17,6 +17,7 @@ import {
 } from "@tabler/icons-react";
 
 import { Avatar } from "./Avatar";
+import { SectionIcon, type Section } from "./SectionIcon";
 import { Dropdown, MenuItem } from "./Dropdown";
 import { Spinner } from "./Loader";
 import { Modal } from "./Modal";
@@ -31,20 +32,18 @@ import { Modal } from "./Modal";
  * pieces that were byte-for-byte identical live here.
  */
 
-type IconComponent = ComponentType<{ size?: number; className?: string }>;
-
 // ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
 
 export function ListHeader({
-    icon: Icon,
+    section,
     title,
     count,
     createLabel,
     onCreate,
 }: {
-    icon: IconComponent;
+    section: Section;
     title: string;
     count?: number;
     createLabel?: string;
@@ -52,7 +51,7 @@ export function ListHeader({
 }) {
     return (
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
-            <Icon size={16} className="text-accent" />
+            <SectionIcon section={section} size="md" />
             <h1 className="font-semibold">{title}</h1>
             {count !== undefined && <span className="text-faint">{count}</span>}
 

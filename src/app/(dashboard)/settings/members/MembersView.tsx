@@ -12,10 +12,11 @@ import {
     IconPlus,
     IconSearch,
     IconTrash,
-    IconUsers,
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { SectionIcon } from "@/components/SectionIcon";
+import { Pill } from "@/components/Pill";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
@@ -113,7 +114,7 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
     return (
         <div className="flex h-full flex-col">
             <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
-                <IconUsers size={16} className="text-[#838383]" />
+                <SectionIcon section="members" size="md" />
                 <h1 className="font-semibold">Members</h1>
                 {members.data && <span className="text-faint">{members.data.length}</span>}
 
@@ -130,8 +131,13 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl px-6 py-8">
-                    <h2 className="text-lg font-semibold">Members</h2>
-                    <p className="mt-1 text-muted">Everyone who can sign in to this workspace, and the role that decides what they can do.</p>
+                    <div className="flex items-start gap-4">
+                        <SectionIcon section="members" size="lg" />
+                        <div className="min-w-0 pt-0.5">
+                            <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em]">Members</h2>
+                            <p className="mt-0.5 text-muted">Everyone who can sign in to this workspace, and the role that decides what they can do.</p>
+                        </div>
+                    </div>
 
                     <label className="mt-6 flex h-8 items-center gap-2 rounded-lg border border-line px-2 focus-within:border-accent">
                         <IconSearch size={14} className="text-faint" />
@@ -160,7 +166,14 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                     )}
 
                     {shown && (
-                        <ul className="mt-3 rounded-lg border border-line">
+                        <ul className="mt-3 rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+                            {/* column headings, lined up with the cells of the rows below */}
+                            <li aria-hidden className="flex h-9 items-center gap-3 rounded-t-xl border-b border-line-light bg-paper px-4 text-sm font-medium text-faint">
+                                <span className="min-w-0 flex-1 pl-10">Member</span>
+                                <span className="w-40 px-2">Role</span>
+                                <span className="w-24">Joined</span>
+                                <span className="w-7" />
+                            </li>
                             {shown.map((member) => {
                                 const isMe = member.id === me.id;
                                 const manageable = isManageable(member.role.id);
@@ -168,13 +181,13 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                 const canDelete = can.delete && manageable && !isMe;
 
                                 return (
-                                    <li key={member.id} className="flex h-14 items-center gap-3 border-b border-line-light px-3 last:border-b-0">
+                                    <li key={member.id} className="flex h-15 items-center gap-3 border-b border-line-light px-4 transition-colors last:rounded-b-xl last:border-b-0 hover:bg-paper">
                                         <Avatar name={member.name} size="md" />
 
                                         <div className="min-w-0 flex-1">
                                             <p className="flex items-center gap-1.5 font-medium">
                                                 <span className="truncate">{member.name}</span>
-                                                {isMe && <span className="rounded bg-app px-1.5 text-sm font-normal text-muted">You</span>}
+                                                {isMe && <Pill tone="indigo">You</Pill>}
                                             </p>
                                             <p className="truncate text-muted">{member.email}</p>
                                         </div>
@@ -184,8 +197,8 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                             {canEdit && !isMe && roles.data ? (
                                                 <Dropdown
                                                     align="right"
-                                                    buttonClassName="flex h-7 max-w-full items-center gap-1 rounded-lg px-2 text-muted hover:bg-fill hover:text-ink"
-                                                    label={<><span className="truncate">{member.role.name}</span><IconChevronDown size={14} className="shrink-0 text-faint" /></>}
+                                                    buttonClassName="flex h-7 max-w-full items-center gap-1 rounded-lg px-1.5 hover:bg-fill"
+                                                    label={<><Pill tone="indigo">{member.role.name}</Pill><IconChevronDown size={14} className="shrink-0 text-faint" /></>}
                                                 >
                                                     {(close) =>
                                                         manageableRoles.map((role) => (
@@ -203,7 +216,9 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                                     }
                                                 </Dropdown>
                                             ) : (
-                                                <span className="block truncate px-2 text-muted">{member.role.name}</span>
+                                                <span className="block px-1.5">
+                                                    <Pill tone="indigo">{member.role.name}</Pill>
+                                                </span>
                                             )}
                                         </div>
 

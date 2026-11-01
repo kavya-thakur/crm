@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconCurrencyRupee, IconTargetArrow } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconTargetArrow } from "@tabler/icons-react";
 
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
@@ -234,7 +234,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     return (
         <div ref={enterRef} className="flex h-full min-h-0 flex-col">
             <ListHeader
-                icon={IconCurrencyRupee}
+                section="deals"
                 title="Deals"
                 count={total}
                 createLabel="New Deal"
@@ -268,7 +268,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         columns={dealColumns}
                         columnPrefs={columnPrefs}
                         canManageCustomFields={can.manageCustomFields}
-                        extraLinks={can.managePipeline ? [{ label: "Pipeline stages", href: "/settings/pipeline" }] : undefined}
+                        extraLinks={can.managePipeline ? [{ label: "Pipeline stages", href: "/settings/stages" }] : undefined}
                     />
                 </div>
             </div>

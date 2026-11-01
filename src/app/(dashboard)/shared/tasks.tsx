@@ -76,7 +76,7 @@ export function TasksTab({ entity, recordId }: { entity: TaskEntity; recordId: n
     });
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-3">
+        <div className="flex flex-col gap-3">
             <QuickAdd link={link} />
 
             <div className="flex gap-1 font-medium text-muted">

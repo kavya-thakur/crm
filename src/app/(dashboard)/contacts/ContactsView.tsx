@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconAddressBook, IconArrowDown, IconArrowUp } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { toast } from "@/components/Toast";
@@ -197,7 +197,7 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
     return (
         <div ref={enterRef} className="flex h-full flex-col">
             <ListHeader
-                icon={IconAddressBook}
+                section="contacts"
                 title="Contacts"
                 count={total}
                 createLabel="New Contact"

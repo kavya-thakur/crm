@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconCalendarEvent, IconChevronDown, IconUserCircle } from "@tabler/icons-react";
+import { IconChevronDown, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
@@ -111,7 +111,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
 
     return (
         <div ref={enterRef} className="flex h-full flex-col">
-            <ListHeader icon={IconCalendarEvent} title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
+            <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
                 {SCOPES.map((item) => (

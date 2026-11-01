@@ -8,7 +8,7 @@ export function refreshLeads(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ["lead"] });
 }
 
-// Admin-editable, mirroring Deal's PipelineStage — see /settings/lead-stages
+// Admin-editable, mirroring Deal's PipelineStage — see /settings/stages
 export interface LeadStage {
     id: number;
     name: string;
@@ -18,7 +18,7 @@ export interface LeadStage {
     isLost: boolean;
 }
 
-// Admin-editable, picked (not typed) on the lead form — see /settings/lead-sources
+// Admin-editable, picked (not typed) on the lead form — see /settings/stages
 export interface LeadSource {
     id: number;
     name: string;

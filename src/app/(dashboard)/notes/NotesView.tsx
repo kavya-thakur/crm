@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { IconAddressBook, IconCurrencyRupee, IconNotes, IconTargetArrow } from "@tabler/icons-react";
+import { IconAddressBook, IconCurrencyRupee, IconTargetArrow } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
+import { SectionIcon } from "@/components/SectionIcon";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/Loader";
 import { timeAgo } from "@/lib/format";
@@ -55,7 +56,7 @@ export default function NotesView({ meId }: { meId: number }) {
     return (
         <div ref={enterRef} className="flex h-full flex-col">
             <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
-                <IconNotes size={16} className="text-[#838383]" />
+                <SectionIcon section="notes" size="md" />
                 <h1 className="font-semibold">Notes</h1>
                 {notesQuery.data && <span className="text-faint">{notesQuery.data.length}</span>}
             </header>
@@ -74,7 +75,7 @@ export default function NotesView({ meId }: { meId: number }) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto max-w-2xl px-6 py-6">
+                <div className="px-6 py-6">
                     {notesQuery.isPending && <SkeletonList rows={4} />}
                     {notesQuery.isError && (
                         <ErrorState

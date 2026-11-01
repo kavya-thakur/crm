@@ -6,6 +6,6 @@ export const DEFAULT_PIPELINE_STAGES = [
     { name: "Qualified", order: 1, color: STAGE_COLORS.purple },
     { name: "Proposal", order: 2, color: STAGE_COLORS.amber },
     { name: "Negotiation", order: 3, color: STAGE_COLORS.orange },
-    { name: "Won", order: 4, color: STAGE_COLORS.emerald, isWon: true },
+    { name: "Won", order: 4, color: STAGE_COLORS.green, isWon: true },
     { name: "Lost", order: 5, color: STAGE_COLORS.red, isLost: true },
 ];

@@ -229,7 +229,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                 </div>
             </header>
 
-            {dealQuery.isPending && <PageLoader label="Loading deal" />}
+            {dealQuery.isPending && <PageLoader label="Loading deal" variant="record" />}
 
             {dealQuery.isError && (
                 <ErrorState

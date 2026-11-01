@@ -41,7 +41,7 @@ export default function LeadsBoard({ filters, canMove, onOpen, onError }: LeadsB
     });
 
     if (stagesQuery.isPending) {
-        return <PageLoader label="Loading stages" className="h-full" />;
+        return <PageLoader label="Loading stages" variant="board" className="h-full" />;
     }
     if (stagesQuery.isError) {
         return (
