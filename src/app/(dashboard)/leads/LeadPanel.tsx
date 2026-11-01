@@ -36,10 +36,12 @@ import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { Select } from "@/components/Select";
 import { StageBadge } from "@/components/StageBadge";
 import { ConfirmDeleteModal } from "@/components/ListPage";
-import { showToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { Avatar } from "@/components/Avatar";
 import { formatDate, timeAgo } from "@/lib/format";
-import { groupCustomFields, useCustomFields, type CustomFieldDef } from "../shared/customFields";
+import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
@@ -118,18 +120,23 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
         onSuccess: (res) => {
             // show the saved value right away, then refresh lists and the timeline
             queryClient.setQueryData(["lead", leadId], res.data.data);
+            toast.success("Lead updated");
             refreshLeads(queryClient);
         },
     });
 
     const assign = useMutation({
         mutationFn: (assignedToId: number | null) => api.post(`/leads/${leadId}/assign`, { assignedToId }),
-        onSuccess: () => refreshLeads(queryClient),
+        onSuccess: (_res, assignedToId) => {
+            toast.success(assignedToId === null ? "Lead unassigned" : "Lead assigned");
+            refreshLeads(queryClient);
+        },
     });
 
     const remove = useMutation({
         mutationFn: () => api.delete(`/leads/${leadId}`),
         onSuccess: () => {
+            toast.success("Lead deleted");
             queryClient.invalidateQueries({ queryKey: ["leads"] });
             onClose();
         },
@@ -202,8 +209,15 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                 </div>
             </header>
 
-            {leadQuery.isPending && <p className="p-4 text-faint">Loading...</p>}
-            {leadQuery.isError && <p className="p-4 text-danger">{errorMessage(leadQuery.error)}</p>}
+            {leadQuery.isPending && <PageLoader label="Loading lead" />}
+            {leadQuery.isError && (
+                <ErrorState
+                    title="Couldn't load lead"
+                    error={leadQuery.error}
+                    onRetry={() => leadQuery.refetch()}
+                    retrying={leadQuery.isFetching}
+                />
+            )}
 
             {lead && (
                 <div className="flex min-h-0 flex-1">
@@ -265,7 +279,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                             <>
                                                 <MenuItem
                                                     selected={!lead.assignedTo}
-                                                    onClick={() => { assign.mutate(null); close(); }}
+                                                    onClick={() => { if (lead.assignedTo) assign.mutate(null); close(); }}
                                                 >
                                                     <IconUserOff size={16} /> Unassigned
                                                 </MenuItem>
@@ -273,7 +287,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                                     <MenuItem
                                                         key={agent.id}
                                                         selected={agent.id === lead.assignedTo?.id}
-                                                        onClick={() => { assign.mutate(agent.id); close(); }}
+                                                        onClick={() => { if (agent.id !== lead.assignedTo?.id) assign.mutate(agent.id); close(); }}
                                                     >
                                                         <Avatar name={agent.name} /> {agent.name}
                                                     </MenuItem>
@@ -332,7 +346,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                             <>
                                                 <MenuItem
                                                     selected={!lead.sourceId}
-                                                    onClick={() => { update.mutate({ sourceId: null }); close(); }}
+                                                    onClick={() => { if (lead.sourceId) update.mutate({ sourceId: null }); close(); }}
                                                 >
                                                     Empty
                                                 </MenuItem>
@@ -369,7 +383,11 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                                     value={lead.customFields?.[field.key]}
                                                     disabled={!can.update}
                                                     agents={agents}
-                                                    onSave={(value) => update.mutate({ customFields: { [field.key]: value } })}
+                                                    onSave={(value) => {
+                                                        if (!isSameFieldValue(value, lead.customFields?.[field.key])) {
+                                                            update.mutate({ customFields: { [field.key]: value } });
+                                                        }
+                                                    }}
                                                 />
                                             </FieldRow>
                                         ))}
@@ -425,6 +443,18 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                             </section>
                         ) : (
                             <section className="px-4 py-4">
+                                {timelineQuery.isPending && <SkeletonList rows={3} />}
+
+                                {timelineQuery.isError && (
+                                    <ErrorState
+                                        variant="inline"
+                                        title="Couldn't load timeline"
+                                        error={timelineQuery.error}
+                                        onRetry={() => timelineQuery.refetch()}
+                                        retrying={timelineQuery.isFetching}
+                                    />
+                                )}
+
                                 {timelineQuery.isSuccess && timeline.length === 0 && (
                                     <p className="text-light">No timeline entries yet</p>
                                 )}
@@ -475,7 +505,13 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                         disabled={timelineQuery.isFetchingNextPage}
                                         className="ml-9 rounded-lg px-1 font-medium text-faint hover:bg-fill hover:text-muted"
                                     >
-                                        {timelineQuery.isFetchingNextPage ? "Loading..." : "Show older entries"}
+                                        {timelineQuery.isFetchingNextPage ? (
+                                            <span className="flex items-center gap-1.5">
+                                                <Spinner size={12} /> Loading
+                                            </span>
+                                        ) : (
+                                            "Show older entries"
+                                        )}
                                     </button>
                                 )}
                             </section>
@@ -501,7 +537,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                     onClose={() => setConverting(false)}
                     onConverted={() => {
                         setConverting(false);
-                        showToast("Lead converted to a deal");
+                        toast.success("Lead converted to a deal");
                         queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
                         queryClient.invalidateQueries({ queryKey: ["deals"] });
                         refreshLeads(queryClient);

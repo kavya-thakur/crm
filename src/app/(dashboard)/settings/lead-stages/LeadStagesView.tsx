@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconLoader2, IconPlus, IconTargetArrow, IconTrash } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconPlus, IconTargetArrow, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { ColorSwatchPicker } from "@/components/ColorSwatchPicker";
-import { showToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { STAGE_COLORS } from "@/lib/stageColors";
 import type { LeadStage } from "@/app/(dashboard)/leads/shared";
 
@@ -45,9 +47,10 @@ export default function LeadStagesView() {
             }
             return { previous };
         },
+        onSuccess: () => toast.success("Stage order saved"),
         onError: (error, _stageIds, context) => {
             if (context?.previous) queryClient.setQueryData(["leadStage"], context.previous);
-            showToast(errorMessage(error));
+            toast.error(errorMessage(error));
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: ["leadStage"] }),
     });
@@ -55,10 +58,11 @@ export default function LeadStagesView() {
     const remove = useMutation({
         mutationFn: (id: number) => api.delete(`/lead-stages/${id}`),
         onSuccess: () => {
+            toast.success("Stage deleted");
             setDeletingStage(null);
             queryClient.invalidateQueries({ queryKey: ["leadStage"] });
         },
-        onError: (error) => showToast(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     function move(index: number, direction: -1 | 1) {
@@ -93,8 +97,15 @@ export default function LeadStagesView() {
                         The columns of the leads board, in the order they appear. A converted or lost stage marks a lead as closed.
                     </p>
 
-                    {stagesQuery.isPending && <p className="mt-6 text-faint">Loading stages...</p>}
-                    {stagesQuery.isError && <p className="mt-6 text-danger">{errorMessage(stagesQuery.error)}</p>}
+                    {stagesQuery.isPending && <PageLoader label="Loading stages" />}
+                    {stagesQuery.isError && (
+                        <ErrorState
+                            title="Couldn't load stages"
+                            error={stagesQuery.error}
+                            onRetry={() => stagesQuery.refetch()}
+                            retrying={stagesQuery.isFetching}
+                        />
+                    )}
 
                     {stagesQuery.data && (
                         <ul className="mt-6 overflow-hidden rounded-lg border border-line">
@@ -185,6 +196,7 @@ function StageForm({ stage, onDone }: StageFormProps) {
             return stage ? api.patch(`/lead-stages/${stage.id}`, data) : api.post("/lead-stages", data);
         },
         onSuccess: () => {
+            toast.success(stage ? "Stage updated" : "Stage created");
             queryClient.invalidateQueries({ queryKey: ["leadStage"] });
             onDone();
         },
@@ -269,7 +281,7 @@ function StageForm({ stage, onDone }: StageFormProps) {
                     disabled={save.isPending}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {save.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {save.isPending && <Spinner size={14} />}
                     {stage ? "Save" : "Create stage"}
                 </button>
             </div>

@@ -152,7 +152,10 @@ function renderEditor<TRecord>(edit: EditConfig<TRecord>, record: TRecord, close
         return (
             <Select
                 value={edit.getValue(record)}
-                onChange={(value) => { edit.onSave(record, value); close(); }}
+                onChange={(value) => {
+                    if (value !== edit.getValue(record)) edit.onSave(record, value);
+                    close();
+                }}
                 options={edit.options}
                 placeholder="—"
             />
@@ -166,7 +169,10 @@ function renderEditor<TRecord>(edit: EditConfig<TRecord>, record: TRecord, close
             defaultValue={edit.getValue(record) ?? ""}
             onBlur={(e) => {
                 const raw = e.target.value.trim();
-                edit.onSave(record, raw === "" ? null : edit.type === "number" ? Number(raw) : raw);
+                // clicking away without changing anything isn't a save
+                if (raw !== String(edit.getValue(record) ?? "")) {
+                    edit.onSave(record, raw === "" ? null : edit.type === "number" ? Number(raw) : raw);
+                }
                 close();
             }}
             onKeyDown={(e) => {

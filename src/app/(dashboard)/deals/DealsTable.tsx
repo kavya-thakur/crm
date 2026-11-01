@@ -11,6 +11,8 @@ import {
 } from "@tabler/icons-react";
 
 import { Avatar } from "@/components/Avatar";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonRows } from "@/components/Loader";
 import { StageBadge } from "@/components/StageBadge";
 import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig } from "@/components/DataTable";
 import type { useTableColumns } from "@/components/FilterPanel";
@@ -118,8 +120,8 @@ interface DealsTableProps {
     loading: boolean;
     loadingMore: boolean;
     failed: boolean;
-    error?: string;
-    retry: () => void;
+    error: unknown;
+    onRetry: () => void;
     retrying: boolean;
     filtered: boolean;
     hasMore: boolean;
@@ -139,7 +141,7 @@ export default function DealsTable({
     loadingMore,
     failed,
     error,
-    retry,
+    onRetry,
     retrying,
     filtered,
     hasMore,
@@ -172,19 +174,7 @@ export default function DealsTable({
     }
 
     if (failed) {
-        return (
-            <div role="alert" className="p-4">
-                <p className="text-danger">{error || "Could not load deals."}</p>
-                <button
-                    type="button"
-                    onClick={retry}
-                    disabled={retrying}
-                    className="mt-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-fill disabled:opacity-60"
-                >
-                    Try again
-                </button>
-            </div>
-        );
+        return <ErrorState title="Couldn't load deals" error={error} onRetry={onRetry} retrying={retrying} />;
     }
 
     return (
@@ -260,14 +250,7 @@ export default function DealsTable({
                         );
                     })}
 
-                    {(loading || loadingMore) &&
-                        [1, 2, 3, 4, 5].map((row) => (
-                            <tr key={`loading-${row}`}>
-                                <td colSpan={colSpan} className="h-8 border-b border-line-light px-3">
-                                    <div className="h-2.5 w-2/3 animate-pulse rounded bg-app" />
-                                </td>
-                            </tr>
-                        ))}
+                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
 
                     {onCreate && !loading && (
                         <tr>

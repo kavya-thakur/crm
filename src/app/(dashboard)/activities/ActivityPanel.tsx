@@ -23,6 +23,9 @@ import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { formatDate, timeAgo } from "@/lib/format";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
@@ -66,7 +69,16 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
 
     const update = useMutation({
         mutationFn: (changes: ActivityChanges) => api.put<{ data: Activity }>(`/activities/${activityId}`, changes),
-        onSuccess: (res) => {
+        onSuccess: (res, changes) => {
+            toast.success(
+                changes.status === "COMPLETED"
+                    ? "Activity completed"
+                    : changes.status === "SCHEDULED"
+                        ? "Activity reopened"
+                        : changes.status === "CANCELLED"
+                            ? "Activity cancelled"
+                            : "Activity updated"
+            );
             // show the saved value right away, then refresh the lists
             queryClient.setQueryData(["activity", activityId], res.data.data);
             refreshActivities(queryClient);
@@ -76,6 +88,7 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
     const remove = useMutation({
         mutationFn: () => api.delete(`/activities/${activityId}`),
         onSuccess: () => {
+            toast.success("Activity deleted");
             refreshActivities(queryClient);
             onClose();
         },
@@ -118,8 +131,10 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
                 </div>
             </header>
 
-            {activityQuery.isPending && <p className="p-4 text-faint">Loading...</p>}
-            {activityQuery.isError && <p role="alert" className="p-4 text-danger">{errorMessage(activityQuery.error)}</p>}
+            {activityQuery.isPending && <PageLoader label="Loading activity" />}
+            {activityQuery.isError && (
+                <ErrorState title="Couldn't load activity" error={activityQuery.error} onRetry={() => activityQuery.refetch()} retrying={activityQuery.isFetching} />
+            )}
 
             {activity && (
                 <div className="flex min-h-0 flex-1">
@@ -175,7 +190,9 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
                                     // saved when you leave the field; clearing it is ignored (an activity needs a time)
                                     onBlur={(event) => {
                                         const next = fromDateTimeLocal(event.target.value);
-                                        if (next && next !== activity.scheduledAt) update.mutate({ scheduledAt: next });
+                                        if (next && event.target.value !== toDateTimeLocal(activity.scheduledAt)) {
+                                            update.mutate({ scheduledAt: next });
+                                        }
                                     }}
                                     className="h-7 rounded-lg px-1 outline-none hover:bg-fill focus:bg-fill"
                                 />
@@ -331,7 +348,7 @@ function PickMenu({
         <Dropdown buttonClassName="flex h-7 max-w-full items-center gap-1.5 rounded-lg px-1 hover:bg-fill" label={label}>
             {(close) =>
                 items.map((item) => (
-                    <MenuItem key={item.key} selected={item.selected} onClick={() => { item.onPick(); close(); }}>
+                    <MenuItem key={item.key} selected={item.selected} onClick={() => { if (!item.selected) item.onPick(); close(); }}>
                         {item.content}
                     </MenuItem>
                 ))

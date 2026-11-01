@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconAddressBook, IconArrowDown, IconArrowUp } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import {
     AssignMenu,
     BulkBar,
@@ -94,12 +94,21 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
 
     const bulk = useMutation({
         mutationFn: (body: BulkAction) => api.patch("/contacts/bulkUpdate", { ...body, contactIds: [...selected] }),
-        onSuccess: () => {
+        onSuccess: (_, body) => {
+            const count = selected.size;
+            const noun = count === 1 ? "contact" : "contacts";
+            toast.success(
+                body.action === "delete"
+                    ? `${count} ${noun} deleted`
+                    : body.assignedToId === null
+                        ? `${count} ${noun} unassigned`
+                        : `${count} ${noun} assigned`
+            );
             setSelected(new Set());
             setConfirmingDelete(false);
             refreshContacts(queryClient);
         },
-        onError: (error) => showToast(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     // Inline edits from the table — a single-row PUT, same endpoint the
@@ -107,15 +116,21 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
     // it's logged to the timeline, just like everywhere else.
     const updateContact = useMutation({
         mutationFn: ({ id, changes }: { id: number; changes: Record<string, unknown> }) => api.put(`/contacts/${id}`, changes),
-        onSuccess: () => refreshContacts(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success("Contact updated");
+            refreshContacts(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const assignContact = useMutation({
         mutationFn: ({ id, assignedToId }: { id: number; assignedToId: number | null }) =>
             api.post(`/contacts/${id}/assign`, { assignedToId }),
-        onSuccess: () => refreshContacts(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: (_, { assignedToId }) => {
+            toast.success(assignedToId === null ? "Contact unassigned" : "Contact assigned");
+            refreshContacts(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const isDefaultSort = filters.sortBy === "createdAt" && filters.sortOrder === "desc";
@@ -230,6 +245,8 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                     tableColumns={{ getWidth, resize, reorderVisible }}
                     loading={contactsQuery.isPending}
                     failed={contactsQuery.isError}
+                    error={contactsQuery.error}
+                    onRetry={() => contactsQuery.refetch()}
                     filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
                     hasMore={contactsQuery.hasNextPage}
                     loadingMore={contactsQuery.isFetchingNextPage}

@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconLoader2, IconPlus, IconTargetArrow, IconTrash } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconPlus, IconTargetArrow, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { ColorSwatchPicker } from "@/components/ColorSwatchPicker";
-import { showToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { STAGE_COLORS } from "@/lib/stageColors";
 import type { PipelineStage } from "@/app/(dashboard)/deals/shared";
 
@@ -46,9 +48,10 @@ export default function PipelineStagesView() {
             }
             return { previous };
         },
+        onSuccess: () => toast.success("Stage order saved"),
         onError: (error, _stageIds, context) => {
             if (context?.previous) queryClient.setQueryData(["pipelineStage"], context.previous);
-            showToast(errorMessage(error));
+            toast.error(errorMessage(error));
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: ["pipelineStage"] }),
     });
@@ -56,10 +59,11 @@ export default function PipelineStagesView() {
     const remove = useMutation({
         mutationFn: (id: number) => api.delete(`/pipeline-stages/${id}`),
         onSuccess: () => {
+            toast.success("Stage deleted");
             setDeletingStage(null);
             queryClient.invalidateQueries({ queryKey: ["pipelineStage"] });
         },
-        onError: (error) => showToast(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     function move(index: number, direction: -1 | 1) {
@@ -94,8 +98,15 @@ export default function PipelineStagesView() {
                         The columns of the deals board, in the order they appear. A won or lost stage marks a deal as closed.
                     </p>
 
-                    {stagesQuery.isPending && <p className="mt-6 text-faint">Loading stages...</p>}
-                    {stagesQuery.isError && <p className="mt-6 text-danger">{errorMessage(stagesQuery.error)}</p>}
+                    {stagesQuery.isPending && <PageLoader label="Loading stages" />}
+                    {stagesQuery.isError && (
+                        <ErrorState
+                            title="Couldn't load stages"
+                            error={stagesQuery.error}
+                            onRetry={() => stagesQuery.refetch()}
+                            retrying={stagesQuery.isFetching}
+                        />
+                    )}
 
                     {stagesQuery.data && (
                         <ul className="mt-6 overflow-hidden rounded-lg border border-line">
@@ -186,6 +197,7 @@ function StageForm({ stage, onDone }: StageFormProps) {
             return stage ? api.patch(`/pipeline-stages/${stage.id}`, data) : api.post("/pipeline-stages", data);
         },
         onSuccess: () => {
+            toast.success(stage ? "Stage updated" : "Stage created");
             queryClient.invalidateQueries({ queryKey: ["pipelineStage"] });
             onDone();
         },
@@ -270,7 +282,7 @@ function StageForm({ stage, onDone }: StageFormProps) {
                     disabled={save.isPending}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {save.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {save.isPending && <Spinner size={14} />}
                     {stage ? "Save" : "Create stage"}
                 </button>
             </div>

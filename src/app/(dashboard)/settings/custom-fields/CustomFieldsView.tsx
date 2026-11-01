@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IconLoader2, IconPlus, IconSettings, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconSettings, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, type CustomFieldType } from "../../shared/customFields";
 
 const TYPE_LABELS: Record<CustomFieldType, string> = {
@@ -36,9 +39,11 @@ export default function CustomFieldsView() {
     const remove = useMutation({
         mutationFn: (id: number) => api.delete(`/custom-fields/${id}`),
         onSuccess: () => {
+            toast.success("Custom field deleted");
             setDeleting(null);
             queryClient.invalidateQueries({ queryKey: ["customFields", entity] });
         },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     return (
@@ -77,8 +82,15 @@ export default function CustomFieldsView() {
                         Extra fields for {current.noun}s. Each one can show on the New {current.label.slice(0, -1)} form, as a table column, and as a filter.
                     </p>
 
-                    {fieldsQuery.isPending && <p className="mt-6 text-faint">Loading...</p>}
-                    {fieldsQuery.isError && <p className="mt-6 text-danger">{errorMessage(fieldsQuery.error)}</p>}
+                    {fieldsQuery.isPending && <PageLoader label="Loading custom fields" />}
+                    {fieldsQuery.isError && (
+                        <ErrorState
+                            title="Couldn't load custom fields"
+                            error={fieldsQuery.error}
+                            onRetry={() => fieldsQuery.refetch()}
+                            retrying={fieldsQuery.isFetching}
+                        />
+                    )}
 
                     {fieldsQuery.data && fieldsQuery.data.length > 0 && (
                         <div className="mt-6 space-y-5">
@@ -198,6 +210,7 @@ function CustomFieldForm({
             });
         },
         onSuccess: () => {
+            toast.success(field ? "Custom field updated" : "Custom field created");
             queryClient.invalidateQueries({ queryKey: ["customFields", entity] });
             onDone();
         },
@@ -358,7 +371,7 @@ function CustomFieldForm({
                     disabled={save.isPending}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {save.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {save.isPending && <Spinner size={14} />}
                     {field ? "Save" : "Create field"}
                 </button>
             </div>

@@ -16,6 +16,8 @@ import Link from "next/link";
 
 import { Avatar } from "@/components/Avatar";
 import { DataCell, type DataColumn, type EditConfig } from "@/components/DataTable";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonRows } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
 import { formatDate, formatDay } from "@/lib/format";
 import type { AgentOption } from "../shared/customFields";
@@ -106,6 +108,8 @@ interface TasksTableProps {
     agents?: AgentOption[];
     loading: boolean;
     failed: boolean;
+    error: unknown;
+    onRetry: () => void;
     hasMore: boolean;
     loadingMore: boolean;
     onLoadMore: () => void;
@@ -116,7 +120,7 @@ interface TasksTableProps {
 }
 
 export default function TasksTable({
-    tasks, scope, agents, loading, failed, hasMore, loadingMore, onLoadMore, onToggle, onUpdate, onOpen, onCreate,
+    tasks, scope, agents, loading, failed, error, onRetry, hasMore, loadingMore, onLoadMore, onToggle, onUpdate, onOpen, onCreate,
 }: TasksTableProps) {
     // Infinite scroll: when this invisible div at the bottom comes into view, load the next page
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -134,7 +138,7 @@ export default function TasksTable({
     const colSpan = columns.length + 3;
 
     if (failed) {
-        return <p className="p-4 text-danger">Could not load tasks. Please refresh the page.</p>;
+        return <ErrorState title="Couldn't load tasks" error={error} onRetry={onRetry} />;
     }
 
     return (
@@ -198,15 +202,7 @@ export default function TasksTable({
                         );
                     })}
 
-                    {/* Loading placeholders, the same height as real rows so nothing jumps */}
-                    {(loading || loadingMore) &&
-                        [1, 2, 3, 4, 5].map((n) => (
-                            <tr key={`loading-${n}`}>
-                                <td colSpan={colSpan} className="h-8 border-b border-line-light px-3">
-                                    <div className="h-2.5 w-2/3 animate-pulse rounded bg-app" />
-                                </td>
-                            </tr>
-                        ))}
+                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
 
                     {!loading && (
                         <tr>

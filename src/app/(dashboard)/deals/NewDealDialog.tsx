@@ -15,6 +15,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { toast } from "@/components/Toast";
 import { Select } from "@/components/Select";
 import { createDealSchema } from "@/lib/validations/deals";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
@@ -122,6 +123,7 @@ function NewDealForm({ canAssign, onClose, onCreated }: Omit<NewDealDialogProps,
                 })
                 .then((res) => res.data.data),
         onSuccess: async (deal) => {
+            toast.success("Deal created");
             await refreshDeals(queryClient);
             onCreated(deal);
         },

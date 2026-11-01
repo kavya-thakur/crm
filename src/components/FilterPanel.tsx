@@ -16,7 +16,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import { Select } from "@/components/Select";
 import { Dropdown, MenuItem } from "./Dropdown";
 import { FilterChip } from "./ListPage";
@@ -530,14 +530,20 @@ function FilterPanelContent<TFilters extends object>({
 
     const saveFilter = useMutation({
         mutationFn: (name: string) => api.post("/saved-filters", { entity, name, filters }),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["savedFilters", entity] }),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success("Filter saved");
+            queryClient.invalidateQueries({ queryKey: ["savedFilters", entity] });
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const deleteSavedFilter = useMutation({
         mutationFn: (id: number) => api.delete(`/saved-filters/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["savedFilters", entity] }),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success("Filter deleted");
+            queryClient.invalidateQueries({ queryKey: ["savedFilters", entity] });
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     // A saved filter only ever contains the fields that were active when it

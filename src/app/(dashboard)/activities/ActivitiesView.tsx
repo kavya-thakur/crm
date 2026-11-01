@@ -8,7 +8,7 @@ import { IconCalendarEvent, IconChevronDown, IconUserCircle } from "@tabler/icon
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ListHeader } from "@/components/ListPage";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { toggledStatus } from "../shared/activities";
@@ -65,8 +65,19 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
     // Ticking an activity off and inline edits from the table are the same single-row PUT the panel uses
     const updateActivity = useMutation({
         mutationFn: ({ id, changes }: { id: number; changes: Record<string, unknown> }) => api.put(`/activities/${id}`, changes),
-        onSuccess: () => refreshActivities(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: (_, { changes }) => {
+            toast.success(
+                changes.status === "COMPLETED"
+                    ? "Activity completed"
+                    : changes.status === "SCHEDULED"
+                        ? "Activity reopened"
+                        : changes.status === "CANCELLED"
+                            ? "Activity cancelled"
+                            : "Activity updated"
+            );
+            refreshActivities(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const activities = activitiesQuery.data?.pages.flatMap((page) => page.data) ?? [];
@@ -147,6 +158,8 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
                     agents={seeAgents ? agents.data : undefined}
                     loading={activitiesQuery.isPending}
                     failed={activitiesQuery.isError}
+                    error={activitiesQuery.error}
+                    onRetry={() => activitiesQuery.refetch()}
                     hasMore={activitiesQuery.hasNextPage}
                     loadingMore={activitiesQuery.isFetchingNextPage}
                     onLoadMore={activitiesQuery.fetchNextPage}

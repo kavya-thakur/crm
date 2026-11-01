@@ -18,6 +18,7 @@ import {
 
 import { Avatar } from "./Avatar";
 import { Dropdown, MenuItem } from "./Dropdown";
+import { Spinner } from "./Loader";
 import { Modal } from "./Modal";
 
 /**
@@ -343,9 +344,10 @@ export function ConfirmDeleteModal({
                         type="button"
                         onClick={onConfirm}
                         disabled={pending}
-                        className="h-8 rounded-lg bg-danger px-3 font-medium text-white hover:bg-[#dd3e42] disabled:opacity-60"
+                        className="flex h-8 items-center gap-1.5 rounded-lg bg-danger px-3 font-medium text-white hover:bg-[#dd3e42] disabled:opacity-60"
                     >
-                        {pending ? "Deleting..." : "Delete"}
+                        {pending && <Spinner size={14} />}
+                        {pending ? "Deleting" : "Delete"}
                     </button>
                 </div>
             </div>

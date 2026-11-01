@@ -32,8 +32,11 @@ import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { Select } from "@/components/Select";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Avatar } from "@/components/Avatar";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { formatDate, timeAgo } from "@/lib/format";
-import { groupCustomFields, useCustomFields, type CustomFieldDef } from "../shared/customFields";
+import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
@@ -97,6 +100,7 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
     const update = useMutation({
         mutationFn: (changes: ContactChanges) => api.put<{ data: Contact }>(`/contacts/${contactId}`, changes),
         onSuccess: (res) => {
+            toast.success("Contact updated");
             // show the saved value right away, then refresh the list
             queryClient.setQueryData(["contact", contactId], res.data.data);
             refreshContacts(queryClient);
@@ -105,7 +109,8 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
 
     const assign = useMutation({
         mutationFn: (assignedToId: number | null) => api.post(`/contacts/${contactId}/assign`, { assignedToId }),
-        onSuccess: async () => {
+        onSuccess: async (_, assignedToId) => {
+            toast.success(assignedToId === null ? "Contact unassigned" : "Contact assigned");
             await refreshContacts(queryClient);
             queryClient.invalidateQueries({ queryKey: ["contact", contactId] });
         },
@@ -114,6 +119,7 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
     const remove = useMutation({
         mutationFn: () => api.delete(`/contacts/${contactId}`),
         onSuccess: () => {
+            toast.success("Contact deleted");
             queryClient.invalidateQueries({ queryKey: ["contacts"] });
             onClose();
         },
@@ -165,8 +171,15 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                 </div>
             </header>
 
-            {contactQuery.isPending && <p className="p-4 text-faint">Loading...</p>}
-            {contactQuery.isError && <p role="alert" className="p-4 text-danger">{errorMessage(contactQuery.error)}</p>}
+            {contactQuery.isPending && <PageLoader label="Loading contact" />}
+            {contactQuery.isError && (
+                <ErrorState
+                    title="Couldn't load contact"
+                    error={contactQuery.error}
+                    onRetry={() => contactQuery.refetch()}
+                    retrying={contactQuery.isFetching}
+                />
+            )}
 
             {contact && (
                 <div className="flex min-h-0 flex-1">
@@ -202,7 +215,7 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                                             <>
                                                 <MenuItem
                                                     selected={!contact.assignedTo}
-                                                    onClick={() => { assign.mutate(null); close(); }}
+                                                    onClick={() => { if (contact.assignedTo) assign.mutate(null); close(); }}
                                                 >
                                                     <IconUserOff size={16} /> Unassigned
                                                 </MenuItem>
@@ -210,7 +223,7 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                                                     <MenuItem
                                                         key={agent.id}
                                                         selected={agent.id === contact.assignedTo?.id}
-                                                        onClick={() => { assign.mutate(agent.id); close(); }}
+                                                        onClick={() => { if (agent.id !== contact.assignedTo?.id) assign.mutate(agent.id); close(); }}
                                                     >
                                                         <Avatar name={agent.name} /> {agent.name}
                                                     </MenuItem>
@@ -266,7 +279,11 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                                                     value={contact.customFields?.[field.key]}
                                                     disabled={!can.update}
                                                     agents={agents}
-                                                    onSave={(value) => update.mutate({ customFields: { [field.key]: value } })}
+                                                    onSave={(value) => {
+                                                        if (!isSameFieldValue(value, contact.customFields?.[field.key])) {
+                                                            update.mutate({ customFields: { [field.key]: value } });
+                                                        }
+                                                    }}
                                                 />
                                             </FieldRow>
                                         ))}
@@ -328,12 +345,16 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                         ) : (
                             <section className="px-4 py-4">
                                 {timelineQuery.isError && (
-                                    <p role="alert" className="mb-3 text-sm text-danger">
-                                        {errorMessage(timelineQuery.error)}
-                                    </p>
+                                    <ErrorState
+                                        variant="inline"
+                                        title="Couldn't load timeline"
+                                        error={timelineQuery.error}
+                                        onRetry={() => timelineQuery.refetch()}
+                                        retrying={timelineQuery.isFetching}
+                                    />
                                 )}
 
-                                {timelineQuery.isPending && <p className="text-sm text-faint">Loading timeline...</p>}
+                                {timelineQuery.isPending && <SkeletonList rows={3} />}
 
                                 {timelineQuery.isSuccess && timeline.length === 0 && (
                                     <p className="text-light">No timeline entries yet</p>
@@ -385,7 +406,13 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                                         disabled={timelineQuery.isFetchingNextPage}
                                         className="ml-9 rounded-lg px-1 font-medium text-faint hover:bg-fill hover:text-muted disabled:opacity-60"
                                     >
-                                        {timelineQuery.isFetchingNextPage ? "Loading..." : "Show older entries"}
+                                        {timelineQuery.isFetchingNextPage ? (
+                                            <span className="flex items-center gap-1.5">
+                                                <Spinner size={12} /> Loading
+                                            </span>
+                                        ) : (
+                                            "Show older entries"
+                                        )}
                                     </button>
                                 )}
                             </section>

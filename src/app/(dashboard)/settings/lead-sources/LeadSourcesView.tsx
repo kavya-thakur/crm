@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconLoader2, IconPlus, IconTag, IconTrash } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconPlus, IconTag, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { ColorSwatchPicker } from "@/components/ColorSwatchPicker";
-import { showToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { STAGE_COLORS } from "@/lib/stageColors";
 import type { LeadSource } from "@/app/(dashboard)/leads/shared";
 
@@ -45,9 +47,10 @@ export default function LeadSourcesView() {
             }
             return { previous };
         },
+        onSuccess: () => toast.success("Source order saved"),
         onError: (error, _sourceIds, context) => {
             if (context?.previous) queryClient.setQueryData(["leadSource"], context.previous);
-            showToast(errorMessage(error));
+            toast.error(errorMessage(error));
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: ["leadSource"] }),
     });
@@ -55,10 +58,11 @@ export default function LeadSourcesView() {
     const remove = useMutation({
         mutationFn: (id: number) => api.delete(`/lead-sources/${id}`),
         onSuccess: () => {
+            toast.success("Source deleted");
             setDeletingSource(null);
             queryClient.invalidateQueries({ queryKey: ["leadSource"] });
         },
-        onError: (error) => showToast(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     function move(index: number, direction: -1 | 1) {
@@ -93,8 +97,15 @@ export default function LeadSourcesView() {
                         The options offered when picking where a lead came from, in the order they appear.
                     </p>
 
-                    {sourcesQuery.isPending && <p className="mt-6 text-faint">Loading sources...</p>}
-                    {sourcesQuery.isError && <p className="mt-6 text-danger">{errorMessage(sourcesQuery.error)}</p>}
+                    {sourcesQuery.isPending && <PageLoader label="Loading sources" />}
+                    {sourcesQuery.isError && (
+                        <ErrorState
+                            title="Couldn't load sources"
+                            error={sourcesQuery.error}
+                            onRetry={() => sourcesQuery.refetch()}
+                            retrying={sourcesQuery.isFetching}
+                        />
+                    )}
 
                     {sourcesQuery.data && (
                         <ul className="mt-6 overflow-hidden rounded-lg border border-line">
@@ -184,6 +195,7 @@ function SourceForm({ source, onDone }: SourceFormProps) {
             return source ? api.patch(`/lead-sources/${source.id}`, data) : api.post("/lead-sources", data);
         },
         onSuccess: () => {
+            toast.success(source ? "Source updated" : "Source created");
             queryClient.invalidateQueries({ queryKey: ["leadSource"] });
             onDone();
         },
@@ -242,7 +254,7 @@ function SourceForm({ source, onDone }: SourceFormProps) {
                     disabled={save.isPending}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {save.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {save.isPending && <Spinner size={14} />}
                     {source ? "Save" : "Create source"}
                 </button>
             </div>

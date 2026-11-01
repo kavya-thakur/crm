@@ -22,6 +22,9 @@ import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { formatDate, timeAgo } from "@/lib/format";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
@@ -53,7 +56,8 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
 
     const update = useMutation({
         mutationFn: (changes: TaskChanges) => api.put<{ data: Task }>(`/tasks/${taskId}`, changes),
-        onSuccess: (res) => {
+        onSuccess: (res, changes) => {
+            toast.success(changes.status === "COMPLETED" ? "Task completed" : changes.status === "PENDING" ? "Task reopened" : "Task updated");
             // show the saved value right away, then refresh the lists and timelines
             queryClient.setQueryData(["task", taskId], res.data.data);
             refreshTasks(queryClient);
@@ -63,6 +67,7 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
     const remove = useMutation({
         mutationFn: () => api.delete(`/tasks/${taskId}`),
         onSuccess: () => {
+            toast.success("Task deleted");
             refreshTasks(queryClient);
             onClose();
         },
@@ -105,8 +110,10 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
                 </div>
             </header>
 
-            {taskQuery.isPending && <p className="p-4 text-faint">Loading...</p>}
-            {taskQuery.isError && <p role="alert" className="p-4 text-danger">{errorMessage(taskQuery.error)}</p>}
+            {taskQuery.isPending && <PageLoader label="Loading task" />}
+            {taskQuery.isError && (
+                <ErrorState title="Couldn't load task" error={taskQuery.error} onRetry={() => taskQuery.refetch()} retrying={taskQuery.isFetching} />
+            )}
 
             {task && (
                 <div className="flex min-h-0 flex-1">
@@ -172,7 +179,7 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
                                                     <MenuItem
                                                         key={agent.id}
                                                         selected={agent.id === task.assignedTo.id}
-                                                        onClick={() => { update.mutate({ assignedToId: agent.id }); close(); }}
+                                                        onClick={() => { if (agent.id !== task.assignedTo.id) update.mutate({ assignedToId: agent.id }); close(); }}
                                                     >
                                                         <Avatar name={agent.name} /> {agent.name}
                                                     </MenuItem>
