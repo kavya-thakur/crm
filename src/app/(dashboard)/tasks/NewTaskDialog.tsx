@@ -7,6 +7,7 @@ import { IconCalendarDue, IconChecklist, IconFileDescription, IconFlag, IconUser
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Select } from "@/components/Select";
+import { toast } from "@/components/Toast";
 import { createTaskSchema } from "@/lib/validations/tasks";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import type { AgentOption } from "../shared/customFields";
@@ -38,7 +39,10 @@ export default function NewTaskDialog({ agents, onClose, onCreated }: NewTaskDia
 
     const create = useMutation({
         mutationFn: (values: unknown) => api.post<{ data: Task }>("/tasks", values).then((res) => res.data.data),
-        onSuccess: onCreated,
+        onSuccess: (task) => {
+            toast.success("Task created");
+            onCreated(task);
+        },
     });
 
     return (

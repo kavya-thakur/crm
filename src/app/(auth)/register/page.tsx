@@ -7,8 +7,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
-import { IconEye, IconEyeOff, IconLoader2 } from "@tabler/icons-react";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
 
+import { Spinner } from "@/components/Loader";
 import { api } from "@/lib/api/client";
 import { registerSchema, type RegisterFormValues } from "@/lib/validations/auth";
 
@@ -138,7 +139,7 @@ export default function RegisterPage() {
                         disabled={registerMutation.isPending}
                         className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-accent text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                     >
-                        {registerMutation.isPending && <IconLoader2 size={16} className="animate-spin" />}
+                        {registerMutation.isPending && <Spinner size={16} />}
                         {registerMutation.isPending ? "Creating workspace..." : "Create workspace"}
                     </button>
                 </form>

@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconCalendarDue, IconCircle, IconCircleCheckFilled, IconLoader2, IconPlus } from "@tabler/icons-react";
+import { IconCalendarDue, IconCircle, IconCircleCheckFilled, IconPlus } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList, Spinner } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import { formatDay } from "@/lib/format";
 import { TASK_PRIORITIES, isOverdue, refreshTasks, type Paginated, type Task, type TaskLink, type TaskPriority } from "../tasks/shared";
 
@@ -53,7 +55,7 @@ export function PriorityDropdown({
                     <MenuItem
                         key={option.value}
                         selected={option.value === value}
-                        onClick={() => { onChange(option.value); close(); }}
+                        onClick={() => { if (option.value !== value) onChange(option.value); close(); }}
                     >
                         <PriorityBadge priority={option.value} />
                     </MenuItem>
@@ -90,8 +92,10 @@ export function TasksTab({ entity, recordId }: { entity: TaskEntity; recordId: n
                 ))}
             </div>
 
-            {tasksQuery.isPending && <p className="text-sm text-faint">Loading tasks...</p>}
-            {tasksQuery.isError && <p role="alert" className="text-sm text-danger">{errorMessage(tasksQuery.error)}</p>}
+            {tasksQuery.isPending && <SkeletonList rows={3} />}
+            {tasksQuery.isError && (
+                <ErrorState variant="inline" title="Couldn't load tasks" error={tasksQuery.error} onRetry={() => tasksQuery.refetch()} retrying={tasksQuery.isFetching} />
+            )}
             {tasksQuery.isSuccess && tasksQuery.data.length === 0 && (
                 <p className="text-light">{scope === "open" ? "No open tasks — add one above." : "Nothing completed yet."}</p>
             )}
@@ -114,8 +118,11 @@ function TaskRow({ task }: { task: Task }) {
 
     const toggle = useMutation({
         mutationFn: () => api.put(`/tasks/${task.id}`, { status: done ? "PENDING" : "COMPLETED" }),
-        onSuccess: () => refreshTasks(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success(done ? "Task reopened" : "Task completed");
+            refreshTasks(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     return (
@@ -160,6 +167,7 @@ function QuickAdd({ link }: { link: TaskLink }) {
     const create = useMutation({
         mutationFn: () => api.post("/tasks", { title, dueDate, priority, ...link }),
         onSuccess: () => {
+            toast.success("Task added");
             setTitle("");
             setPriority("MEDIUM");
             refreshTasks(queryClient);
@@ -197,7 +205,7 @@ function QuickAdd({ link }: { link: TaskLink }) {
                     disabled={!canSubmit}
                     className="flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {create.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {create.isPending && <Spinner size={14} />}
                     Add
                 </button>
             </div>

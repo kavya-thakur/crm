@@ -13,6 +13,12 @@ import { FormFieldRow, FormSection } from "./FullPageForm";
 
 export type CustomFieldType = "TEXT" | "NUMBER" | "DATE" | "SELECT" | "BOOLEAN" | "AGENT";
 
+// Is a custom field being saved with the value it already has? null, undefined and
+// "not set" all count as the same empty value.
+export function isSameFieldValue(next: unknown, current: unknown) {
+    return (next ?? null) === (current ?? null);
+}
+
 export interface AgentOption {
     id: number;
     name: string;

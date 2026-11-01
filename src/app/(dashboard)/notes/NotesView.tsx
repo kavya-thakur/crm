@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { IconAddressBook, IconCurrencyRupee, IconNotes, IconTargetArrow } from "@tabler/icons-react";
 
-import { api, errorMessage } from "@/lib/api/client";
+import { api } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList } from "@/components/Loader";
 import { timeAgo } from "@/lib/format";
 import { renderNoteBody } from "../shared/notes";
 import { usePanelEnter } from "../shared/usePanelEnter";
@@ -73,8 +75,15 @@ export default function NotesView({ meId }: { meId: number }) {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-2xl px-6 py-6">
-                    {notesQuery.isPending && <p className="text-faint">Loading notes...</p>}
-                    {notesQuery.isError && <p role="alert" className="text-danger">{errorMessage(notesQuery.error)}</p>}
+                    {notesQuery.isPending && <SkeletonList rows={4} />}
+                    {notesQuery.isError && (
+                        <ErrorState
+                            title="Couldn't load notes"
+                            error={notesQuery.error}
+                            onRetry={() => notesQuery.refetch()}
+                            retrying={notesQuery.isFetching}
+                        />
+                    )}
                     {notesQuery.isSuccess && notesQuery.data.length === 0 && (
                         <p className="rounded-lg border border-line px-3 py-10 text-center text-faint">{EMPTY_MESSAGE[scope]}</p>
                     )}

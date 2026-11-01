@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     IconChevronDown,
     IconDots,
-    IconLoader2,
     IconPencil,
     IconPlus,
     IconSearch,
@@ -17,6 +16,9 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { formatDate } from "@/lib/format";
 import { createAgentSchema } from "@/lib/validations/agents";
 import { Avatar } from "@/components/Avatar";
@@ -88,12 +90,16 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
 
     const changeRole = useMutation({
         mutationFn: ({ id, roleId }: { id: number; roleId: number }) => api.patch(`/agents/${id}`, { roleId }),
-        onSuccess: refresh,
+        onSuccess: () => {
+            toast.success("Role updated");
+            refresh();
+        },
     });
 
     const remove = useMutation({
         mutationFn: (id: number) => api.delete(`/agents/${id}`),
         onSuccess: () => {
+            toast.success("Member deleted");
             setDeleting(null);
             refresh();
         },
@@ -143,8 +149,15 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                         </p>
                     )}
 
-                    {members.isPending && <p className="mt-4 text-faint">Loading members...</p>}
-                    {members.isError && <p className="mt-4 text-danger">{errorMessage(members.error)}</p>}
+                    {members.isPending && <PageLoader label="Loading members" />}
+                    {members.isError && (
+                        <ErrorState
+                            title="Couldn't load members"
+                            error={members.error}
+                            onRetry={() => members.refetch()}
+                            retrying={members.isFetching}
+                        />
+                    )}
 
                     {shown && (
                         <ul className="mt-3 rounded-lg border border-line">
@@ -277,9 +290,10 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                         <button
                             onClick={() => deleting && remove.mutate(deleting.id)}
                             disabled={remove.isPending}
-                            className="h-8 rounded-lg bg-danger px-3 font-medium text-white hover:bg-[#dd3e42] disabled:opacity-60"
+                            className="flex h-8 items-center gap-1.5 rounded-lg bg-danger px-3 font-medium text-white hover:bg-[#dd3e42] disabled:opacity-60"
                         >
-                            {remove.isPending ? "Deleting..." : "Delete"}
+                            {remove.isPending && <Spinner size={14} />}
+                            {remove.isPending ? "Deleting" : "Delete"}
                         </button>
                     </div>
                 </div>
@@ -307,7 +321,10 @@ function AddMemberForm({ roles, onClose, onSaved }: AddMemberFormProps) {
 
     const create = useMutation({
         mutationFn: (values: unknown) => api.post("/agents", values),
-        onSuccess: onSaved,
+        onSuccess: () => {
+            toast.success("Member added");
+            onSaved();
+        },
     });
 
     return (
@@ -402,7 +419,7 @@ function AddMemberForm({ roles, onClose, onSaved }: AddMemberFormProps) {
                     disabled={create.isPending}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {create.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {create.isPending && <Spinner size={14} />}
                     Add member
                 </button>
             </div>
@@ -428,7 +445,10 @@ function EditMemberForm({ member, onClose, onSaved }: EditMemberFormProps) {
 
     const update = useMutation({
         mutationFn: (values: unknown) => api.patch(`/agents/${member.id}`, values),
-        onSuccess: onSaved,
+        onSuccess: () => {
+            toast.success("Member updated");
+            onSaved();
+        },
     });
 
     return (
@@ -484,7 +504,7 @@ function EditMemberForm({ member, onClose, onSaved }: EditMemberFormProps) {
                     disabled={update.isPending}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {update.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {update.isPending && <Spinner size={14} />}
                     Save
                 </button>
             </div>

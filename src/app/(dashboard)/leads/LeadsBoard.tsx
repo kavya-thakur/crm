@@ -6,6 +6,9 @@ import { IconBuilding, IconMail, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import {
     StageLabel,
     refreshLeads,
@@ -38,10 +41,17 @@ export default function LeadsBoard({ filters, canMove, onOpen, onError }: LeadsB
     });
 
     if (stagesQuery.isPending) {
-        return <p className="p-4 text-sm text-faint">Loading stages...</p>;
+        return <PageLoader label="Loading stages" className="h-full" />;
     }
     if (stagesQuery.isError) {
-        return <p role="alert" className="p-4 text-sm text-danger">{errorMessage(stagesQuery.error)}</p>;
+        return (
+            <ErrorState
+                title="Couldn't load stages"
+                error={stagesQuery.error}
+                onRetry={() => stagesQuery.refetch()}
+                retrying={stagesQuery.isFetching}
+            />
+        );
     }
 
     const stages = filters.stageId === undefined
@@ -83,7 +93,10 @@ function BoardColumn({ stage, filters, canMove, onOpen, onError }: LeadsBoardPro
 
     const move = useMutation({
         mutationFn: (id: number) => api.put(`/leads/${id}`, { stageId: stage.id }),
-        onSuccess: () => refreshLeads(queryClient),
+        onSuccess: () => {
+            toast.success(`Lead moved to ${stage.name}`);
+            refreshLeads(queryClient);
+        },
         onError: (error) => onError(errorMessage(error)),
     });
 

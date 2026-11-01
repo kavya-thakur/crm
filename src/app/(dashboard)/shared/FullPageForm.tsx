@@ -3,11 +3,11 @@
 import { useState, type ComponentType, type ReactNode } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import {
+    IconCalendarEvent,
     IconChecklist,
     IconChevronUp,
     IconLock,
     IconNotes,
-    IconPhoneCall,
     IconProgress,
 } from "@tabler/icons-react";
 import { Avatar } from "@/components/Avatar";
@@ -17,7 +17,7 @@ import { usePanelEnter } from "./usePanelEnter";
  * The "new record" page shell shared by Leads/Deals/Contacts: a breadcrumb
  * header with Cancel/Create in the top right (not buried at the bottom of
  * the form), a fixed-width column of collapsible field groups on the left,
- * and a locked Timeline/Calls/Notes/Activities tab shell on the right —
+ * and a locked Timeline/Notes/Tasks/Activities tab shell on the right —
  * those only make sense once the record actually exists.
  */
 
@@ -31,7 +31,7 @@ interface RecordFormShellProps {
     onSubmit: (e: React.FormEvent) => void;
     onCancel: () => void;
     submitDisabled?: boolean;
-    /** for records with no Timeline/Calls/Notes/Activities of their own (e.g. a task): centres the form instead */
+    /** for records with no Timeline/Notes/Tasks/Activities of their own (e.g. a task): centres the form instead */
     hideTabs?: boolean;
     children: ReactNode;
 }
@@ -162,12 +162,12 @@ export function FormFieldRow({
     );
 }
 
-const TABS = ["Timeline", "Calls", "Notes", "Activities"] as const;
+const TABS = ["Timeline", "Notes", "Tasks", "Activities"] as const;
 const TAB_ICONS: Record<(typeof TABS)[number], typeof IconProgress> = {
     Timeline: IconProgress,
-    Calls: IconPhoneCall,
+    Tasks: IconChecklist,
     Notes: IconNotes,
-    Activities: IconChecklist,
+    Activities: IconCalendarEvent,
 };
 
 function LockedRecordTabs({ noun }: { noun: string }) {

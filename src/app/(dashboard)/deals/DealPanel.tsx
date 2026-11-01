@@ -34,11 +34,14 @@ import {
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
 import { Select } from "@/components/Select";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Avatar } from "@/components/Avatar";
+import { toast } from "@/components/Toast";
 import { formatDate, timeAgo } from "@/lib/format";
-import { groupCustomFields, useCustomFields, type CustomFieldDef } from "../shared/customFields";
+import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
@@ -150,6 +153,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
         mutationFn: (changes: DealChanges) =>
             api.put<{ data: Deal }>(`/deals/${dealId}`, changes),
         onSuccess: async (res) => {
+            toast.success("Deal updated");
             queryClient.setQueryData(["deal", dealId], res.data.data);
             await refreshDeals(queryClient);
         },
@@ -158,7 +162,8 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
     const assign = useMutation({
         mutationFn: (assignedToId: number | null) =>
             api.post(`/deals/${dealId}/assign`, { assignedToId }),
-        onSuccess: async () => {
+        onSuccess: async (_data, assignedToId) => {
+            toast.success(assignedToId === null ? "Deal unassigned" : "Deal assigned");
             await refreshDeals(queryClient);
             queryClient.invalidateQueries({ queryKey: ["deal", dealId] });
         },
@@ -167,6 +172,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
     const remove = useMutation({
         mutationFn: () => api.delete(`/deals/${dealId}`),
         onSuccess: async () => {
+            toast.success("Deal deleted");
             await refreshDeals(queryClient);
             onClose();
         },
@@ -223,14 +229,15 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                 </div>
             </header>
 
-            {dealQuery.isPending && (
-                <p className="p-4 text-faint">Loading deal...</p>
-            )}
+            {dealQuery.isPending && <PageLoader label="Loading deal" />}
 
             {dealQuery.isError && (
-                <p role="alert" className="p-4 text-danger">
-                    {errorMessage(dealQuery.error)}
-                </p>
+                <ErrorState
+                    title="Couldn't load this deal"
+                    error={dealQuery.error}
+                    onRetry={() => dealQuery.refetch()}
+                    retrying={dealQuery.isFetching}
+                />
             )}
 
             {deal && (
@@ -349,7 +356,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                             <>
                                                 <MenuItem
                                                     selected={!deal.assignedTo}
-                                                    onClick={() => { assign.mutate(null); close(); }}
+                                                    onClick={() => { if (deal.assignedTo) assign.mutate(null); close(); }}
                                                 >
                                                     <IconUserOff size={16} /> Unassigned
                                                 </MenuItem>
@@ -357,7 +364,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                                     <MenuItem
                                                         key={agent.id}
                                                         selected={agent.id === deal.assignedTo?.id}
-                                                        onClick={() => { assign.mutate(agent.id); close(); }}
+                                                        onClick={() => { if (agent.id !== deal.assignedTo?.id) assign.mutate(agent.id); close(); }}
                                                     >
                                                         <Avatar name={agent.name} /> {agent.name}
                                                     </MenuItem>
@@ -412,7 +419,11 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                                     value={deal.customFields?.[field.key]}
                                                     disabled={!can.update}
                                                     agents={agents}
-                                                    onSave={(value) => update.mutate({ customFields: { [field.key]: value } })}
+                                                    onSave={(value) => {
+                                                        if (!isSameFieldValue(value, deal.customFields?.[field.key])) {
+                                                            update.mutate({ customFields: { [field.key]: value } });
+                                                        }
+                                                    }}
                                                 />
                                             </FieldRow>
                                         ))}
@@ -477,16 +488,18 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                         ) : (
                             <section className="px-4 py-4">
                                 {timelineQuery.isError && (
-                                    <p role="alert" className="mb-3 text-sm text-danger">
-                                        {errorMessage(timelineQuery.error)}
-                                    </p>
+                                    <div className="mb-3">
+                                        <ErrorState
+                                            variant="inline"
+                                            title="Couldn't load the timeline"
+                                            error={timelineQuery.error}
+                                            onRetry={() => timelineQuery.refetch()}
+                                            retrying={timelineQuery.isFetching}
+                                        />
+                                    </div>
                                 )}
 
-                                {timelineQuery.isPending && (
-                                    <p className="text-sm text-faint">
-                                        Loading timeline...
-                                    </p>
-                                )}
+                                {timelineQuery.isPending && <SkeletonList rows={3} />}
 
                                 {timelineQuery.isSuccess && timeline.length === 0 && (
                                     <p className="text-light">No timeline entries yet</p>
@@ -546,9 +559,13 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                         disabled={timelineQuery.isFetchingNextPage}
                                         className="ml-9 rounded-lg px-1 font-medium text-faint hover:bg-fill hover:text-muted disabled:opacity-60"
                                     >
-                                        {timelineQuery.isFetchingNextPage
-                                            ? "Loading..."
-                                            : "Show older entries"}
+                                        {timelineQuery.isFetchingNextPage ? (
+                                            <span className="flex items-center gap-1.5">
+                                                <Spinner size={12} /> Loading
+                                            </span>
+                                        ) : (
+                                            "Show older entries"
+                                        )}
                                     </button>
                                 )}
                             </section>

@@ -12,7 +12,7 @@ import {
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import {
     AssignMenu,
     BulkBar,
@@ -118,12 +118,25 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
     const bulk = useMutation({
         mutationFn: (body: BulkAction) => api.patch("/leads/bulkUpdate", { ...body, leadIds: [...selected] }),
-        onSuccess: () => {
+        onSuccess: (_res, body) => {
+            // read before the selection is cleared below
+            const count = selected.size;
+            const leadsLabel = `${count} ${count === 1 ? "lead" : "leads"}`;
+
+            toast.success(
+                body.action === "delete"
+                    ? `${leadsLabel} deleted`
+                    : body.action === "stage"
+                        ? `${leadsLabel} moved`
+                        : body.assignedToId === null
+                            ? `${leadsLabel} unassigned`
+                            : `${leadsLabel} assigned`
+            );
             setSelected(new Set());
             setConfirmingDelete(false);
             refreshLeads(queryClient);
         },
-        onError: (error) => showToast(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     // Inline edits from the table — a single-row PUT, same endpoint the lead
@@ -131,15 +144,21 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     // own endpoint so it's logged to the timeline, just like everywhere else.
     const updateLead = useMutation({
         mutationFn: ({ id, changes }: { id: number; changes: Record<string, unknown> }) => api.put(`/leads/${id}`, changes),
-        onSuccess: () => refreshLeads(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success("Lead updated");
+            refreshLeads(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const assignLead = useMutation({
         mutationFn: ({ id, assignedToId }: { id: number; assignedToId: number | null }) =>
             api.post(`/leads/${id}/assign`, { assignedToId }),
-        onSuccess: () => refreshLeads(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: (_res, { assignedToId }) => {
+            toast.success(assignedToId === null ? "Lead unassigned" : "Lead assigned");
+            refreshLeads(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const isDefaultSort = filters.sortBy === "createdAt" && filters.sortOrder === "desc";
@@ -312,6 +331,8 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         tableColumns={{ getWidth, resize, reorderVisible }}
                         loading={leadsQuery.isPending}
                         failed={leadsQuery.isError}
+                        error={leadsQuery.error}
+                        onRetry={() => leadsQuery.refetch()}
                         filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
                         hasMore={leadsQuery.hasNextPage}
                         loadingMore={leadsQuery.isFetchingNextPage}
@@ -323,7 +344,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
                 ) : (
-                    <LeadsBoard filters={filters} canMove={can.update} onOpen={setOpenLeadId} onError={showToast} />
+                    <LeadsBoard filters={filters} canMove={can.update} onOpen={setOpenLeadId} onError={toast.error} />
                 )}
             </div>
 

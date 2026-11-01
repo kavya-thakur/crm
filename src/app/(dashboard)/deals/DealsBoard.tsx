@@ -5,6 +5,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { IconCurrencyRupee, IconTargetArrow, IconUser, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { ErrorState } from "@/components/ErrorState";
+import { InlineLoader, PageLoader } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import {
     StageLabel,
     formatDealAmount,
@@ -39,13 +42,16 @@ export default function DealsBoard({ filters, canMove, onOpen, onError }: DealsB
     });
 
     if (stagesQuery.isPending) {
-        return <p className="p-4 text-sm text-faint">Loading pipeline...</p>;
+        return <PageLoader label="Loading pipeline" />;
     }
     if (stagesQuery.isError) {
         return (
-            <p role="alert" className="p-4 text-sm text-danger">
-                {errorMessage(stagesQuery.error)}
-            </p>
+            <ErrorState
+                title="Couldn't load the pipeline"
+                error={stagesQuery.error}
+                onRetry={() => stagesQuery.refetch()}
+                retrying={stagesQuery.isFetching}
+            />
         );
     }
 
@@ -105,6 +111,7 @@ function BoardColumn({ stage, filters, canMove, onOpen, onError }: BoardColumnPr
     const moveDeal = useMutation({
         mutationFn: (dealId: number) => api.put(`/deals/${dealId}`, { pipelineStageId: stage.id }),
         onSuccess: () => {
+            toast.success("Deal moved");
             void refreshDeals(queryClient);
         },
         onError: (error) => onError(errorMessage(error)),
@@ -141,11 +148,15 @@ function BoardColumn({ stage, filters, canMove, onOpen, onError }: BoardColumnPr
             </header>
 
             <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
-                {dealsQuery.isPending && <p className="py-3 text-center text-light">Loading deals...</p>}
+                {dealsQuery.isPending && <InlineLoader label="Loading deals" />}
                 {dealsQuery.isError && (
-                    <p role="alert" className="py-3 text-center text-sm text-danger">
-                        {errorMessage(dealsQuery.error)}
-                    </p>
+                    <ErrorState
+                        variant="inline"
+                        title="Couldn't load deals"
+                        error={dealsQuery.error}
+                        onRetry={() => dealsQuery.refetch()}
+                        retrying={dealsQuery.isFetching}
+                    />
                 )}
                 {dealsQuery.isSuccess && deals.length === 0 && (
                     <p className="py-3 text-center text-light">No deals</p>

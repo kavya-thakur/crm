@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconCircle, IconCircleCheckFilled, IconLoader2, IconPlus, IconX } from "@tabler/icons-react";
+import { IconCircle, IconCircleCheckFilled, IconPlus, IconX } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList, Spinner } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import { formatDateTime } from "@/lib/format";
 import {
     ACTIVITY_TYPES,
@@ -167,7 +169,7 @@ export function TypeDropdown({
                     <MenuItem
                         key={option.value}
                         selected={option.value === value}
-                        onClick={() => { onChange(option.value); close(); }}
+                        onClick={() => { if (option.value !== value) onChange(option.value); close(); }}
                     >
                         <ActivityTypeLabel type={option.value} />
                     </MenuItem>
@@ -216,8 +218,16 @@ export function ActivitiesTab({ entity, recordId }: { entity: ActivityEntity; re
                 ))}
             </div>
 
-            {activitiesQuery.isPending && <p className="text-sm text-faint">Loading activities...</p>}
-            {activitiesQuery.isError && <p role="alert" className="text-sm text-danger">{errorMessage(activitiesQuery.error)}</p>}
+            {activitiesQuery.isPending && <SkeletonList rows={3} />}
+            {activitiesQuery.isError && (
+                <ErrorState
+                    variant="inline"
+                    title="Couldn't load activities"
+                    error={activitiesQuery.error}
+                    onRetry={() => activitiesQuery.refetch()}
+                    retrying={activitiesQuery.isFetching}
+                />
+            )}
             {activitiesQuery.isSuccess && activitiesQuery.data.length === 0 && (
                 <p className="text-light">
                     {scope === "upcoming" ? "Nothing scheduled — book a call or meeting above." : scope === "overdue" ? "Nothing is overdue." : "Nothing completed yet."}
@@ -243,8 +253,11 @@ function ActivityRow({ activity }: { activity: Activity }) {
 
     const toggle = useMutation({
         mutationFn: () => api.put(`/activities/${activity.id}`, { status: toggledStatus(activity.status) }),
-        onSuccess: () => refreshActivities(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success(done ? "Activity reopened" : "Activity completed");
+            refreshActivities(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     return (
@@ -288,6 +301,7 @@ function QuickAdd({ link }: { link: ActivityLink }) {
     const create = useMutation({
         mutationFn: () => api.post("/activities", { type, title, scheduledAt, ...link }),
         onSuccess: () => {
+            toast.success("Activity scheduled");
             setTitle("");
             refreshActivities(queryClient);
         },
@@ -323,7 +337,7 @@ function QuickAdd({ link }: { link: ActivityLink }) {
                     disabled={!canSubmit}
                     className="flex h-7 items-center gap-1 rounded-lg bg-accent px-2.5 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {create.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {create.isPending && <Spinner size={14} />}
                     Add
                 </button>
             </div>

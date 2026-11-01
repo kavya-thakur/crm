@@ -2,10 +2,13 @@
 
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconLoader2, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
+import { IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/format";
 import type { AgentOption } from "./customFields";
 
@@ -54,12 +57,21 @@ export function NotesTab({
             <NoteComposer
                 agents={agents ?? []}
                 submitLabel="Post"
+                successMessage="Note posted"
                 onSubmit={(body, mentionedUserIds) => api.post(path, { body, mentionedUserIds })}
                 onDone={refresh}
             />
 
-            {notesQuery.isPending && <p className="text-sm text-faint">Loading notes...</p>}
-            {notesQuery.isError && <p role="alert" className="text-sm text-danger">{errorMessage(notesQuery.error)}</p>}
+            {notesQuery.isPending && <SkeletonList rows={3} />}
+            {notesQuery.isError && (
+                <ErrorState
+                    variant="inline"
+                    title="Couldn't load notes"
+                    error={notesQuery.error}
+                    onRetry={() => notesQuery.refetch()}
+                    retrying={notesQuery.isFetching}
+                />
+            )}
             {notesQuery.isSuccess && notesQuery.data.length === 0 && (
                 <p className="text-light">No notes yet — write one above, or @mention a teammate to loop them in.</p>
             )}
@@ -97,7 +109,10 @@ function NoteItem({
 
     const remove = useMutation({
         mutationFn: () => api.delete(notePath),
-        onSuccess: onChanged,
+        onSuccess: () => {
+            toast.success("Note deleted");
+            onChanged();
+        },
     });
 
     if (editing) {
@@ -110,6 +125,7 @@ function NoteItem({
                         .map((id) => agents.find((agent) => agent.id === id))
                         .filter((agent): agent is AgentOption => !!agent)}
                     submitLabel="Save"
+                    successMessage="Note updated"
                     autoFocus
                     onSubmit={(body, mentionedUserIds) => api.patch(notePath, { body, mentionedUserIds })}
                     onDone={() => { setEditing(false); onChanged(); }}
@@ -167,6 +183,7 @@ function NoteComposer({
     initialBody = "",
     initialMentions = [],
     submitLabel,
+    successMessage,
     autoFocus,
     onSubmit,
     onDone,
@@ -176,6 +193,8 @@ function NoteComposer({
     initialBody?: string;
     initialMentions?: AgentOption[];
     submitLabel: string;
+    // what the toast says once it's saved: "Note posted" or "Note updated"
+    successMessage: string;
     autoFocus?: boolean;
     onSubmit: (body: string, mentionedUserIds: number[]) => Promise<unknown>;
     onDone: () => void;
@@ -199,6 +218,7 @@ function NoteComposer({
             return onSubmit(body.trim(), mentionedUserIds);
         },
         onSuccess: () => {
+            toast.success(successMessage);
             setBody("");
             setMentioned([]);
             onDone();
@@ -286,7 +306,7 @@ function NoteComposer({
                     onClick={() => submit.mutate()}
                     className="flex h-7 items-center gap-1.5 rounded-lg bg-accent px-2.5 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {submit.isPending ? <IconLoader2 size={14} className="animate-spin" /> : <IconSend size={14} />}
+                    {submit.isPending ? <Spinner size={14} /> : <IconSend size={14} />}
                     {submitLabel}
                 </button>
             </div>

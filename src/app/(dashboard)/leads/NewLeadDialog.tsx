@@ -16,8 +16,10 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { InlineLoader } from "@/components/Loader";
 import { Select } from "@/components/Select";
 import { StageBadge } from "@/components/StageBadge";
+import { toast } from "@/components/Toast";
 import { createLeadSchema } from "@/lib/validations/leads";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import { CustomFieldsFormSection, useCustomFields } from "../shared/customFields";
@@ -60,7 +62,10 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
 
     const create = useMutation({
         mutationFn: (values: unknown) => api.post<{ data: Lead }>("/leads", values).then((res) => res.data.data),
-        onSuccess: onCreated,
+        onSuccess: (lead) => {
+            toast.success("Lead created");
+            onCreated(lead);
+        },
     });
 
     const customFieldsQuery = useCustomFields("lead");
@@ -272,7 +277,7 @@ function ContactPicker({
             />
             {debounced && (
                 <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-line bg-surface shadow-strong">
-                    {searchQuery.isLoading && <p className="px-2 py-1.5 text-sm text-faint">Searching...</p>}
+                    {searchQuery.isLoading && <InlineLoader label="Searching" className="py-2!" />}
                     {searchQuery.data?.length === 0 && (
                         <p className="px-2 py-1.5 text-sm text-faint">No match — a new contact will be created</p>
                     )}

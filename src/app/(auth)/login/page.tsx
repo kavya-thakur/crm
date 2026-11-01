@@ -7,8 +7,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
-import { IconEye, IconEyeOff, IconLoader2 } from "@tabler/icons-react";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
 
+import { Spinner } from "@/components/Loader";
 import { api } from "@/lib/api/client";
 import { loginSchema, type LoginFormValues } from "@/lib/validations/auth";
 
@@ -102,7 +103,7 @@ export default function LoginPage() {
                         disabled={loginMutation.isPending}
                         className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-accent text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                     >
-                        {loginMutation.isPending && <IconLoader2 size={16} className="animate-spin" />}
+                        {loginMutation.isPending && <Spinner size={16} />}
                         {loginMutation.isPending ? "Signing in..." : "Sign in"}
                     </button>
                 </form>

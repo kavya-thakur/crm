@@ -8,7 +8,7 @@ import { IconChecklist, IconChevronDown, IconFlag, IconUserCircle } from "@table
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ListHeader } from "@/components/ListPage";
-import { showToast } from "@/components/Toast";
+import { toast } from "@/components/Toast";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { PriorityBadge } from "../shared/tasks";
@@ -66,8 +66,11 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
     // Ticking a task off and inline edits from the table are the same single-row PUT the panel uses
     const updateTask = useMutation({
         mutationFn: ({ id, changes }: { id: number; changes: Record<string, unknown> }) => api.put(`/tasks/${id}`, changes),
-        onSuccess: () => refreshTasks(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: (_, { changes }) => {
+            toast.success(changes.status === "COMPLETED" ? "Task completed" : changes.status === "PENDING" ? "Task reopened" : "Task updated");
+            refreshTasks(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const tasks = tasksQuery.data?.pages.flatMap((page) => page.data) ?? [];
@@ -173,6 +176,8 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
                     agents={seeAgents ? agents.data : undefined}
                     loading={tasksQuery.isPending}
                     failed={tasksQuery.isError}
+                    error={tasksQuery.error}
+                    onRetry={() => tasksQuery.refetch()}
                     hasMore={tasksQuery.hasNextPage}
                     loadingMore={tasksQuery.isFetchingNextPage}
                     onLoadMore={tasksQuery.fetchNextPage}

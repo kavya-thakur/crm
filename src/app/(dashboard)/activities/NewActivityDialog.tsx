@@ -7,6 +7,7 @@ import { IconCalendarDue, IconCalendarEvent, IconClock, IconFileDescription, Ico
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Select } from "@/components/Select";
+import { toast } from "@/components/Toast";
 import { createScheduledActivitySchema } from "@/lib/validations/scheduledActivities";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import type { AgentOption } from "../shared/customFields";
@@ -37,7 +38,10 @@ export default function NewActivityDialog({ agents, onClose, onCreated }: NewAct
 
     const create = useMutation({
         mutationFn: (values: unknown) => api.post<{ data: Activity }>("/activities", values).then((res) => res.data.data),
-        onSuccess: onCreated,
+        onSuccess: (activity) => {
+            toast.success("Activity created");
+            onCreated(activity);
+        },
     });
 
     return (

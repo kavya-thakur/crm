@@ -3,8 +3,9 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { IconLoader2, IconProgress } from "@tabler/icons-react";
+import { IconProgress } from "@tabler/icons-react";
 import { api, errorMessage } from "@/lib/api/client";
+import { Spinner } from "@/components/Loader";
 import { Modal } from "@/components/Modal";
 import { Select } from "@/components/Select";
 import { StageLabel } from "@/app/(dashboard)/deals/shared";
@@ -239,7 +240,7 @@ function ConvertToDealForm({ open, leadId, leadName, onClose, onConverted }: Con
                     disabled={convert.isPending || stagesQuery.isPending || !stagesQuery.data?.length}
                     className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {convert.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                    {convert.isPending && <Spinner size={14} />}
                     Convert to deal
                 </button>
             </div>

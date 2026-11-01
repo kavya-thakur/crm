@@ -6,7 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconArrowDown, IconArrowUp, IconCurrencyRupee, IconTargetArrow } from "@tabler/icons-react";
 
 import { Dropdown, MenuItem } from "@/components/Dropdown";
-import { showToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
+import { toast } from "@/components/Toast";
 import {
     AssignMenu,
     BulkBar,
@@ -116,14 +117,19 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     const customFields = customFieldsQuery.data ?? [];
 
     const bulk = useMutation({
+        // the count rides along with the action, since the selection is cleared on success
         mutationFn: (action: BulkAction) =>
-            api.patch("/deals/bulkUpdate", { ...action, dealIds: [...selected] }),
-        onSuccess: async () => {
+            api.patch("/deals/bulkUpdate", { ...action, dealIds: [...selected] }).then(() => ({ action, count: selected.size })),
+        onSuccess: async ({ action, count }) => {
+            const deals = `${count} ${count === 1 ? "deal" : "deals"}`;
+            toast.success(
+                action.action === "delete" ? `${deals} deleted` : action.action === "assign" ? `${deals} assigned` : `${deals} moved`
+            );
             setSelected(new Set());
             setConfirmingDelete(false);
             await refreshDeals(queryClient);
         },
-        onError: (error) => showToast(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     // Inline edits from the table — a single-row PUT, same endpoint the deal
@@ -131,15 +137,21 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     // logged to the timeline, just like everywhere else.
     const updateDeal = useMutation({
         mutationFn: ({ id, changes }: { id: number; changes: Record<string, unknown> }) => api.put(`/deals/${id}`, changes),
-        onSuccess: () => refreshDeals(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+        onSuccess: () => {
+            toast.success("Deal updated");
+            return refreshDeals(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const assignDeal = useMutation({
         mutationFn: ({ id, assignedToId }: { id: number; assignedToId: number | null }) =>
-            api.post(`/deals/${id}/assign`, { assignedToId }),
-        onSuccess: () => refreshDeals(queryClient),
-        onError: (error) => showToast(errorMessage(error)),
+            api.post(`/deals/${id}/assign`, { assignedToId }).then(() => assignedToId),
+        onSuccess: (assignedToId) => {
+            toast.success(assignedToId === null ? "Deal unassigned" : "Deal assigned");
+            return refreshDeals(queryClient);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const defaultSort = filters.sortBy === "createdAt" && filters.sortOrder === "desc";
@@ -279,9 +291,15 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
             </FilterBar>
 
             {can.read && stagesQuery.isError && (
-                <p role="alert" className="border-b border-line-light px-3 py-2 text-sm text-danger">
-                    Could not load pipeline stages: {errorMessage(stagesQuery.error)}
-                </p>
+                <div className="border-b border-line-light px-3 py-2">
+                    <ErrorState
+                        variant="inline"
+                        title="Couldn't load pipeline stages"
+                        error={stagesQuery.error}
+                        onRetry={() => stagesQuery.refetch()}
+                        retrying={stagesQuery.isFetching}
+                    />
+                </div>
             )}
 
             <div className="relative min-h-0 flex-1 overflow-auto">
@@ -295,8 +313,8 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         loading={dealsQuery.isPending}
                         loadingMore={dealsQuery.isFetchingNextPage}
                         failed={dealsQuery.isError}
-                        error={dealsQuery.error ? errorMessage(dealsQuery.error) : undefined}
-                        retry={() => dealsQuery.refetch()}
+                        error={dealsQuery.error}
+                        onRetry={() => dealsQuery.refetch()}
                         retrying={dealsQuery.isFetching}
                         filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
                         hasMore={dealsQuery.hasNextPage}
@@ -313,7 +331,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                             filters={filters}
                             canMove={can.update}
                             onOpen={setSelectedDealId}
-                            onError={showToast}
+                            onError={toast.error}
                         />
                     </div>
                 )}

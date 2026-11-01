@@ -17,6 +17,8 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { StageBadge } from "@/components/StageBadge";
 import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig } from "@/components/DataTable";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonRows } from "@/components/Loader";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { formatDate } from "@/lib/format";
@@ -121,6 +123,8 @@ interface LeadsTableProps {
     tableColumns: Pick<ReturnType<typeof useTableColumns<LeadColumn>>, "getWidth" | "resize" | "reorderVisible">;
     loading: boolean;
     failed: boolean;
+    error: unknown;
+    onRetry: () => void;
     filtered: boolean;
     hasMore: boolean;
     loadingMore: boolean;
@@ -133,7 +137,7 @@ interface LeadsTableProps {
 }
 
 export default function LeadsTable({
-    leads, columns, tableColumns, loading, failed, filtered, hasMore, loadingMore, onLoadMore,
+    leads, columns, tableColumns, loading, failed, error, onRetry, filtered, hasMore, loadingMore, onLoadMore,
     selectable, selected, onSelect, onOpen, onCreate,
 }: LeadsTableProps) {
     // Infinite scroll: when this invisible div at the bottom comes into view, load the next page
@@ -160,7 +164,7 @@ export default function LeadsTable({
     }
 
     if (failed) {
-        return <p className="p-4 text-danger">Could not load leads. Please refresh the page.</p>;
+        return <ErrorState title="Couldn't load leads" error={error} onRetry={onRetry} />;
     }
 
     return (
@@ -238,14 +242,7 @@ export default function LeadsTable({
                     })}
 
                     {/* Loading placeholders, the same height as real rows so nothing jumps */}
-                    {(loading || loadingMore) &&
-                        [1, 2, 3, 4, 5].map((n) => (
-                            <tr key={`loading-${n}`}>
-                                <td colSpan={colSpan} className="h-8 border-b border-line-light px-3">
-                                    <div className="h-2.5 w-2/3 animate-pulse rounded bg-app" />
-                                </td>
-                            </tr>
-                        ))}
+                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
 
                     {onCreate && !loading && (
                         <tr>

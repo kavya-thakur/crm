@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconChevronRight, IconLoader2, IconPlus, IconShieldLock, IconUsers } from "@tabler/icons-react";
+import { IconChevronRight, IconPlus, IconShieldLock, IconUsers } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { SidePanel } from "@/components/SidePanel";
+import { ErrorState } from "@/components/ErrorState";
+import { PageLoader, Spinner } from "@/components/Loader";
+import { toast } from "@/components/Toast";
 
 interface Permission {
     id: number;
@@ -85,8 +88,15 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
                         A role decides what its members can do. Everyone with a role gets all of its permissions.
                     </p>
 
-                    {roles.isPending && <p className="mt-6 text-faint">Loading roles...</p>}
-                    {roles.isError && <p className="mt-6 text-danger">{errorMessage(roles.error)}</p>}
+                    {roles.isPending && <PageLoader label="Loading roles" />}
+                    {roles.isError && (
+                        <ErrorState
+                            title="Couldn't load roles"
+                            error={roles.error}
+                            onRetry={() => roles.refetch()}
+                            retrying={roles.isFetching}
+                        />
+                    )}
 
                     {roles.data && (
                         <ul className="mt-6 overflow-hidden rounded-lg border border-line">
@@ -129,8 +139,15 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
                         can={can}
                         onDone={() => setEditing(null)}
                     />
+                ) : permissions.isError ? (
+                    <ErrorState
+                        title="Couldn't load permissions"
+                        error={permissions.error}
+                        onRetry={() => permissions.refetch()}
+                        retrying={permissions.isFetching}
+                    />
                 ) : (
-                    <p className="p-6 text-faint">Loading...</p>
+                    <PageLoader label="Loading permissions" />
                 )}
             </SidePanel>
         </div>
@@ -183,12 +200,18 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
                 ...(permissionsChanged && { permissionIds: [...selected] }),
             });
         },
-        onSuccess: done,
+        onSuccess: () => {
+            toast.success(role ? "Role updated" : "Role created");
+            done();
+        },
     });
 
     const remove = useMutation({
         mutationFn: () => api.delete(`/roles/${role?.id}`),
-        onSuccess: done,
+        onSuccess: () => {
+            toast.success("Role deleted");
+            done();
+        },
     });
 
     function toggle(id: number) {
@@ -342,7 +365,7 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
                         disabled={save.isPending}
                         className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                     >
-                        {save.isPending && <IconLoader2 size={14} className="animate-spin" />}
+                        {save.isPending && <Spinner size={14} />}
                         {role ? "Save" : "Create role"}
                     </button>
                 )}

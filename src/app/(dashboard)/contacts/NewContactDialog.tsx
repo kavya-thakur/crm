@@ -13,6 +13,7 @@ import {
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Select } from "@/components/Select";
+import { toast } from "@/components/Toast";
 import { createContactSchema } from "@/lib/validations/contact";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import { CustomFieldsFormSection, useCustomFields } from "../shared/customFields";
@@ -47,7 +48,10 @@ function NewContactForm({ canAssign, agents, onClose, onCreated }: Omit<NewConta
 
     const create = useMutation({
         mutationFn: (values: unknown) => api.post<{ data: Contact }>("/contacts", values).then((res) => res.data.data),
-        onSuccess: onCreated,
+        onSuccess: (contact) => {
+            toast.success("Contact created");
+            onCreated(contact);
+        },
     });
 
     const customFieldsQuery = useCustomFields("contact");
