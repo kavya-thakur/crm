@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCurrencyRupee, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCurrencyRupee, IconGitMerge, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
 
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
 import { toast } from "@/components/Toast";
+import { askLostReason } from "@/components/LostReasonPrompt";
 import {
     AssignMenu,
     BulkEditButton,
@@ -45,6 +46,7 @@ import {
 import DealsBoard from "./DealsBoard";
 import DealsTable, { DEAL_COLUMNS, withDealEdits } from "./DealsTable";
 import DealPanel from "./DealPanel";
+import { MergeDealsPanel } from "./MergeDeals";
 import NewDealDialog from "./NewDealDialog";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
@@ -61,7 +63,7 @@ const SORT_FIELDS: { field: DealFilters["sortBy"]; label: string }[] = [
 
 type BulkAction =
     | { action: "update"; changes: Record<string, unknown> }
-    | { action: "stage"; pipelineStageId: number }
+    | { action: "stage"; pipelineStageId: number; lostReason?: string | null }
     | { action: "assign"; assignedToId: number | null }
     | { action: "delete" };
 
@@ -74,13 +76,19 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     const queryClient = useQueryClient();
     const [view, setView] = useState<"table" | "board">("table");
     const searchParams = useSearchParams();
-    // Lets a link elsewhere (e.g. the Notes feed) land straight on a deal's panel
-    const [selectedDealId, setSelectedDealId] = useState<number | null>(() => {
-        const param = searchParams.get("open");
-        return param ? Number(param) : null;
-    });
+    // Lets a link elsewhere (the Notes feed, a notification) land straight on a deal's panel,
+    // including one followed while this page is already open
+    const openParam = searchParams.get("open");
+    const [selectedDealId, setSelectedDealId] = useState<number | null>(openParam ? Number(openParam) : null);
+    const [followedParam, setFollowedParam] = useState(openParam);
+    if (openParam !== followedParam) {
+        setFollowedParam(openParam);
+        if (openParam) setSelectedDealId(Number(openParam));
+    }
     const [creating, setCreating] = useState(false);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    // two deals picked in the table, being merged; the one added first (lower id) stays
+    const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
 
     const {
         query: dealsQuery,
@@ -230,7 +238,9 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         return (
             <NewDealDialog
                 open
-                canAssign={can.update}
+                // picking who it's for needs the right to give deals to others, and to see the team
+                canAssign={can.assign && can.seeAgents}
+                canLinkLead={can.readLeads}
                 onClose={() => setCreating(false)}
                 onCreated={() => setCreating(false)}
             />
@@ -243,7 +253,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 // key: switching deals starts a fresh panel (no leftover edit state)
                 key={selectedDealId}
                 dealId={selectedDealId}
-                can={{ update: can.update, delete: can.delete, assign: can.assign }}
+                can={{ update: can.update, delete: can.delete, assign: can.assign, linkLead: can.readLeads }}
                 agents={can.seeAgents ? agentsQuery.data : undefined}
                 meId={meId}
                 onClose={() => setSelectedDealId(null)}
@@ -268,8 +278,6 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         setView(next);
                         if (next === "board") setSelected(new Set());
                     }}
-                    tableLabel="All deals"
-                    boardLabel="By stage"
                 />
 
                 <div className="ml-auto flex items-center gap-1">
@@ -368,7 +376,14 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         label={<><IconTargetArrow size={14} /> Stage</>}
                     >
                         {(close) => stagesQuery.data.map((stage) => (
-                            <MenuItem key={stage.id} onClick={() => { bulk.mutate({ action: "stage", pipelineStageId: stage.id }); close(); }}>
+                            <MenuItem
+                                key={stage.id}
+                                onClick={async () => {
+                                    close();
+                                    const answer = stage.isLost ? await askLostReason("deal") : {};
+                                    if (answer) bulk.mutate({ action: "stage", pipelineStageId: stage.id, ...answer });
+                                }}
+                            >
                                 <StageLabel stage={stage} />
                             </MenuItem>
                         ))}
@@ -380,6 +395,19 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         agents={agentsQuery.data}
                         onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
                     />
+                )}
+
+                {can.update && can.delete && selected.size === 2 && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const [first, second] = [...selected].sort((a, b) => a - b);
+                            setMerging({ keepId: first, duplicateId: second });
+                        }}
+                        className="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
+                    >
+                        <IconGitMerge size={14} /> Merge
+                    </button>
                 )}
 
                 {can.update && (
@@ -405,6 +433,16 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                     />
                 )}
             </BulkBar>
+
+            <MergeDealsPanel
+                pair={merging}
+                onClose={() => setMerging(null)}
+                onMerged={(keptId) => {
+                    setMerging(null);
+                    setSelected(new Set());
+                    setSelectedDealId(keptId);
+                }}
+            />
 
             <ConfirmDeleteModal
                 open={confirmingDelete}

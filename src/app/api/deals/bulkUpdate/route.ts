@@ -3,11 +3,12 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
 import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
-import { dbIdSchema } from "@/lib/validations/common";
+import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
 import { bulkDealChangesSchema } from "@/lib/validations/deals";
 import { closedAtFor } from "@/lib/pipelineStages";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 const dealIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -22,6 +23,8 @@ const bulkDealSchema = z.discriminatedUnion("action", [
         action: z.literal("stage"),
         dealIds: dealIdsSchema,
         pipelineStageId: dbIdSchema,
+        // asked for when the stage is a lost one
+        lostReason: optionalText(200),
     }),
 
     // the same value for one field (or custom field) on every selected deal
@@ -70,6 +73,7 @@ export async function PATCH(req: NextRequest) {
             },
             select: {
                 id: true,
+                title: true,
                 assignedToId: true,
                 pipelineStageId: true,
             },
@@ -158,6 +162,16 @@ export async function PATCH(req: NextRequest) {
                         })),
                     });
                 });
+
+                const [only] = changed;
+                await notify([assignedToId], {
+                    organizationId: user.organizationId,
+                    actorId: user.id,
+                    type: "DEAL_ASSIGNED",
+                    title: `${firstName(user.name)} assigned you ${changed.length === 1 ? "a deal" : `${changed.length} deals`}`,
+                    body: changed.length === 1 ? only.title : null,
+                    link: changed.length === 1 ? `/deals?open=${only.id}` : "/deals",
+                });
             }
 
             return NextResponse.json({
@@ -206,6 +220,7 @@ export async function PATCH(req: NextRequest) {
                         data: {
                             pipelineStageId: data.pipelineStageId,
                             closedAt: closedAtFor(stage),
+                            lostReason: stage.isLost ? (data.lostReason ?? null) : null,
                             updatedById: user.id,
                         },
                     });
@@ -215,7 +230,7 @@ export async function PATCH(req: NextRequest) {
                             dealId: deal.id,
                             userId: user.id,
                             type: "STAGE_CHANGED",
-                            message: "Deal moved to a new pipeline stage",
+                            message: stage.isLost && data.lostReason ? `Deal lost: ${data.lostReason}` : "Deal moved to a new pipeline stage",
                         })),
                     });
                 });

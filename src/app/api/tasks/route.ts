@@ -7,6 +7,7 @@ import { addTaskToTimeline, dueDateToDb, startOfToday, taskInclude } from "@/lib
 import { createTaskSchema, listTasksQuerySchema } from "@/lib/validations/tasks";
 import { searchParamsToObject } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 export async function POST(req: NextRequest) {
     try {
@@ -90,6 +91,16 @@ export async function POST(req: NextRequest) {
             await addTaskToTimeline(tx, created, user.id, "created");
 
             return created;
+        });
+
+        // a task written down for someone else lands in their bell
+        await notify([task.assignedToId], {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "TASK_ASSIGNED",
+            title: `${firstName(user.name)} gave you a task`,
+            body: task.title,
+            link: `/tasks?open=${task.id}`,
         });
 
         return NextResponse.json(

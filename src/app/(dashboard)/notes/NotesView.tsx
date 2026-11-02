@@ -64,7 +64,7 @@ export default function NotesView({ meId, entities }: { meId: number; entities: 
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2">
                 <div className="font-medium text-muted">
-                    <ViewSwitcher view={view} onChange={setView} tableLabel="All notes" boardLabel="By record" />
+                    <ViewSwitcher view={view} onChange={setView} />
                 </div>
                 <span className="mx-1 h-4 w-px bg-line" />
                 {SCOPES.map((item) => (

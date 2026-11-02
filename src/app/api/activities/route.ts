@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { createScheduledActivitySchema, listScheduledActivitiesQuerySchema } from "@/lib/validations/scheduledActivities";
 import { searchParamsToObject } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 export async function POST(req: NextRequest) {
     try {
@@ -68,6 +69,17 @@ export async function POST(req: NextRequest) {
             },
             include: activityInclude,
         })
+
+        // whoever it's for, and everyone tagged on it, hear about it (not the person booking it)
+        await notify([activity.assignedToId, ...attendeeIds], {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "ACTIVITY_INVITED",
+            title: `${firstName(user.name)} added you to a ${activity.type === "OTHER" ? "calendar item" : activity.type.toLowerCase()}`,
+            body: activity.title,
+            link: `/activities?open=${activity.id}`,
+        });
+
         return NextResponse.json(
             {
                 ok: true,

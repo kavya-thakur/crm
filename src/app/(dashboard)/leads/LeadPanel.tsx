@@ -14,6 +14,7 @@ import {
     IconClock,
     IconFiles,
     IconForms,
+    IconGitMerge,
     IconLock,
     IconMail,
     IconMailFast,
@@ -30,6 +31,7 @@ import {
     IconUserMinus,
     IconUserOff,
     IconX,
+    IconThumbDown,
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
@@ -41,6 +43,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 import { Avatar } from "@/components/Avatar";
+import { askLostReason, LostReasonValue } from "@/components/LostReasonPrompt";
 import { formatDate, timeAgo } from "@/lib/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
@@ -58,6 +61,7 @@ import {
     type Permissions,
 } from "./shared";
 import ConvertToDealDialog from "./ConvertToDealDialog";
+import { MergeLeadsPanel, PossibleDuplicates } from "./MergeLeads";
 
 interface TimelineEntry {
     id: number;
@@ -79,9 +83,10 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
     WEB_FORM: IconForms,
+    MERGED: IconGitMerge,
 };
 
-type LeadChanges = Partial<Pick<Lead, "name" | "email" | "phone" | "companyName" | "stageId">> & {
+type LeadChanges = Partial<Pick<Lead, "name" | "email" | "phone" | "companyName" | "stageId" | "lostReason">> & {
     sourceId?: number | null;
     customFields?: Record<string, unknown>;
 };
@@ -99,6 +104,8 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
     const queryClient = useQueryClient();
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [converting, setConverting] = useState(false);
+    // the duplicate being merged into this lead
+    const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
     const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities">("timeline");
 
     const leadQuery = useQuery({
@@ -241,6 +248,8 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                             </div>
                         </div>
 
+                        {can.update && can.delete && <PossibleDuplicates lead={lead} onMerge={(duplicateId) => setMerging({ keepId: lead.id, duplicateId })} />}
+
                         {/* Fields */}
                         <section className="space-y-0.5 px-3 py-3">
                             <SectionLabel>Fields</SectionLabel>
@@ -256,9 +265,12 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                                 <MenuItem
                                                     key={stage.id}
                                                     selected={stage.id === lead.stageId}
-                                                    onClick={() => {
-                                                        if (stage.id !== lead.stageId) update.mutate({ stageId: stage.id });
+                                                    onClick={async () => {
                                                         close();
+                                                        if (stage.id === lead.stageId) return;
+                                                        // moving to a lost stage asks why first; closing the question calls the move off
+                                                        const answer = stage.isLost ? await askLostReason("lead") : {};
+                                                        if (answer) update.mutate({ stageId: stage.id, ...answer });
                                                     }}
                                                 >
                                                     <StageLabel stage={stage} />
@@ -270,6 +282,12 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                     <span className="px-1"><StageLabel stage={lead.stage} /></span>
                                 )}
                             </FieldRow>
+
+                            {lead.stage.isLost && (
+                                <FieldRow icon={IconThumbDown} label="Lost reason">
+                                    <LostReasonValue what="lead" reason={lead.lostReason} editable={can.update} onChange={(lostReason) => update.mutate({ lostReason })} />
+                                </FieldRow>
+                            )}
 
                             <FieldRow icon={IconUserCircle} label="Assigned to">
                                 {can.assign && agents ? (
@@ -549,6 +567,8 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                     }}
                 />
             )}
+
+            <MergeLeadsPanel pair={merging} onClose={() => setMerging(null)} onMerged={() => setMerging(null)} />
         </div>
     );
 }

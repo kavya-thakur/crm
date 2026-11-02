@@ -8,6 +8,18 @@ export function refreshLeads(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ["lead"] });
 }
 
+// A lead that looks like the same person as another (GET /api/leads/duplicates)
+export interface SimilarLead {
+    id: number;
+    name: string;
+    companyName: string | null;
+    stage: { name: string; color: string };
+    open: boolean;
+    owner: string | null;
+    matchedOn: "email" | "phone";
+    canOpen: boolean;
+}
+
 // Admin-editable, mirroring Deal's PipelineStage — see /settings/stages
 export interface LeadStage {
     id: number;
@@ -36,6 +48,10 @@ export interface Lead {
     source: LeadSource | null;
     stageId: number;
     stage: LeadStage;
+    // why it was lost, while it's in a lost stage
+    lostReason: string | null;
+    // in lists: another open lead for the same person (same phone or email), if there is one
+    duplicates?: { count: number; name: string } | null;
     createdAt: string;
     updatedAt: string;
     assignedTo: { id: number; name: string; email: string } | null;
@@ -85,6 +101,8 @@ export interface LeadFilters {
     updatedBy?: string;
     updatedFrom?: string; // "YYYY-MM-DD"
     updatedTo?: string;
+    // only open leads that share a phone or email with another open lead
+    duplicates?: boolean;
     // values for fields marked "show in filter", keyed by CustomFieldDefinition.key
     customFields?: Record<string, unknown>;
     sortBy: "createdAt" | "updatedAt" | "name" | "source";

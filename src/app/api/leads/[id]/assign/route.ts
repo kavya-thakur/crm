@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema, idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 const assignLeadSchema = z.object({
     assignedToId: dbIdSchema.nullable(),
@@ -128,6 +129,15 @@ export async function POST(
             include: {
                 assignedTo: assignedToSelect,
             },
+        });
+
+        await notify([assignedToId], {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "LEAD_ASSIGNED",
+            title: `${firstName(user.name)} assigned you a lead`,
+            body: lead.name,
+            link: `/leads?open=${lead.id}`,
         });
 
         return NextResponse.json({

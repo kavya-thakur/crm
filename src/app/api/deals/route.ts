@@ -1,5 +1,5 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { dealScope, requirePermission } from "@/lib/auth/requirePermission";
+import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { createDealSchema, listDealsQuerySchema } from "@/lib/validations/deals";
@@ -7,6 +7,8 @@ import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/co
 import { validateCustomFieldValues } from "@/lib/customFields";
 import { closedAtFor } from "@/lib/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";
+import { firstName, notify } from "@/lib/realtime/notify";
+import { dealLeadSelect } from "@/lib/deals";
 
 export async function GET(req: NextRequest) {
     try {
@@ -94,9 +96,7 @@ export async function GET(req: NextRequest) {
                 skip: (page - 1) * limit,
                 take: limit,
                 include: {
-                    lead: {
-                        select: { id: true, name: true },
-                    },
+                    lead: dealLeadSelect,
                     assignedTo: {
                         select: { id: true, name: true, email: true },
                     },
@@ -192,11 +192,22 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Omitted = the creator's own deal. Giving it to someone else (or nobody) needs
+        // deal:all, like assigning does: without it you'd create a deal you then can't see.
+        const ownerId = assignedToId === undefined ? user.id : assignedToId;
+
+        if (ownerId !== user.id && !hasPermission(user, "deal:all")) {
+            return NextResponse.json(
+                { ok: false, message: "You can only create deals assigned to yourself" },
+                { status: 403 }
+            );
+        }
+
         // Verify that the assigned agent belongs to this organization.
-        if (assignedToId != null) {
+        if (ownerId !== null && ownerId !== user.id) {
             const agent = await prisma.user.findFirst({
                 where: {
-                    id: assignedToId,
+                    id: ownerId,
                     organizationId: user.organizationId,
                 },
                 select: { id: true },
@@ -232,7 +243,7 @@ export async function POST(req: NextRequest) {
                 amount,
                 probability,
                 leadId: leadId ?? null,
-                assignedToId: assignedToId ?? null,
+                assignedToId: ownerId,
                 pipelineStageId,
                 closedAt: closedAtFor(stage),
                 createdById: user.id,
@@ -253,12 +264,7 @@ export async function POST(req: NextRequest) {
                 },
             },
             include: {
-                lead: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
+                lead: dealLeadSelect,
                 assignedTo: {
                     select: {
                         id: true,
@@ -268,6 +274,16 @@ export async function POST(req: NextRequest) {
                 },
                 pipelineStage: true,
             },
+        });
+
+        // a deal made for someone else lands in their bell
+        await notify([deal.assignedToId], {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "DEAL_ASSIGNED",
+            title: `${firstName(user.name)} gave you a new deal`,
+            body: deal.title,
+            link: `/deals?open=${deal.id}`,
         });
 
         return NextResponse.json(

@@ -7,6 +7,7 @@ import { updateDealSchema } from "@/lib/validations/deals";
 import { validateCustomFieldValues } from "@/lib/customFields";
 import { closedAtFor } from "@/lib/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";
+import { dealLeadSelect } from "@/lib/deals";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -36,9 +37,7 @@ export async function GET(req: NextRequest, { params }: Params) {
                 ...dealScope(user),
             },
             include: {
-                lead: {
-                    select: { id: true, name: true },
-                },
+                lead: dealLeadSelect,
                 assignedTo: {
                     select: { id: true, name: true, email: true },
                 },
@@ -94,6 +93,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
         // when the stage changes: the moment the deal closed, or null if it's open again
         let closedAt: Date | null = null;
+        let lost = false;
 
         // Verify that the pipeline stage belongs to this organization, if changing it.
         if (pipelineStageId !== undefined) {
@@ -116,6 +116,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
             }
 
             closedAt = closedAtFor(stage);
+            lost = stage.isLost;
         }
 
         // Verify that the lead belongs to this organization, if changing it.
@@ -181,19 +182,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...(customFields && { customFields }),
                 ...(stageChanged && {
                     closedAt,
+                    // a deal that's no longer lost has no reason to be
+                    ...(!lost && { lostReason: null }),
                     timeline: {
                         create: {
                             userId: user.id,
                             type: "STAGE_CHANGED",
-                            message: "Deal moved to a new pipeline stage",
+                            message: lost && fields.lostReason ? `Deal lost: ${fields.lostReason}` : "Deal moved to a new pipeline stage",
                         },
                     },
                 }),
             },
             include: {
-                lead: {
-                    select: { id: true, name: true },
-                },
+                lead: dealLeadSelect,
                 assignedTo: {
                     select: { id: true, name: true, email: true },
                 },

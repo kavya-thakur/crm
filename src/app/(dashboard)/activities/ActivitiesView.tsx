@@ -114,7 +114,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
             <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
-                <ViewSwitcher view={view} onChange={setView} tableLabel="All activities" boardLabel="By status" />
+                <ViewSwitcher view={view} onChange={setView} />
 
                 {/* the board's columns already split activities by status, so these are table-only */}
                 {view === "table" && <span className="mx-1 h-4 w-px bg-line" />}

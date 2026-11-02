@@ -20,6 +20,7 @@ const DealPage = async () => {
                 read: can("deal:read"),
                 assign: can("deal:update") && can("deal:all"),
                 seeAgents: can("user:read"),
+                readLeads: can("lead:read"),
                 managePipeline: can("pipeline:manage"),
                 manageCustomFields: can("custom-fields:manage"),
             }}

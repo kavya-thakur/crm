@@ -59,11 +59,15 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
     const queryClient = useQueryClient();
 
     const searchParams = useSearchParams();
-    // Lets a link elsewhere (e.g. the Notes feed) land straight on a contact's panel
-    const [openContactId, setOpenContactId] = useState<number | null>(() => {
-        const param = searchParams.get("open");
-        return param ? Number(param) : null;
-    });
+    // Lets a link elsewhere (the Notes feed, a notification) land straight on a contact's panel,
+    // including one followed while this page is already open
+    const openParam = searchParams.get("open");
+    const [openContactId, setOpenContactId] = useState<number | null>(openParam ? Number(openParam) : null);
+    const [followedParam, setFollowedParam] = useState(openParam);
+    if (openParam !== followedParam) {
+        setFollowedParam(openParam);
+        if (openParam) setOpenContactId(Number(openParam));
+    }
     const [creating, setCreating] = useState(false);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
 

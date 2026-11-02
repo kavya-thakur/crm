@@ -32,7 +32,7 @@ const FAQS = [
     },
     {
         q: "What does it cost?",
-        a: "₹999 per user, per month, billed monthly. No setup fees and no minimum number of seats.",
+        a: "Flash is free for up to 3 users. The Team plan is ₹999 per user, per month, or ₹799 when billed yearly. No setup fees and no minimum number of seats.",
     },
 ];
 
@@ -51,7 +51,7 @@ export function FaqSection({ primaryHref, primaryLabel }: { primaryHref: string;
     const [open, setOpen] = useState<number | null>(null);
 
     return (
-        <section id="pricing" data-scheme="dark" data-reveal className="relative overflow-clip bg-[#1c1c1c] py-30">
+        <section id="faq" data-scheme="dark" data-reveal className="relative overflow-clip bg-[#1c1c1c] py-30">
             <DashArt
                 width={ART_WIDTH}
                 height={ART_HEIGHT}

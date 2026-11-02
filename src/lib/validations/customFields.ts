@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ENTITY_TYPES, hasAnyField, requiredText } from "./common";
+import { capitalizeFirst, ENTITY_TYPES, hasAnyField, requiredText } from "./common";
 
 export const CUSTOM_FIELD_TYPES = ["TEXT", "NUMBER", "DATE", "SELECT", "BOOLEAN", "AGENT"] as const;
 export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number];
@@ -14,7 +14,8 @@ export const createCustomFieldSchema = z
             .toLowerCase()
             .regex(/^[a-z][a-z0-9_]*$/, "Use lowercase letters, numbers and underscores, starting with a letter")
             .max(50),
-        label: requiredText(100),
+        // shown as a column header and form label, so "collaborator" is saved as "Collaborator"
+        label: requiredText(100).transform(capitalizeFirst),
         type: z.enum(CUSTOM_FIELD_TYPES),
         // SELECT only: the choices it offers
         options: z.array(requiredText(100)).max(50).optional(),
@@ -33,7 +34,7 @@ export const createCustomFieldSchema = z
 // the old key, so only the display/behaviour bits can change after creation.
 export const updateCustomFieldSchema = z
     .object({
-        label: requiredText(100).optional(),
+        label: requiredText(100).transform(capitalizeFirst).optional(),
         // changing type doesn't convert values already saved under the old type
         type: z.enum(CUSTOM_FIELD_TYPES).optional(),
         options: z.array(requiredText(100)).max(50).optional(),

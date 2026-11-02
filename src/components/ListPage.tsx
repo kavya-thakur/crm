@@ -12,12 +12,12 @@ import {
     IconChevronRight,
     IconHash,
     IconLayoutKanban,
+    IconLayoutList,
     IconLetterCase,
     IconList,
     IconPencil,
     IconPlus,
     IconSearch,
-    IconTable,
     IconTrash,
     IconUserCircle,
     IconUserOff,
@@ -80,27 +80,18 @@ export function ListHeader({
 }
 
 // ---------------------------------------------------------------------------
-// View switcher (table / board), search box, sort menu — the toolbar row
+// View switcher (List / Kanban), search box, sort menu — the toolbar row
 // ---------------------------------------------------------------------------
 
-export function ViewSwitcher({
-    view,
-    onChange,
-    tableLabel,
-    boardLabel,
-}: {
-    view: "table" | "board";
-    onChange: (view: "table" | "board") => void;
-    tableLabel: string;
-    boardLabel: string;
-}) {
+// Same two names on every page, so people learn them once
+export function ViewSwitcher({ view, onChange }: { view: "table" | "board"; onChange: (view: "table" | "board") => void }) {
     return (
         <Dropdown
             buttonClassName="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
             label={
                 <>
-                    {view === "table" ? <IconTable size={16} /> : <IconLayoutKanban size={16} />}
-                    {view === "table" ? tableLabel : boardLabel}
+                    {view === "table" ? <IconLayoutList size={16} /> : <IconLayoutKanban size={16} />}
+                    {view === "table" ? "List" : "Kanban"}
                     <IconChevronDown size={14} className="text-faint" />
                 </>
             }
@@ -108,10 +99,10 @@ export function ViewSwitcher({
             {(close) => (
                 <>
                     <MenuItem selected={view === "table"} onClick={() => { onChange("table"); close(); }}>
-                        <IconTable size={16} /> {tableLabel}
+                        <IconLayoutList size={16} /> List
                     </MenuItem>
                     <MenuItem selected={view === "board"} onClick={() => { onChange("board"); close(); }}>
-                        <IconLayoutKanban size={16} /> {boardLabel}
+                        <IconLayoutKanban size={16} /> Kanban
                     </MenuItem>
                 </>
             )}

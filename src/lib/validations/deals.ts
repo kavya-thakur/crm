@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { capitalizeFirst, hasAnyField, idParamSchema, paginationSchema, idListParamSchema, personParamSchema } from "./common";
+import { capitalizeFirst, hasAnyField, optionalText, idParamSchema, paginationSchema, idListParamSchema, personParamSchema } from "./common";
 
 export const listDealsQuerySchema = paginationSchema.extend({
     search: z.string().trim().max(100).optional(),
@@ -45,6 +45,9 @@ const dealFields = z.object({
 
     description: z.string().trim().max(5000).nullable().optional(),
 
+    // why it was lost, when it's in a lost stage ("Price too high"); cleared when it leaves one
+    lostReason: optionalText(200),
+
     // keyed by CustomFieldDefinition.key; checked against the org's actual
     // definitions in the route, not here (this schema doesn't know them)
     customFields: z.record(z.string(), z.unknown()).optional(),
@@ -71,3 +74,12 @@ export const bulkDealChangesSchema = dealFields
     .refine(hasAnyField, "Pick a field to change");
 
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
+// The fields that can differ between two copies of a deal, where merging asks which to keep
+export const MERGE_DEAL_FIELDS = ["title", "amount", "probability", "pipelineStageId", "expectedCloseDate", "leadId", "assignedToId", "description"] as const;
+
+export const mergeDealsSchema = z.object({
+    duplicateId: z.number().int().positive(),
+    // where to take the duplicate's value instead; every other field keeps this deal's
+    // (or the duplicate's, where this deal's is empty)
+    fromDuplicate: z.array(z.enum(MERGE_DEAL_FIELDS)).max(MERGE_DEAL_FIELDS.length).default([]),
+});

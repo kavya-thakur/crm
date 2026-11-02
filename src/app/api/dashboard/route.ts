@@ -88,17 +88,21 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
 
     // Totals are added up by Postgres; only the won deals' dates and amounts come back as
     // rows, for the trend lines and the average time to close
-    const [won, previousWon, lost, previousLost, openStages, byStage, byProbability, closing, closingItems, pastDue] = await Promise.all([
+    const lostThisPeriod = { ...where, pipelineStage: { isLost: true }, closedAt: { gte: start, lt: end } };
+
+    const [won, previousWon, lost, previousLost, lostByReason, openStages, byStage, byProbability, closing, closingItems, pastDue] = await Promise.all([
         prisma.deal.findMany({
             where: { ...where, pipelineStage: { isWon: true }, closedAt: { gte: start, lt: end } },
-            select: { amount: true, closedAt: true, createdAt: true },
+            // the source of the lead it came from, for revenue per source
+            select: { amount: true, closedAt: true, createdAt: true, lead: { select: { sourceId: true } } },
         }),
         prisma.deal.findMany({
             where: { ...where, pipelineStage: { isWon: true }, closedAt: { gte: previousStart, lt: start } },
             select: { amount: true, closedAt: true },
         }),
-        prisma.deal.count({ where: { ...where, pipelineStage: { isLost: true }, closedAt: { gte: start, lt: end } } }),
+        prisma.deal.count({ where: lostThisPeriod }),
         prisma.deal.count({ where: { ...where, pipelineStage: { isLost: true }, closedAt: { gte: previousStart, lt: start } } }),
+        prisma.deal.groupBy({ by: ["lostReason"], where: lostThisPeriod, _count: { _all: true } }),
         prisma.pipelineStage.findMany({
             where: { organizationId: user.organizationId, ...isOpen },
             orderBy: [{ order: "asc" }, { id: "asc" }],
@@ -124,6 +128,14 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
     const trend = perBucket(buckets, won, (deal) => deal.closedAt!, (deal) => Number(deal.amount));
     const previousTrend = perBucket(previousBuckets, previousWon, (deal) => deal.closedAt!, (deal) => Number(deal.amount));
 
+    // revenue won per lead source; deals that didn't come from a lead (or one without a source) count as "no source"
+    const wonBySource = new Map<number | null, { value: number; count: number }>();
+    for (const deal of won) {
+        const sourceId = deal.lead?.sourceId ?? null;
+        const row = wonBySource.get(sourceId) ?? { value: 0, count: 0 };
+        wonBySource.set(sourceId, { value: row.value + Number(deal.amount), count: row.count + 1 });
+    }
+
     // every open stage in board order, including the empty ones
     const stages = openStages.map((stage) => {
         const row = byStage.find((group) => group.pipelineStageId === stage.id);
@@ -140,8 +152,9 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
             averageDays: daysToClose.length ? Math.round(daysToClose.reduce((sum, days) => sum + days, 0) / daysToClose.length) : null,
             trend: buckets.map((bucket, index) => ({ start: bucket.toISOString(), value: trend[index] })),
             previousTrend,
+            bySource: [...wonBySource].map(([sourceId, row]) => ({ sourceId, ...row })),
         },
-        lost: { count: lost, previousCount: previousLost },
+        lost: { count: lost, previousCount: previousLost, reasons: reasonRows(lostByReason) },
         open: {
             value: stages.reduce((sum, stage) => sum + stage.value, 0),
             count: stages.reduce((sum, stage) => sum + stage.count, 0),
@@ -170,10 +183,12 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
     const lastPeriod = { ...where, createdAt: { gte: previousStart, lt: start } };
 
     // counted by Postgres; only each lead's creation time comes back, for the chart
-    const [createdAt, byStage, bySource, converted, previousCreated, previousConverted, stages, sources] = await Promise.all([
+    const [createdAt, byStage, bySource, convertedBySource, lostByReason, converted, previousCreated, previousConverted, stages, sources] = await Promise.all([
         prisma.lead.findMany({ where: thisPeriod, select: { createdAt: true } }),
         prisma.lead.groupBy({ by: ["stageId"], where: thisPeriod, _count: { _all: true } }),
         prisma.lead.groupBy({ by: ["sourceId"], where: thisPeriod, _count: { _all: true } }),
+        prisma.lead.groupBy({ by: ["sourceId"], where: { ...thisPeriod, stage: { isConverted: true } }, _count: { _all: true } }),
+        prisma.lead.groupBy({ by: ["lostReason"], where: { ...thisPeriod, stage: { isLost: true } }, _count: { _all: true } }),
         prisma.lead.count({ where: { ...thisPeriod, stage: { isConverted: true } } }),
         prisma.lead.count({ where: lastPeriod }),
         prisma.lead.count({ where: { ...lastPeriod, stage: { isConverted: true } } }),
@@ -190,10 +205,14 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
 
     const perDay = perBucket(buckets, createdAt, (lead) => lead.createdAt, () => 1);
 
-    // leads without a source get their own row; sources nobody used this period are left out
+    // every source (leads without one get their own row), biggest first; the page drops the
+    // ones that brought neither leads nor revenue this period
     const sourceRows = [...sources, { id: null, name: "No source", color: null }]
-        .map((source) => ({ ...source, count: bySource.find((group) => group.sourceId === source.id)?._count._all ?? 0 }))
-        .filter((source) => source.count > 0)
+        .map((source) => ({
+            ...source,
+            count: bySource.find((group) => group.sourceId === source.id)?._count._all ?? 0,
+            converted: convertedBySource.find((group) => group.sourceId === source.id)?._count._all ?? 0,
+        }))
         .sort((a, b) => b.count - a.count);
 
     return {
@@ -205,7 +224,15 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
         // where this period's leads are now, stage by stage in board order
         stages: stages.map((stage) => ({ ...stage, count: byStage.find((group) => group.stageId === stage.id)?._count._all ?? 0 })),
         sources: sourceRows,
+        lostReasons: reasonRows(lostByReason),
     };
+}
+
+// "Price too high: 4" rows, most common first; lost before reasons were asked = "Not recorded"
+function reasonRows(groups: { lostReason: string | null; _count: { _all: number } }[]) {
+    return groups
+        .map((group) => ({ reason: group.lostReason ?? "Not recorded", count: group._count._all }))
+        .sort((a, b) => b.count - a.count);
 }
 
 type Groups = { assignedToId: number | null; _count: { _all: number }; _sum?: { amount: Prisma.Decimal | null } }[];

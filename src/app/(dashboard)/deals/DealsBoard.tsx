@@ -8,6 +8,7 @@ import type { DataColumn } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
+import { askLostReason } from "@/components/LostReasonPrompt";
 import { formatMoneyShort } from "@/lib/format";
 import { formatDealAmount, refreshDeals, type Deal, type DealFilters, type PipelineStage } from "./shared";
 
@@ -87,7 +88,7 @@ function StageColumn({
     });
 
     const moveDeal = useMutation({
-        mutationFn: (dealId: number) => api.put(`/deals/${dealId}`, { pipelineStageId: stage.id }),
+        mutationFn: ({ id, lostReason }: { id: number; lostReason?: string | null }) => api.put(`/deals/${id}`, { pipelineStageId: stage.id, lostReason }),
         onSuccess: () => {
             toast.success(`Deal moved to ${stage.name}`);
             void refreshDeals(queryClient);
@@ -113,7 +114,16 @@ function StageColumn({
             error={column.error}
             onRetry={column.retry}
             emptyText="No deals"
-            onDropCard={canMove ? (id) => !moveDeal.isPending && moveDeal.mutate(id) : undefined}
+            onDropCard={
+                canMove
+                    ? async (id) => {
+                          if (moveDeal.isPending) return;
+                          // dropping on a lost stage asks why first; closing the question leaves the card where it was
+                          const answer = stage.isLost ? await askLostReason("deal") : {};
+                          if (answer) moveDeal.mutate({ id, ...answer });
+                      }
+                    : undefined
+            }
             onAdd={onAdd}
         >
             {deals.map((deal) => (

@@ -12,6 +12,7 @@ import {
     IconTargetArrow,
     IconUser,
     IconUserCircle,
+    IconThumbDown,
 } from "@tabler/icons-react";
 
 import { Avatar } from "@/components/Avatar";
@@ -21,6 +22,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Loader";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
+import { askLostReason } from "@/components/LostReasonPrompt";
 import { formatDate } from "@/lib/format";
 import {
     StageLabel,
@@ -57,6 +59,7 @@ export const LEAD_COLUMNS: LeadColumn[] = [
         ),
     },
     { key: "createdAt", label: "Created", icon: IconCalendar, width: 150, cell: (lead) => formatDate(lead.createdAt) },
+    { key: "lostReason", label: "Lost reason", icon: IconThumbDown, width: 180, cell: (lead) => lead.stage.isLost && lead.lostReason },
     ...peopleColumns<Lead>(),
 ];
 
@@ -94,7 +97,13 @@ export function withLeadEdits(
             type: "select",
             getValue: (lead) => String(lead.stageId),
             options: stageOptions,
-            onSave: (lead, value) => value !== undefined && context.onUpdate(lead, { stageId: Number(value) }),
+            onSave: async (lead, value) => {
+                const stage = context.stages?.find((item) => String(item.id) === value);
+                if (!stage) return;
+                // moving to a lost stage asks why first; closing the question calls the move off
+                const answer = stage.isLost ? await askLostReason("lead") : {};
+                if (answer) context.onUpdate(lead, { stageId: stage.id, ...answer });
+            },
         },
         company: { type: "text", getValue: (lead) => lead.companyName, onSave: (lead, value) => context.onUpdate(lead, { companyName: value }) },
         email: { type: "email", getValue: (lead) => lead.email, onSave: (lead, value) => context.onUpdate(lead, { email: value }) },

@@ -6,6 +6,8 @@ import { createLeadSchema, listLeadsQuerySchema } from "@/lib/validations/leads"
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/customFields";
+import { alreadyALead, duplicateLeadsWhere, findOpenCopy, withDuplicateHints } from "@/lib/leadDuplicates";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 export async function POST(req: NextRequest) {
     try {
@@ -38,6 +40,14 @@ export async function POST(req: NextRequest) {
                 { ok: false, message: "Invalid lead stage" },
                 { status: 400 }
             );
+        }
+
+        // One open lead per person: someone already being worked on isn't added twice.
+        // A lead that was lost or converted doesn't count; coming back is a new opportunity.
+        const copy = await findOpenCopy(user.organizationId, fields);
+
+        if (copy) {
+            return alreadyALead(copy, user);
         }
 
         // Verify that the source belongs to this organization, if supplied.
@@ -181,6 +191,16 @@ export async function POST(req: NextRequest) {
             });
         });
 
+        // a lead made for someone else lands in their bell
+        await notify([lead.assignedToId], {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "LEAD_ASSIGNED",
+            title: `${firstName(user.name)} gave you a new lead`,
+            body: lead.name,
+            link: `/leads?open=${lead.id}`,
+        });
+
         return NextResponse.json(
             {
                 ok: true,
@@ -205,7 +225,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder } =
+        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, duplicates, customFields: customFieldsParam, sortBy, sortOrder } =
             query.data;
 
         const term = search && escapeLike(search);
@@ -238,8 +258,11 @@ export async function GET(req: NextRequest) {
                 .map(([key, value]) => ({ customFields: { path: [key], equals: value as Prisma.InputJsonValue } }));
         }
 
+        // "Possible duplicates": open leads that share a phone or email with another open one
+        const andFilters = duplicates ? [...customFieldFilters, await duplicateLeadsWhere(leadScope(user))] : customFieldFilters;
+
         const where: Prisma.LeadWhereInput = {
-            ...(customFieldFilters.length > 0 && { AND: customFieldFilters }),
+            ...(andFilters.length > 0 && { AND: andFilters }),
             ...(term && {
                 OR: [
                     { name: { contains: term, mode: "insensitive" } },
@@ -308,7 +331,8 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             ok: true,
-            data: leads,
+            // each open lead that has an open copy is marked, for the list and the board
+            data: await withDuplicateHints(leads, leadScope(user)),
             pagination: {
                 page,
                 limit,

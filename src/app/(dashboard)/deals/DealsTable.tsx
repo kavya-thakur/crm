@@ -6,8 +6,11 @@ import {
     IconCurrencyRupee,
     IconPlus,
     IconTargetArrow,
+    IconMail,
+    IconPhone,
     IconUser,
     IconUserCircle,
+    IconThumbDown,
 } from "@tabler/icons-react";
 
 import { Avatar } from "@/components/Avatar";
@@ -17,6 +20,7 @@ import { StageBadge } from "@/components/StageBadge";
 import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, peopleColumns } from "@/components/DataTable";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
+import { askLostReason } from "@/components/LostReasonPrompt";
 import { formatDate } from "@/lib/format";
 import { StageLabel, formatDealAmount, type Deal, type DealUser, type PipelineStage } from "./shared";
 
@@ -32,6 +36,15 @@ export const DEAL_COLUMNS: DealColumn[] = [
         cell: (deal) => <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} />,
     },
     { key: "lead", label: "Lead", icon: IconUser, width: 180, cell: (deal) => (deal.lead?.name ? <span className="text-muted">{deal.lead.name}</span> : <span className="text-light">Empty</span>) },
+    // how to reach the person: their lead's phone and email
+    {
+        key: "phone", label: "Phone", icon: IconPhone, width: 160,
+        cell: (deal) => deal.lead?.phone ? <a href={`tel:${deal.lead.phone}`} className="hover:underline">{deal.lead.phone}</a> : <span className="text-light">Empty</span>,
+    },
+    {
+        key: "email", label: "Email", icon: IconMail, width: 220,
+        cell: (deal) => deal.lead?.email ? <a href={`mailto:${deal.lead.email}`} className="hover:underline">{deal.lead.email}</a> : <span className="text-light">Empty</span>,
+    },
     {
         key: "assignedTo", label: "Assigned to", icon: IconUserCircle, width: 180,
         cell: (deal) => deal.assignedTo ? (
@@ -56,6 +69,7 @@ export const DEAL_COLUMNS: DealColumn[] = [
         key: "expectedCloseDate", label: "Expected close", icon: IconCalendar, width: 170,
         cell: (deal) => deal.expectedCloseDate ? <span className="text-muted">{formatDate(deal.expectedCloseDate)}</span> : <span className="text-light">Empty</span>,
     },
+    { key: "lostReason", label: "Lost reason", icon: IconThumbDown, width: 180, cell: (deal) => deal.pipelineStage.isLost && deal.lostReason },
     ...peopleColumns<Deal>(),
 ];
 
@@ -88,7 +102,13 @@ export function withDealEdits(
             type: "select",
             getValue: (deal) => String(deal.pipelineStageId),
             options: stageOptions,
-            onSave: (deal, value) => value !== undefined && context.onUpdate(deal, { pipelineStageId: Number(value) }),
+            onSave: async (deal, value) => {
+                const stage = context.stages?.find((item) => String(item.id) === value);
+                if (!stage) return;
+                // moving to a lost stage asks why first; closing the question calls the move off
+                const answer = stage.isLost ? await askLostReason("deal") : {};
+                if (answer) context.onUpdate(deal, { pipelineStageId: stage.id, ...answer });
+            },
         },
         probability: { type: "number", getValue: (deal) => deal.probability, onSave: (deal, value) => context.onUpdate(deal, { probability: value ?? 0 }) },
         expectedCloseDate: {
