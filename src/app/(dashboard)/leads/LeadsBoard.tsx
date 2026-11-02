@@ -9,6 +9,7 @@ import type { DataColumn } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
+import { askLostReason } from "@/components/LostReasonPrompt";
 import { refreshLeads, type Lead, type LeadFilters, type LeadStage } from "./shared";
 
 interface LeadsBoardProps {
@@ -87,7 +88,7 @@ function StageColumn({
     const column = useBoardColumn<Lead>(["leads", "board", { ...filters, stageId: stage.id }], "/leads", { ...filters, stageId: stage.id });
 
     const move = useMutation({
-        mutationFn: (id: number) => api.put(`/leads/${id}`, { stageId: stage.id }),
+        mutationFn: ({ id, lostReason }: { id: number; lostReason?: string | null }) => api.put(`/leads/${id}`, { stageId: stage.id, lostReason }),
         onSuccess: () => {
             toast.success(`Lead moved to ${stage.name}`);
             refreshLeads(queryClient);
@@ -107,7 +108,15 @@ function StageColumn({
             error={column.error}
             onRetry={column.retry}
             emptyText="No leads"
-            onDropCard={canMove ? (id) => move.mutate(id) : undefined}
+            onDropCard={
+                canMove
+                    ? async (id) => {
+                          // dropping on a lost stage asks why first; closing the question leaves the card where it was
+                          const answer = stage.isLost ? await askLostReason("lead") : {};
+                          if (answer) move.mutate({ id, ...answer });
+                      }
+                    : undefined
+            }
             onAdd={onAdd}
         >
             {leads.map((lead) => (

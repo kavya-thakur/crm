@@ -21,6 +21,7 @@ import {
     IconLayoutKanban,
     IconListCheck,
     IconTargetArrow,
+    IconThumbDown,
     IconTrendingUp,
     IconTrophy,
     IconUsersGroup,
@@ -61,8 +62,9 @@ interface Dashboard {
             averageDays: number | null;
             trend: TrendPoint[];
             previousTrend: number[];
+            bySource: { sourceId: number | null; value: number; count: number }[];
         };
-        lost: { count: number; previousCount: number };
+        lost: { count: number; previousCount: number; reasons: LostReason[] };
         open: { value: number; count: number; weighted: number; stages: (Stage & { value: number })[] };
         closing: {
             total: number;
@@ -78,7 +80,8 @@ interface Dashboard {
         previousConverted: number;
         trend: TrendPoint[];
         stages: (Stage & { isConverted: boolean; isLost: boolean })[];
-        sources: { id: number | null; name: string; color: string | null; count: number }[];
+        sources: { id: number | null; name: string; color: string | null; count: number; converted: number }[];
+        lostReasons: LostReason[];
     } | null;
     team: Team | null;
     tasks: {
@@ -89,6 +92,7 @@ interface Dashboard {
     activities: { id: number; title: string; type: ActivityType; scheduledAt: string; durationMinutes: number | null }[];
 }
 
+type LostReason = { reason: string; count: number };
 type Deals = NonNullable<Dashboard["deals"]>;
 type Leads = NonNullable<Dashboard["leads"]>;
 type Icon = ComponentType<{ size?: number; stroke?: number; className?: string }>;
@@ -279,7 +283,8 @@ function Overview({
             {leads && <LeadStagesCard leads={leads} period={period} className={deals ? "" : "lg:col-span-3"} />}
 
             {leads && <NewLeadsCard leads={leads} range={range} against={against} />}
-            {leads && <SourcesCard sources={leads.sources} period={period} />}
+            {(deals || leads) && <LostReasonsCard deals={deals?.lost.reasons} leads={leads?.lostReasons} period={period} className={leads ? "" : "lg:col-span-3"} />}
+            {leads && <SourcePerformanceCard sources={leads.sources} won={deals?.won.bySource} period={period} />}
 
             <div className="grid gap-4 lg:col-span-3 lg:grid-cols-2">
                 <TasksCard tasks={data.tasks} />
@@ -551,27 +556,130 @@ function NewLeadsCard({ leads, range, against }: { leads: Leads; range: Dashboar
     );
 }
 
-// Where this period's leads came from, biggest first; past six, the rest share a row
-function SourcesCard({ sources, period }: { sources: Leads["sources"]; period: string }) {
+// Which sources are worth the effort: how many leads each brought this period, how many of
+// those converted, and the revenue won from deals that started as one of its leads
+function SourcePerformanceCard({ sources, won, period }: { sources: Leads["sources"]; won: Deals["won"]["bySource"] | undefined; period: string }) {
+    const rows = sources
+        .map((source) => {
+            const deals = won?.find((row) => row.sourceId === source.id);
+            return { ...source, revenue: deals?.value ?? 0, wonCount: deals?.count ?? 0 };
+        })
+        .filter((row) => row.count > 0 || row.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue || b.count - a.count);
+    const topRevenue = Math.max(...rows.map((row) => row.revenue), 1);
+    const head = "py-2 pr-5 text-right font-medium whitespace-nowrap";
+
+    return (
+        <Card
+            title="Source performance"
+            description={`Where the last ${period}'s leads came from, and which sources turn into customers`}
+            icon={IconAntenna}
+            tone="sky"
+            className="lg:col-span-3"
+        >
+            {rows.length === 0 ? (
+                <Empty>No new leads in the last {period}.</Empty>
+            ) : (
+                <div className="-mx-5 overflow-x-auto">
+                    <table className="w-full min-w-[640px] border-collapse">
+                        <thead>
+                            <tr className="border-y border-line-light text-left text-sm text-faint">
+                                <th className="py-2 pr-4 pl-5 font-medium">Source</th>
+                                <th className={head}>New leads</th>
+                                <th className={head}>Converted</th>
+                                <th className={head}>Conversion rate</th>
+                                {won && <th className={head}>Deals won</th>}
+                                {won && <th className={head}>Revenue won</th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((row) => {
+                                const rate = percent(row.converted, row.count);
+                                return (
+                                    <tr key={row.id ?? "none"} className="border-b border-line-light text-muted tabular-nums last:border-b-0">
+                                        <td className="py-2.5 pr-4 pl-5">
+                                            <span className="flex items-center gap-2">
+                                                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: row.color ?? "#d6d6d6" }} />
+                                                <span className="font-medium whitespace-nowrap text-ink">{row.name}</span>
+                                            </span>
+                                        </td>
+                                        <td className="py-2.5 pr-5 text-right">{row.count}</td>
+                                        <td className="py-2.5 pr-5 text-right">{row.converted}</td>
+                                        <td className="py-2.5 pr-5 text-right">{row.count === 0 ? <span className="text-light">—</span> : `${rate}%`}</td>
+                                        {won && <td className="py-2.5 pr-5 text-right">{row.wonCount}</td>}
+                                        {won && (
+                                            <td className="py-2.5 pr-5 text-right">
+                                                <span className="font-medium text-ink">{formatMoney(row.revenue)}</span>
+                                                {/* a thin bar: its share of the best source's revenue */}
+                                                <span className="mt-1 ml-auto block h-1 w-24 rounded-full bg-accent-soft">
+                                                    <span className="block h-full rounded-full bg-accent" style={{ width: `${(row.revenue / topRevenue) * 100}%` }} />
+                                                </span>
+                                            </td>
+                                        )}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </Card>
+    );
+}
+
+// Why deals (and leads) were lost this period, most common first. Someone who sees both can switch.
+function LostReasonsCard({ deals, leads, period, className }: { deals?: LostReason[]; leads?: LostReason[]; period: string; className: string }) {
+    const [showing, setShowing] = useState<"deals" | "leads">(deals ? "deals" : "leads");
+    const reasons = (showing === "deals" ? deals : leads) ?? [];
+    const total = reasons.reduce((sum, row) => sum + row.count, 0);
     const rows =
-        sources.length > 6
-            ? [...sources.slice(0, 5), { id: -1, name: "Other", color: null, count: sources.slice(5).reduce((sum, row) => sum + row.count, 0) }]
-            : sources;
+        reasons.length > 6 ? [...reasons.slice(0, 5), { reason: "Everything else", count: reasons.slice(5).reduce((sum, row) => sum + row.count, 0) }] : reasons;
     const largest = Math.max(...rows.map((row) => row.count), 1);
 
     return (
-        <Card title="Leads by source" icon={IconAntenna} tone="sky">
+        <Card
+            title="Why we lose"
+            icon={IconThumbDown}
+            tone="rose"
+            className={className}
+            action={
+                deals &&
+                leads && (
+                    <div role="radiogroup" aria-label="Lost" className="-mt-1 flex rounded-lg bg-fill p-0.5">
+                        {(["deals", "leads"] as const).map((key) => (
+                            <button
+                                key={key}
+                                type="button"
+                                role="radio"
+                                aria-checked={showing === key}
+                                onClick={() => setShowing(key)}
+                                className={`h-6 rounded-md px-2 text-sm font-medium capitalize transition-colors ${
+                                    showing === key ? "bg-surface text-ink shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-muted hover:text-ink"
+                                }`}
+                            >
+                                {key}
+                            </button>
+                        ))}
+                    </div>
+                )
+            }
+        >
             {rows.length === 0 ? (
-                <Empty>No new leads in the last {period}.</Empty>
+                <Empty icon>Nothing lost in the last {period}.</Empty>
             ) : (
                 <ul className="flex flex-col gap-3.5">
                     {rows.map((row) => (
                         <BarRow
-                            key={row.id ?? "none"}
-                            name={row.name}
-                            color={row.color}
+                            key={row.reason}
+                            name={row.reason}
+                            color={null}
                             share={row.count / largest}
-                            figure={<span className="font-medium text-ink">{row.count}</span>}
+                            figure={
+                                <>
+                                    <span className="font-medium text-ink">{row.count}</span>
+                                    <span className="inline-block w-10 text-faint">{percent(row.count, total)}%</span>
+                                </>
+                            }
                         />
                     ))}
                 </ul>

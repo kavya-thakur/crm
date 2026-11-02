@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconBuilding, IconProgress, IconTag } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconBuilding, IconGitMerge, IconProgress, IconTag } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { toast } from "@/components/Toast";
+import { askLostReason } from "@/components/LostReasonPrompt";
 import {
     AssignMenu,
     BulkEditButton,
@@ -46,6 +47,7 @@ import {
 import LeadsTable, { LEAD_COLUMNS, withLeadEdits } from "./LeadsTable";
 import LeadsBoard from "./LeadsBoard";
 import LeadPanel from "./LeadPanel";
+import { MergeLeadsPanel } from "./MergeLeads";
 import NewLeadDialog from "./NewLeadDialog";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
@@ -60,7 +62,7 @@ const SORT_FIELDS: { field: LeadFilters["sortBy"]; label: string }[] = [
 
 type BulkAction =
     | { action: "update"; changes: Record<string, unknown> }
-    | { action: "stage"; stageId: number }
+    | { action: "stage"; stageId: number; lostReason?: string | null }
     | { action: "assign"; assignedToId: number | null }
     | { action: "delete" };
 
@@ -69,13 +71,19 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
     const [view, setView] = useState<"table" | "board">("table");
     const searchParams = useSearchParams();
-    // Lets a link elsewhere (e.g. the Notes feed) land straight on a lead's panel
-    const [openLeadId, setOpenLeadId] = useState<number | null>(() => {
-        const param = searchParams.get("open");
-        return param ? Number(param) : null;
-    });
+    // Lets a link elsewhere (the Notes feed, a notification) land straight on a lead's panel,
+    // including one followed while this page is already open
+    const openParam = searchParams.get("open");
+    const [openLeadId, setOpenLeadId] = useState<number | null>(openParam ? Number(openParam) : null);
+    const [followedParam, setFollowedParam] = useState(openParam);
+    if (openParam !== followedParam) {
+        setFollowedParam(openParam);
+        if (openParam) setOpenLeadId(Number(openParam));
+    }
     const [creating, setCreating] = useState(false);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    // two leads picked in the table, being merged; the one added first (lower id) stays
+    const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
 
     const {
         query: leadsQuery,
@@ -190,9 +198,26 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         renderChip: (f) => `Source: ${sourcesQuery.data?.find((source) => source.id === f.sourceId)?.name ?? "Selected"}`,
     };
 
+    // open leads that look like the same person as another open lead, to clean up in one place
+    const duplicatesField: FilterFieldDef<LeadFilters> = {
+        key: "duplicates",
+        label: "Possible duplicates",
+        isActive: (f) => f.duplicates === true,
+        clear: () => ({ duplicates: undefined }),
+        renderControl: (f, onChange) =>
+            renderSelectControl(
+                f.duplicates ? "only" : undefined,
+                (value) => onChange({ duplicates: value ? true : undefined }),
+                [{ value: "only", label: "Only possible duplicates" }],
+                "All leads",
+            ),
+        renderChip: () => "Possible duplicates",
+    };
+
     const FILTER_FIELDS: FilterFieldDef<LeadFilters>[] = [
         stageField,
         sourceField,
+        duplicatesField,
         createAssignedToField<LeadFilters>({
             get: (f) => f.assignedTo,
             set: (value) => ({ assignedTo: value }),
@@ -289,8 +314,6 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         setView(next);
                         if (next === "board") setSelected(new Set());
                     }}
-                    tableLabel="All leads"
-                    boardLabel="By status"
                 />
 
                 <div className="ml-auto flex items-center gap-1">
@@ -380,7 +403,14 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     >
                         {(close) =>
                             stagesQuery.data.map((stage) => (
-                                <MenuItem key={stage.id} onClick={() => { bulk.mutate({ action: "stage", stageId: stage.id }); close(); }}>
+                                <MenuItem
+                                    key={stage.id}
+                                    onClick={async () => {
+                                        close();
+                                        const answer = stage.isLost ? await askLostReason("lead") : {};
+                                        if (answer) bulk.mutate({ action: "stage", stageId: stage.id, ...answer });
+                                    }}
+                                >
                                     <StageLabel stage={stage} />
                                 </MenuItem>
                             ))
@@ -393,6 +423,19 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         agents={agents.data}
                         onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
                     />
+                )}
+
+                {can.update && can.delete && selected.size === 2 && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const [first, second] = [...selected].sort((a, b) => a - b);
+                            setMerging({ keepId: first, duplicateId: second });
+                        }}
+                        className="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
+                    >
+                        <IconGitMerge size={14} /> Merge
+                    </button>
                 )}
 
                 {can.update && (
@@ -421,6 +464,16 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     />
                 )}
             </BulkBar>
+
+            <MergeLeadsPanel
+                pair={merging}
+                onClose={() => setMerging(null)}
+                onMerged={(keptId) => {
+                    setMerging(null);
+                    setSelected(new Set());
+                    setOpenLeadId(keptId);
+                }}
+            />
 
             <ConfirmDeleteModal
                 open={confirmingDelete}

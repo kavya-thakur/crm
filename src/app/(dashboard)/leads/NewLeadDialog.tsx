@@ -8,6 +8,7 @@ import {
     IconAddressBook,
     IconAlertTriangle,
     IconExternalLink,
+    IconInfoCircle,
     IconMail,
     IconPhone,
     IconProgress,
@@ -31,6 +32,7 @@ import {
     type Lead,
     type LeadSource,
     type LeadStage,
+    type SimilarLead,
 } from "./shared";
 
 const inputClassName =
@@ -88,8 +90,11 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
     }, [stagesQuery.data, setValue]);
 
     const [contact, setContact] = useState<ContactOption | null>(null);
-    // for the duplicate warning, which checks as these are typed
+    // checked as these are typed: is this person already a lead?
     const [email, phone] = useWatch({ control, name: ["email", "phone"] });
+    const similar = useSimilarLeads(String(email ?? ""), String(phone ?? ""));
+    // one open lead per person, so an open one already there stops a second (the API refuses it too)
+    const openCopy = similar.find((lead) => lead.open);
 
     return (
         <RecordFormShell
@@ -99,7 +104,7 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
             formId="new-lead-form"
             onCancel={onClose}
             onSubmit={handleSubmit((values) => create.mutate(values))}
-            submitDisabled={create.isPending || !stagesQuery.data?.length}
+            submitDisabled={create.isPending || !stagesQuery.data?.length || Boolean(openCopy)}
         >
             <FormIdentityHeader placeholder="Lead name *" error={errors.name?.message} registerProps={register("name")} />
 
@@ -157,7 +162,7 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
                     <input type="tel" placeholder="+91 555 0100" aria-invalid={!!errors.phone} {...register("phone")} className={inputClassName} />
                 </FormFieldRow>
 
-                <DuplicateWarning email={String(email ?? "")} phone={String(phone ?? "")} />
+                <DuplicateNotice openCopy={openCopy} earlier={similar.filter((lead) => !lead.open)} />
             </FormSection>
 
             {canLinkContact && (
@@ -226,21 +231,8 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
     );
 }
 
-interface SimilarLead {
-    id: number;
-    name: string;
-    companyName: string | null;
-    stage: { name: string; color: string };
-    open: boolean;
-    owner: string | null;
-    matchedOn: "email" | "phone";
-    canOpen: boolean;
-}
-
-// "This person may already be a lead": checked as the email and phone are typed (once
-// typing pauses), so two people don't end up chasing the same customer. Only a warning:
-// the lead can still be created, e.g. when someone comes back for something new.
-function DuplicateWarning({ email, phone }: { email: string; phone: string }) {
+// Leads with the same email or phone as the one being typed, checked once typing pauses
+function useSimilarLeads(email: string, phone: string) {
     const [typed, setTyped] = useState({ email: "", phone: "" });
 
     useEffect(() => {
@@ -257,40 +249,45 @@ function DuplicateWarning({ email, phone }: { email: string; phone: string }) {
         staleTime: 30_000,
     });
 
-    const matches = similarQuery.data ?? [];
-    if (matches.length === 0) return null;
+    return similarQuery.data ?? [];
+}
+
+// Under the email and phone: either "already an open lead" (which stops the form), or a
+// note that they were a lead before, lost or converted, so this one is a new opportunity
+function DuplicateNotice({ openCopy, earlier }: { openCopy?: SimilarLead; earlier: SimilarLead[] }) {
+    if (openCopy) {
+        return (
+            <div role="alert" className="mt-2 flex items-start gap-2 rounded-lg border border-[#f5d090] bg-[#fff8eb] p-3 text-[#8a5a00]">
+                <IconAlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <p className="min-w-0 flex-1">
+                    <span className="font-medium">{openCopy.name}</span> is already an open lead with the same {openCopy.matchedOn}
+                    {openCopy.owner ? `, owned by ${openCopy.owner}` : ""}. Work on that one instead of adding a second.
+                </p>
+                {openCopy.canOpen && (
+                    // a new tab, so this form isn't lost
+                    <a
+                        href={`/leads?open=${openCopy.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex shrink-0 items-center gap-1 text-sm font-medium text-accent hover:underline"
+                    >
+                        Open <IconExternalLink size={13} />
+                    </a>
+                )}
+            </div>
+        );
+    }
+
+    if (earlier.length === 0) return null;
+    const [last] = earlier;
 
     return (
-        <div role="status" className="mt-2 rounded-lg border border-[#f5d090] bg-[#fff8eb] p-3">
-            <p className="flex items-center gap-1.5 font-medium text-[#8a5a00]">
-                <IconAlertTriangle size={15} className="shrink-0" />
-                {matches.length === 1 ? "This person may already be a lead" : `This person may already be one of ${matches.length} leads`}
-            </p>
-            <ul className="mt-2 flex flex-col gap-1.5">
-                {matches.map((lead) => (
-                    <li key={lead.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-surface px-2.5 py-1.5">
-                        <span className="font-medium text-ink">{lead.name}</span>
-                        {lead.companyName && <span className="text-faint">· {lead.companyName}</span>}
-                        <StageBadge name={lead.stage.name} color={lead.stage.color} />
-                        <span className="text-sm text-faint">
-                            {lead.owner ? `owned by ${lead.owner}` : "unassigned"} · same {lead.matchedOn}
-                        </span>
-                        {lead.canOpen && (
-                            // a new tab, so this half-filled form isn't lost
-                            <a
-                                href={`/leads?open=${lead.id}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="ml-auto flex items-center gap-1 text-sm font-medium text-accent hover:underline"
-                            >
-                                Open <IconExternalLink size={13} />
-                            </a>
-                        )}
-                    </li>
-                ))}
-            </ul>
-            <p className="mt-2 text-sm text-[#8a5a00]/80">You can still create it, for example if they&apos;re back for something new.</p>
-        </div>
+        <p role="status" className="mt-2 flex items-center gap-1.5 rounded-lg bg-paper px-3 py-2 text-sm text-muted">
+            <IconInfoCircle size={15} className="shrink-0 text-faint" />
+            <span className="min-w-0">
+                Was a lead before: <span className="font-medium text-ink">{last.name}</span> ({last.stage.name}). This starts a new opportunity for them.
+            </span>
+        </p>
     );
 }
 

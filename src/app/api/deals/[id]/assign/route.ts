@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema, idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 const assignDealSchema = z.object({
     assignedToId: dbIdSchema.nullable(),
@@ -128,6 +129,15 @@ export async function POST(
             include: {
                 assignedTo: assignedToSelect,
             },
+        });
+
+        await notify([assignedToId], {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "DEAL_ASSIGNED",
+            title: `${firstName(user.name)} assigned you a deal`,
+            body: deal.title,
+            link: `/deals?open=${deal.id}`,
         });
 
         return NextResponse.json({

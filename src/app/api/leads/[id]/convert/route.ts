@@ -5,6 +5,7 @@ import { createDealSchema } from "@/lib/validations/deals";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { closedAtFor } from "@/lib/pipelineStages";
+import { dealLeadSelect } from "@/lib/deals";
 
 // Only what a deal needs beyond the lead itself: the lead and its current
 // assignee carry over as-is, so neither is asked for here. Deal custom fields
@@ -110,7 +111,7 @@ export async function POST(
                     },
                 },
                 include: {
-                    lead: { select: { id: true, name: true } },
+                    lead: dealLeadSelect,
                     assignedTo: { select: { id: true, name: true, email: true } },
                     pipelineStage: true,
                 },
@@ -120,6 +121,7 @@ export async function POST(
                 where: { id: lead.id },
                 data: {
                     stageId: convertedStage.id,
+                    lostReason: null,
                     updatedById: user.id,
                     timeline: {
                         create: {

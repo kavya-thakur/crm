@@ -7,6 +7,7 @@ export interface Permissions {
     delete: boolean;
     assign: boolean;
     seeAgents: boolean;
+    readLeads: boolean;
     managePipeline: boolean;
     manageCustomFields: boolean;
 }
@@ -16,9 +17,12 @@ export interface DealUser {
     name: string;
     email: string;
 }
+// The lead a deal came from: the person, and how to reach them
 export interface DealLead {
     id: number;
     name: string;
+    phone: string | null;
+    email: string | null;
 }
 export type PipelineStage = PrismaPipelineStage;
 

@@ -30,6 +30,11 @@ import {
     IconUserCircle,
     IconUserOff,
     IconX,
+    IconThumbDown,
+    IconGitMerge,
+    IconLinkOff,
+    IconMail,
+    IconPhone,
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
@@ -39,6 +44,8 @@ import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
 import { Select } from "@/components/Select";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Avatar } from "@/components/Avatar";
+import { askLostReason, LostReasonValue } from "@/components/LostReasonPrompt";
+import { MergeDealsPanel, PossibleDuplicateDeals } from "./MergeDeals";
 import { toast } from "@/components/Toast";
 import { formatDate, timeAgo } from "@/lib/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
@@ -51,6 +58,7 @@ import {
     formatDealAmount,
     refreshDeals,
     type Deal,
+    type DealLead,
     type DealUser,
     type Paginated,
     type PipelineStage,
@@ -79,6 +87,7 @@ const TIMELINE_ICONS: Record<string, typeof IconTargetArrow> = {
     UNASSIGNED: IconUserCircle,
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
+    MERGED: IconGitMerge,
 };
 
 type DealChanges = Partial<
@@ -92,6 +101,7 @@ type DealChanges = Partial<
         | "expectedCloseDate"
         | "description"
         | "customFields"
+        | "lostReason"
     >
 >;
 
@@ -101,6 +111,8 @@ interface DealPanelProps {
         update: boolean;
         delete: boolean;
         assign: boolean;
+        // picking the lead lists the leads, which needs lead:read
+        linkLead: boolean;
     };
     agents?: DealUser[];
     meId: number;
@@ -116,6 +128,8 @@ interface StagesResponse {
 export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPanelProps) {
     const queryClient = useQueryClient();
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    // a duplicate being merged into this deal
+    const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
     const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities">("timeline");
 
     const dealQuery = useQuery({
@@ -267,6 +281,10 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                             </div>
                         </div>
 
+                        {can.update && can.delete && (
+                            <PossibleDuplicateDeals deal={deal} onMerge={(duplicateId) => setMerging({ keepId: deal.id, duplicateId })} />
+                        )}
+
                         {/* Fields */}
                         <section className="space-y-0.5 px-3 py-3">
                             <SectionLabel>Fields</SectionLabel>
@@ -287,13 +305,12 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                                 <MenuItem
                                                     key={stage.id}
                                                     selected={stage.id === deal.pipelineStageId}
-                                                    onClick={() => {
-                                                        if (stage.id !== deal.pipelineStageId) {
-                                                            update.mutate({
-                                                                pipelineStageId: stage.id,
-                                                            });
-                                                        }
+                                                    onClick={async () => {
                                                         close();
+                                                        if (stage.id === deal.pipelineStageId) return;
+                                                        // moving to a lost stage asks why first; closing the question calls the move off
+                                                        const answer = stage.isLost ? await askLostReason("deal") : {};
+                                                        if (answer) update.mutate({ pipelineStageId: stage.id, ...answer });
                                                     }}
                                                 >
                                                     <StageLabel stage={stage} />
@@ -307,6 +324,12 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                     </span>
                                 )}
                             </FieldRow>
+
+                            {deal.pipelineStage.isLost && (
+                                <FieldRow icon={IconThumbDown} label="Lost reason">
+                                    <LostReasonValue what="deal" reason={deal.lostReason} editable={can.update} onChange={(lostReason) => update.mutate({ lostReason })} />
+                                </FieldRow>
+                            )}
 
                             <FieldRow icon={IconCurrencyRupee} label="Amount">
                                 <EditableText
@@ -432,11 +455,32 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                     </div>
                                 ))}
 
+                            {/* who the deal is with, and how to reach them (their lead's phone and email) */}
+                            <SectionLabel>Contact</SectionLabel>
+                            <FieldRow icon={IconUser} label="Lead">
+                                {can.update && can.linkLead ? (
+                                    <LeadPicker lead={deal.lead} onPick={(leadId) => update.mutate({ leadId })} />
+                                ) : deal.lead ? (
+                                    <span className="truncate px-1 text-muted">{deal.lead.name}</span>
+                                ) : (
+                                    <span className="px-1 text-light">No lead linked</span>
+                                )}
+                            </FieldRow>
                             {deal.lead && (
                                 <>
-                                    <SectionLabel>Relations</SectionLabel>
-                                    <FieldRow icon={IconUser} label="Lead">
-                                        <span className="px-1 text-muted">{deal.lead.name}</span>
+                                    <FieldRow icon={IconPhone} label="Phone">
+                                        {deal.lead.phone ? (
+                                            <a href={`tel:${deal.lead.phone}`} className="truncate px-1 text-accent hover:underline">{deal.lead.phone}</a>
+                                        ) : (
+                                            <span className="px-1 text-light">Empty</span>
+                                        )}
+                                    </FieldRow>
+                                    <FieldRow icon={IconMail} label="Email">
+                                        {deal.lead.email ? (
+                                            <a href={`mailto:${deal.lead.email}`} className="truncate px-1 text-accent hover:underline">{deal.lead.email}</a>
+                                        ) : (
+                                            <span className="px-1 text-light">Empty</span>
+                                        )}
                                     </FieldRow>
                                 </>
                             )}
@@ -585,7 +629,57 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                 onCancel={() => setConfirmingDelete(false)}
                 onConfirm={() => remove.mutate()}
             />
+
+            <MergeDealsPanel pair={merging} onClose={() => setMerging(null)} onMerged={() => setMerging(null)} />
         </div>
+    );
+}
+
+// Which lead (person) the deal is with. The list loads only once the menu opens.
+function LeadPicker({ lead, onPick }: { lead: DealLead | null; onPick: (leadId: number | null) => void }) {
+    return (
+        <Dropdown
+            buttonClassName="flex h-7 max-w-full items-center gap-1 rounded-lg px-1 hover:bg-fill"
+            label={
+                <>
+                    {lead ? <span className="truncate">{lead.name}</span> : <span className="text-light">Link a lead</span>}
+                    <IconChevronDown size={14} className="shrink-0 text-faint" />
+                </>
+            }
+        >
+            {(close) => <LeadOptions selectedId={lead?.id} onPick={(leadId) => { close(); if (leadId !== (lead?.id ?? null)) onPick(leadId); }} />}
+        </Dropdown>
+    );
+}
+
+function LeadOptions({ selectedId, onPick }: { selectedId?: number; onPick: (leadId: number | null) => void }) {
+    // the same list (and cache) as the New deal form: the first 100 leads by name, searchable
+    const leadsQuery = useQuery({
+        queryKey: ["leads", "deal-options"],
+        queryFn: () =>
+            api
+                .get<{ data: { id: number; name: string }[] }>("/leads", { params: { page: 1, limit: 100, sortBy: "name", sortOrder: "asc" } })
+                .then((res) => res.data.data),
+    });
+
+    if (leadsQuery.isPending) return <p className="px-2 py-1.5 text-sm text-faint">Loading leads…</p>;
+    if (leadsQuery.isError) return <p className="px-2 py-1.5 text-sm text-danger">{errorMessage(leadsQuery.error)}</p>;
+
+    return (
+        <>
+            {selectedId !== undefined && (
+                <MenuItem onClick={() => onPick(null)}>
+                    <IconLinkOff size={16} /> Unlink lead
+                </MenuItem>
+            )}
+            <SearchableItems items={leadsQuery.data} label={(item) => item.name}>
+                {(item) => (
+                    <MenuItem key={item.id} selected={item.id === selectedId} onClick={() => onPick(item.id)}>
+                        {item.name}
+                    </MenuItem>
+                )}
+            </SearchableItems>
+        </>
     );
 }
 

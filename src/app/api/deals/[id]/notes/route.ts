@@ -5,6 +5,7 @@ import { dealScope, requirePermission } from "@/lib/auth/requirePermission";
 import { createNoteSchema } from "@/lib/validations/notes";
 import { idParamSchema, paginationSchema, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 const authorSelect = { select: { id: true, name: true, email: true } };
 
@@ -82,7 +83,7 @@ export async function POST(
 
         const deal = await prisma.deal.findFirst({
             where: { id: id.data, ...dealScope(user) },
-            select: { id: true },
+            select: { id: true, title: true },
         });
 
         if (!deal) {
@@ -106,6 +107,16 @@ export async function POST(
                 mentionedUserIds: mentioned.map((agent) => agent.id),
             },
             include: { author: authorSelect },
+        });
+
+        // everyone @-mentioned hears about it
+        await notify(note.mentionedUserIds, {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "MENTIONED",
+            title: `${firstName(user.name)} mentioned you on ${deal.title}`,
+            body: text.length > 140 ? `${text.slice(0, 140)}…` : text,
+            link: `/deals?open=${deal.id}`,
         });
 
         return NextResponse.json({ ok: true, data: note }, { status: 201 });

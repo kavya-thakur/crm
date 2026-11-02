@@ -6,6 +6,7 @@ import { addTaskToTimeline, dueDateToDb, taskInclude } from "@/lib/tasks";
 import { updateTaskSchema } from "@/lib/validations/tasks";
 import { idParamSchema } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -79,7 +80,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 id: id.data,
                 ...taskScope(user),
             },
-            select: { status: true },
+            select: { status: true, assignedToId: true },
         });
 
         if (!existingTask) {
@@ -129,6 +130,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
             return updated;
         });
+
+        // handed to someone new: it lands in their bell
+        if (assignedToId !== undefined && assignedToId !== existingTask.assignedToId) {
+            await notify([assignedToId], {
+                organizationId: user.organizationId,
+                actorId: user.id,
+                type: "TASK_ASSIGNED",
+                title: `${firstName(user.name)} gave you a task`,
+                body: updatedTask.title,
+                link: `/tasks?open=${updatedTask.id}`,
+            });
+        }
 
         return NextResponse.json({
             ok: true,

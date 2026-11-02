@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconCheck, IconCode, IconCopy, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconCheck, IconCode, IconCopy, IconExternalLink, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
 import { SectionIcon } from "@/components/SectionIcon";
-import { Select } from "@/components/Select";
+import { MultiSelect, Select } from "@/components/Select";
 import { StageBadge } from "@/components/StageBadge";
 import { toast } from "@/components/Toast";
-import type { AgentOption } from "../../shared/customFields";
+import { SidePanel } from "@/components/SidePanel";
+import { readFormSettings } from "@/lib/validations/leadForms";
+import { useCustomFields, type AgentOption, type CustomFieldDef } from "../../shared/customFields";
+import { embedHtml, FormBuilder } from "./FormBuilder";
 
 interface LeadForm {
     id: number;
@@ -20,6 +23,10 @@ interface LeadForm {
     key: string;
     source: { id: number; name: string; color: string } | null;
     owner: { id: number; name: string } | null;
+    // share leads in turn between these people (round-robin); empty = just the owner
+    assigneeIds: number[];
+    // what it asks and how its page reads (read through readFormSettings)
+    settings: unknown;
 }
 
 interface LeadSource {
@@ -51,6 +58,9 @@ export default function LeadFormsView({ seeAgents }: { seeAgents: boolean }) {
         queryFn: () => api.get<{ data: AgentOption[] }>("/agents").then((res) => res.data.data),
         enabled: seeAgents,
     });
+
+    // the lead custom fields a form can ask for
+    const customFieldsQuery = useCustomFields("lead");
 
     const create = useMutation({
         mutationFn: (formName: string) => api.post("/lead-forms", { name: formName }),
@@ -119,7 +129,7 @@ export default function LeadFormsView({ seeAgents }: { seeAgents: boolean }) {
 
                     <div className="mt-4 flex flex-col gap-4">
                         {formsQuery.data?.map((form) => (
-                            <FormCard key={form.id} form={form} sources={sourcesQuery.data ?? []} agents={agentsQuery.data} />
+                            <FormCard key={form.id} form={form} sources={sourcesQuery.data ?? []} agents={agentsQuery.data} definitions={customFieldsQuery.data ?? []} />
                         ))}
                     </div>
                 </div>
@@ -128,12 +138,19 @@ export default function LeadFormsView({ seeAgents }: { seeAgents: boolean }) {
     );
 }
 
-function FormCard({ form, sources, agents }: { form: LeadForm; sources: LeadSource[]; agents?: AgentOption[] }) {
+function FormCard({ form, sources, agents, definitions }: { form: LeadForm; sources: LeadSource[]; agents?: AgentOption[]; definitions: CustomFieldDef[] }) {
     const queryClient = useQueryClient();
     const [deleting, setDeleting] = useState(false);
+    const [editing, setEditing] = useState(false);
     const [showHtml, setShowHtml] = useState(false);
+    const settings = readFormSettings(form.settings);
+    const html = embedHtml(`${window.location.origin}/api/public/forms/${form.key}`, settings, form.name, definitions);
+    // "Take turns" is picked first, then the people; shown while there's a rotation
+    const [rotating, setRotating] = useState(form.assigneeIds.length > 0);
     // shown only after the list has loaded in the browser, so window is always there
     const endpoint = `${window.location.origin}/api/public/forms/${form.key}`;
+    const pageUrl = `${window.location.origin}/f/${form.key}`;
+    const asked = settings.customFields.length;
 
     const refresh = () => queryClient.invalidateQueries({ queryKey: ["leadForms"] });
 
@@ -172,6 +189,14 @@ function FormCard({ form, sources, agents }: { form: LeadForm; sources: LeadSour
                 />
                 <button
                     type="button"
+                    onClick={() => setEditing(true)}
+                    className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 font-medium text-muted hover:bg-paper hover:text-ink"
+                >
+                    <IconPencil size={14} />
+                    Edit form
+                </button>
+                <button
+                    type="button"
                     aria-label={`Delete ${form.name}`}
                     onClick={() => setDeleting(true)}
                     className="flex size-8 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-danger-soft hover:text-danger"
@@ -197,22 +222,67 @@ function FormCard({ form, sources, agents }: { form: LeadForm; sources: LeadSour
                     <p className="mb-1 text-sm font-medium text-muted">Give them to</p>
                     {agents ? (
                         <Select
-                            value={form.owner ? String(form.owner.id) : "none"}
-                            onChange={(value) => update.mutate({ ownerId: value && value !== "none" ? Number(value) : null })}
+                            value={rotating ? "rotate" : form.owner ? String(form.owner.id) : "none"}
+                            onChange={(value) => {
+                                // the people who take turns are picked just below
+                                if (value === "rotate") return setRotating(true);
+                                setRotating(false);
+                                update.mutate({ ownerId: value && value !== "none" ? Number(value) : null, assigneeIds: [] });
+                            }}
                             placeholder="Nobody"
                             options={[
                                 { value: "none", label: "Nobody (leave unassigned)" },
+                                { value: "rotate", label: "Take turns between people…" },
                                 ...agents.map((agent) => ({ value: String(agent.id), label: agent.name })),
                             ]}
                         />
                     ) : (
-                        <p className="flex h-8 items-center text-ink">{form.owner?.name ?? "Nobody (unassigned)"}</p>
+                        <p className="flex h-8 items-center text-ink">
+                            {form.assigneeIds.length > 0 ? `Shared between ${form.assigneeIds.length} people` : (form.owner?.name ?? "Nobody (unassigned)")}
+                        </p>
                     )}
                 </div>
             </div>
 
+            {agents && rotating && (
+                <div className="mt-3 px-2">
+                    <p className="mb-1 text-sm font-medium text-muted">Taking turns</p>
+                    <MultiSelect
+                        values={form.assigneeIds.map(String)}
+                        onChange={(values) => update.mutate({ assigneeIds: values.map(Number) })}
+                        options={agents.map((agent) => ({ value: String(agent.id), label: agent.name }))}
+                        placeholder="Pick who shares the leads"
+                    />
+                    <p className="mt-1 text-sm text-faint">Each new lead goes to the next person here, in order, so everyone gets the same share.</p>
+                </div>
+            )}
+
+            {/* the hosted page: share it anywhere, no website needed */}
             <div className="mt-4 px-2">
-                <p className="mb-1 text-sm font-medium text-muted">Send submissions to</p>
+                <p className="mb-1 text-sm font-medium text-muted">Share this form</p>
+                <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
+                    <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink [font-variant-ligatures:none]">{pageUrl}</code>
+                    <CopyButton text={pageUrl} label="Copy link" />
+                    <a
+                        href={pageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-line bg-surface px-2 text-sm font-medium text-muted hover:text-ink"
+                    >
+                        <IconExternalLink size={13} />
+                        Open
+                    </a>
+                </div>
+                <p className="mt-1 text-sm text-faint">
+                    Its own page, for an Instagram bio, WhatsApp, a QR code or an email. Asks for name, phone
+                    {settings.email !== "hidden" && ", email"}
+                    {settings.company !== "hidden" && ", company"}
+                    {asked > 0 && ` and ${asked} of your lead field${asked === 1 ? "" : "s"}`}.
+                </p>
+            </div>
+
+            <div className="mt-4 px-2">
+                <p className="mb-1 text-sm font-medium text-muted">For developers: send submissions to</p>
                 <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
                     <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink [font-variant-ligatures:none]">{endpoint}</code>
                     <CopyButton text={endpoint} label="Copy link" />
@@ -233,18 +303,23 @@ function FormCard({ form, sources, agents }: { form: LeadForm; sources: LeadSour
                         <div className="overflow-hidden rounded-lg border border-line bg-[#fafafa]">
                             <div className="flex items-center justify-between border-b border-line-light bg-paper px-3 py-1.5">
                                 <span className="text-sm text-faint">HTML</span>
-                                <CopyButton text={embedHtml(endpoint)} label="Copy HTML" />
+                                <CopyButton text={html} label="Copy HTML" />
                             </div>
                             {/* no ligatures, so "-->" shows as typed rather than as an arrow */}
-                            <pre className="overflow-x-auto p-3 font-mono text-[12px] leading-5 text-ink [font-variant-ligatures:none]">{embedHtml(endpoint)}</pre>
+                            <pre className="overflow-x-auto p-3 font-mono text-[12px] leading-5 text-ink [font-variant-ligatures:none]">{html}</pre>
                         </div>
                         <p className="mt-1.5 text-sm text-faint">
-                            Style it any way you like. Keep the hidden &quot;website&quot; field: it stops spam bots. Any extra fields you add are saved
-                            on the lead too.
+                            Paste it into your site (in WordPress, Webflow or Wix: a &quot;Custom HTML&quot; block) and style it any way you like. It
+                            follows this form&apos;s setup; copy it again after editing the form. Keep the hidden &quot;website&quot; field: it stops spam
+                            bots. Any extra fields you add are saved on the lead&apos;s timeline.
                         </p>
                     </div>
                 )}
             </div>
+
+            <SidePanel open={editing} onClose={() => setEditing(false)} wide>
+                <FormBuilder formId={form.id} formName={form.name} saved={settings} definitions={definitions} onClose={() => setEditing(false)} />
+            </SidePanel>
 
             <ConfirmDeleteModal
                 open={deleting}
@@ -276,20 +351,4 @@ function CopyButton({ text, label }: { text: string; label: string }) {
             {copied ? "Copied" : label}
         </button>
     );
-}
-
-// A plain HTML form that works on any website, no JavaScript needed
-function embedHtml(endpoint: string) {
-    return `<form action="${endpoint}" method="POST">
-  <input name="name" placeholder="Your name" required>
-  <input name="email" type="email" placeholder="Work email" required>
-  <input name="phone" type="tel" placeholder="Phone" required>
-  <input name="company" placeholder="Company">
-  <textarea name="message" placeholder="How can we help?"></textarea>
-  <!-- spam trap: leave it hidden and empty -->
-  <input name="website" tabindex="-1" autocomplete="off" style="display:none">
-  <!-- where to send people afterwards (optional) -->
-  <input type="hidden" name="redirect" value="https://your-site.com/thanks">
-  <button type="submit">Send</button>
-</form>`;
 }

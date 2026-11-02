@@ -41,6 +41,8 @@ interface OptionsResponse<T> {
 interface NewDealDialogProps {
     open: boolean;
     canAssign: boolean;
+    // linking a lead lists the leads, which needs lead:read
+    canLinkLead: boolean;
     onClose: () => void;
     onCreated: (deal: Deal) => void;
 }
@@ -50,7 +52,7 @@ export default function NewDealDialog({ open, ...props }: NewDealDialogProps) {
     return <NewDealForm {...props} />;
 }
 
-function NewDealForm({ canAssign, onClose, onCreated }: Omit<NewDealDialogProps, "open">) {
+function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDealDialogProps, "open">) {
     const queryClient = useQueryClient();
     const {
         register,
@@ -83,6 +85,7 @@ function NewDealForm({ canAssign, onClose, onCreated }: Omit<NewDealDialogProps,
             api
                 .get<OptionsResponse<LeadOption>>("/leads", { params: { page: 1, limit: 100, sortBy: "name", sortOrder: "asc" } })
                 .then((res) => res.data.data),
+        enabled: canLinkLead,
     });
 
     const agentsQuery = useQuery({
@@ -117,7 +120,8 @@ function NewDealForm({ canAssign, onClose, onCreated }: Omit<NewDealDialogProps,
                     probability: Number(values.probability),
                     pipelineStageId: Number(values.pipelineStageId),
                     leadId: values.leadId ? Number(values.leadId) : null,
-                    assignedToId: values.assignedToId ? Number(values.assignedToId) : null,
+                    // without the picker, leave it out: the deal is then the creator's own
+                    ...(canAssign && { assignedToId: values.assignedToId ? Number(values.assignedToId) : null }),
                     expectedCloseDate: values.expectedCloseDate ? new Date(values.expectedCloseDate).toISOString() : null,
                     description: values.description || null,
                 })
@@ -129,8 +133,9 @@ function NewDealForm({ canAssign, onClose, onCreated }: Omit<NewDealDialogProps,
         },
     });
 
-    const loadingOptions = stagesQuery.isPending || leadsQuery.isPending || (canAssign && agentsQuery.isPending);
-    const optionsError = stagesQuery.error || leadsQuery.error || (canAssign && agentsQuery.error);
+    // only the lists this person may load count (a disabled query stays "pending" forever)
+    const loadingOptions = stagesQuery.isPending || (canLinkLead && leadsQuery.isPending) || (canAssign && agentsQuery.isPending);
+    const optionsError = stagesQuery.error || (canLinkLead && leadsQuery.error) || (canAssign && agentsQuery.error);
 
     return (
         <RecordFormShell
@@ -191,21 +196,23 @@ function NewDealForm({ canAssign, onClose, onCreated }: Omit<NewDealDialogProps,
             </FormSection>
 
             <FormSection title="Relations">
-                <FormFieldRow icon={IconUser} label="Lead">
-                    <Controller
-                        name="leadId"
-                        control={control}
-                        render={({ field }) => (
-                            <Select
-                                disabled={loadingOptions}
-                                value={field.value ? String(field.value) : undefined}
-                                onChange={(value) => field.onChange(value === undefined ? null : Number(value))}
-                                placeholder="No lead linked"
-                                options={leadsQuery.data?.map((lead) => ({ value: String(lead.id), label: lead.name })) ?? []}
-                            />
-                        )}
-                    />
-                </FormFieldRow>
+                {canLinkLead && (
+                    <FormFieldRow icon={IconUser} label="Lead">
+                        <Controller
+                            name="leadId"
+                            control={control}
+                            render={({ field }) => (
+                                <Select
+                                    disabled={loadingOptions}
+                                    value={field.value ? String(field.value) : undefined}
+                                    onChange={(value) => field.onChange(value === undefined ? null : Number(value))}
+                                    placeholder="No lead linked"
+                                    options={leadsQuery.data?.map((lead) => ({ value: String(lead.id), label: lead.name })) ?? []}
+                                />
+                            )}
+                        />
+                    </FormFieldRow>
+                )}
 
                 {canAssign && (
                     <FormFieldRow icon={IconUserCircle} label="Agent">

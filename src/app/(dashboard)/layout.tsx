@@ -6,6 +6,9 @@ import { IconLogout } from "@tabler/icons-react";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasPermission } from "@/lib/auth/requirePermission";
 import { Avatar } from "@/components/Avatar";
+import { LostReasonPrompt } from "@/components/LostReasonPrompt";
+import { LiveUpdates } from "./LiveUpdates";
+import { NotificationBell } from "./NotificationBell";
 import CommandMenu, { SearchButton, type MenuPage, type SearchKind } from "./CommandMenu";
 import SidebarNav, { type NavGroup } from "./SidebarNav";
 
@@ -81,6 +84,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
                         {user.organization.name[0].toUpperCase()}
                     </span>
                     <span className="truncate">{user.organization.name}</span>
+                    <NotificationBell />
                 </div>
 
                 <SearchButton />
@@ -113,6 +117,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
             </main>
 
             <CommandMenu pages={[...workspace.pages, ...settings.flatMap((group) => group.pages)]} kinds={searchKinds} />
+            <LostReasonPrompt />
+            {/* the live connection: other people's changes and notifications arrive here */}
+            <LiveUpdates />
         </div>
     );
 }

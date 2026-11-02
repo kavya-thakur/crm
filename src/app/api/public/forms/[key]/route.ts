@@ -52,36 +52,45 @@ export async function POST(req: NextRequest, { params }: Params) {
 
         // the spam trap was filled in: a bot. Say thanks and keep nothing, so it learns nothing
         if (submission.data.website) {
-            return done(htmlForm, raw);
+            return done(htmlForm, raw, { thankYou: "Thanks, we'll be in touch soon.", redirectUrl: null });
         }
 
         const result = await captureLead(key, submission.data);
+
+        if (!result.ok && result.reason === "invalid") {
+            // what the form itself asks for: a required field left empty, an answer that doesn't fit
+            const first = Object.values(result.errors)[0];
+            return htmlForm ? reply(true, 400, first) : NextResponse.json({ ok: false, message: first, errors: result.errors }, { status: 400, headers: CORS });
+        }
 
         if (!result.ok) {
             return reply(htmlForm, 404, "This form isn't taking submissions any more.");
         }
 
-        return done(htmlForm, raw);
+        return done(htmlForm, raw, result);
     } catch (error) {
         return handleRouteError(error, "Web form submission");
     }
 }
 
-// An HTML form's fields, with anything beyond the usual ones ("team_size") kept as details
+// An HTML form's fields. Answers to the form's custom fields are named "cf_<key>"
+// (cf_budget); anything beyond those and the usual ones ("team_size") is kept as details.
 function fromHtmlForm(form: FormData) {
     const fields = Object.fromEntries([...form.entries()].map(([name, value]) => [name, String(value)]));
-    const details = Object.fromEntries(Object.entries(fields).filter(([name]) => !KNOWN_FIELDS.has(name)));
-    return { ...fields, ...(Object.keys(details).length > 0 && { details }) };
+    const customFields = Object.fromEntries(Object.entries(fields).flatMap(([name, value]) => (name.startsWith("cf_") ? [[name.slice(3), value]] : [])));
+    const details = Object.fromEntries(Object.entries(fields).filter(([name]) => !KNOWN_FIELDS.has(name) && !name.startsWith("cf_")));
+    return { ...fields, customFields, ...(Object.keys(details).length > 0 && { details }) };
 }
 
-function done(htmlForm: boolean, raw: unknown) {
-    if (!htmlForm) return NextResponse.json({ ok: true, message: "Thanks, we'll be in touch soon." }, { headers: CORS });
+// Sent: the form's own thank-you message, or off to the page it (or the embed code) names
+function done(htmlForm: boolean, raw: unknown, form: { thankYou: string; redirectUrl: string | null }) {
+    if (!htmlForm) return NextResponse.json({ ok: true, message: form.thankYou, redirectUrl: form.redirectUrl }, { headers: CORS });
 
     // only a real web address, never javascript: or the like
-    const redirect = (raw as { redirect?: string } | null)?.redirect;
+    const redirect = (raw as { redirect?: string } | null)?.redirect || form.redirectUrl;
     if (redirect && /^https?:\/\//.test(redirect)) return NextResponse.redirect(redirect, 303);
 
-    return reply(true, 200, "Thanks, we'll be in touch soon.");
+    return reply(true, 200, form.thankYou);
 }
 
 // A message for whoever sent the form: JSON for scripts, a small page for plain HTML forms

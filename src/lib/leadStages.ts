@@ -9,3 +9,8 @@ export const DEFAULT_LEAD_STAGES = [
     { name: "Customer", order: 4, color: STAGE_COLORS.amber, isConverted: true },
     { name: "Lost", order: 5, color: STAGE_COLORS.gray, isLost: true },
 ];
+
+// The timeline line for a stage move: "Lead stage changed from Meeting to Lost (No budget)"
+export function stageMessage(from: string | undefined, to: { name: string; isLost: boolean }, lostReason?: string | null) {
+    return `Lead stage changed from ${from} to ${to.name}${to.isLost && lostReason ? ` (${lostReason})` : ""}`;
+}

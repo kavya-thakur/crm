@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { updateScheduledActivitySchema } from "@/lib/validations/scheduledActivities";
 import { idParamSchema } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -79,7 +80,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 id: id.data,
                 ...activityScope(user),
             },
-            select: { id: true },
+            select: { id: true, assignedToId: true, scheduledAt: true, attendees: { select: { id: true } } },
         });
 
         if (!existingActivity) {
@@ -109,8 +110,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...(assignedToId !== undefined && { assignedToId }),
                 // `set` swaps the whole tagged list for the one sent
                 ...(attendeeIds && { attendees: { set: [...new Set(attendeeIds)].map((agentId) => ({ id: agentId })) } }),
+                // moved to another time: its 10-minute reminder goes out again, for the new time
+                ...(fields.scheduledAt !== undefined &&
+                    new Date(fields.scheduledAt).getTime() !== existingActivity.scheduledAt.getTime() && { reminderSentAt: null }),
             },
             include: activityInclude,
+        });
+
+        // only the people newly on it hear about it: a new owner, or someone newly tagged
+        const before = new Set([existingActivity.assignedToId, ...existingActivity.attendees.map((attendee) => attendee.id)]);
+        const added = [assignedToId, ...(attendeeIds ?? [])].filter((agentId): agentId is number => agentId !== undefined && !before.has(agentId));
+        await notify(added, {
+            organizationId: user.organizationId,
+            actorId: user.id,
+            type: "ACTIVITY_INVITED",
+            title: `${firstName(user.name)} added you to a ${updatedActivity.type === "OTHER" ? "calendar item" : updatedActivity.type.toLowerCase()}`,
+            body: updatedActivity.title,
+            link: `/activities?open=${updatedActivity.id}`,
         });
 
         return NextResponse.json({

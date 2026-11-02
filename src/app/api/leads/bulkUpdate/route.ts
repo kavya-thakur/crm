@@ -3,10 +3,12 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
 import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requirePermission";
-import { dbIdSchema } from "@/lib/validations/common";
+import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
 import { bulkLeadChangesSchema } from "@/lib/validations/leads";
+import { stageMessage } from "@/lib/leadStages";
+import { firstName, notify } from "@/lib/realtime/notify";
 
 const leadIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -21,6 +23,8 @@ const bulkLeadSchema = z.discriminatedUnion("action", [
         action: z.literal("stage"),
         leadIds: leadIdsSchema,
         stageId: dbIdSchema,
+        // asked for when the stage is a lost one
+        lostReason: optionalText(200),
     }),
 
     // the same value for one field (or custom field) on every selected lead
@@ -69,6 +73,7 @@ export async function PATCH(req: NextRequest) {
             },
             select: {
                 id: true,
+                name: true,
                 assignedToId: true,
                 stageId: true,
             },
@@ -157,6 +162,16 @@ export async function PATCH(req: NextRequest) {
                         })),
                     });
                 });
+
+                const [only] = changed;
+                await notify([assignedToId], {
+                    organizationId: user.organizationId,
+                    actorId: user.id,
+                    type: "LEAD_ASSIGNED",
+                    title: `${firstName(user.name)} assigned you ${changed.length === 1 ? "a lead" : `${changed.length} leads`}`,
+                    body: changed.length === 1 ? only.name : null,
+                    link: changed.length === 1 ? `/leads?open=${only.id}` : "/leads",
+                });
             }
 
             return NextResponse.json({
@@ -172,7 +187,7 @@ export async function PATCH(req: NextRequest) {
         if (data.action === "stage") {
             const stage = await prisma.leadStage.findFirst({
                 where: { id: data.stageId, organizationId: user.organizationId },
-                select: { id: true, name: true },
+                select: { id: true, name: true, isLost: true },
             });
 
             if (!stage) {
@@ -204,6 +219,7 @@ export async function PATCH(req: NextRequest) {
                         },
                         data: {
                             stageId: stage.id,
+                            lostReason: stage.isLost ? (data.lostReason ?? null) : null,
                             updatedById: user.id,
                         },
                     });
@@ -213,7 +229,7 @@ export async function PATCH(req: NextRequest) {
                             leadId: lead.id,
                             userId: user.id,
                             type: "STATUS_CHANGED",
-                            message: `Lead stage changed from ${stageNames.get(lead.stageId)} to ${stage.name}`,
+                            message: stageMessage(stageNames.get(lead.stageId), stage, data.lostReason),
                         })),
                     });
                 });

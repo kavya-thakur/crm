@@ -5,6 +5,8 @@ import { updateLeadSchema } from "@/lib/validations/leads";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/customFields";
+import { stageMessage } from "@/lib/leadStages";
+import { alreadyALead, findOpenCopy, isOpen } from "@/lib/leadDuplicates";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -86,7 +88,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
             },
             select: {
                 stageId: true,
-                stage: { select: { name: true } },
+                stage: { select: { name: true, isConverted: true, isLost: true } },
+                email: true,
+                phone: true,
                 customFields: true,
             },
         });
@@ -97,12 +101,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
         const { stageId, customFields: submittedCustomFields, ...fields } = body.data;
         const stageChanged = stageId !== undefined && stageId !== existingLead.stageId;
-        let newStageName: string | undefined;
+        let newStage: { name: string; isConverted: boolean; isLost: boolean } | undefined;
 
         if (stageChanged) {
             const stage = await prisma.leadStage.findFirst({
                 where: { id: stageId, organizationId: user.organizationId },
-                select: { name: true },
+                select: { name: true, isConverted: true, isLost: true },
             });
 
             if (!stage) {
@@ -112,7 +116,24 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 );
             }
 
-            newStageName = stage.name;
+            newStage = stage;
+        }
+
+        // One open lead per person: a new phone or email, or reopening a lost lead, can't make
+        // it a second open lead for someone who already has one
+        const identityChanged = fields.phone !== undefined || fields.email !== undefined;
+        const reopened = newStage && !isOpen(existingLead.stage);
+
+        if (isOpen(newStage ?? existingLead.stage) && (identityChanged || reopened)) {
+            const copy = await findOpenCopy(user.organizationId, {
+                email: fields.email !== undefined ? fields.email : existingLead.email,
+                phone: fields.phone ?? existingLead.phone,
+                exceptId: id.data,
+            });
+
+            if (copy) {
+                return alreadyALead(copy, user);
+            }
         }
 
         // Verify that the source belongs to this organization, if changing it.
@@ -166,13 +187,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 stageId,
                 updatedById: user.id,
                 ...(customFields && { customFields }),
+                // a lead that's no longer lost has no reason to be
+                ...(newStage && !newStage.isLost && { lostReason: null }),
                 // same timeline entry the bulk route logs, saved in the same query as the update
-                ...(stageChanged && {
+                ...(newStage && {
                     timeline: {
                         create: {
                             userId: user.id,
                             type: "STATUS_CHANGED",
-                            message: `Lead stage changed from ${existingLead.stage.name} to ${newStageName}`,
+                            message: stageMessage(existingLead.stage.name, newStage, fields.lostReason),
                         },
                     },
                 }),

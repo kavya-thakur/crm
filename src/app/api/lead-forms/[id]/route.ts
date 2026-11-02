@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { allAgentsInOrganization } from "@/lib/activities";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { idParamSchema } from "@/lib/validations/common";
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             return body.response;
         }
 
-        const { sourceId, ownerId } = body.data;
+        const { sourceId, ownerId, assigneeIds, settings } = body.data;
 
         // the source and owner have to be this organization's own
         if (sourceId) {
@@ -41,10 +42,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             if (!owner) return NextResponse.json({ ok: false, message: "Invalid owner" }, { status: 400 });
         }
 
+        if (assigneeIds?.length && !(await allAgentsInOrganization(assigneeIds, user.organizationId))) {
+            return NextResponse.json({ ok: false, message: "Everyone in the rotation has to be in this workspace" }, { status: 400 });
+        }
+
+        // the custom fields a form asks for have to be this workspace's lead fields, each once.
+        // An Agent field is left out: a visitor can't pick one of the team.
+        if (settings) {
+            const keys = settings.customFields.map((field) => field.key);
+            const usable = await prisma.customFieldDefinition.count({
+                where: { organizationId: user.organizationId, entity: "lead", key: { in: keys }, type: { not: "AGENT" } },
+            });
+            if (usable !== keys.length || new Set(keys).size !== keys.length) {
+                return NextResponse.json({ ok: false, message: "A form can only ask for your lead custom fields, each once" }, { status: 400 });
+            }
+        }
+
         // organizationId in the where, so a form from another workspace is a 404 (P2025)
         const form = await prisma.leadForm.update({
             where: { id: id.data, organizationId: user.organizationId },
-            data: body.data,
+            // a fresh rotation starts from its first person
+            data: { ...body.data, ...(assigneeIds && { assigneeIds: [...new Set(assigneeIds)], turn: 0 }) },
             include,
         });
 

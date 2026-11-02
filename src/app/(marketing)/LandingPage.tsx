@@ -15,6 +15,9 @@ import { FeaturesSection } from "./components/FeaturesSection";
 import { QuoteSection } from "./components/QuoteSection";
 import { UseCasesSection } from "./components/UseCasesSection";
 import { PromiseSection } from "./components/PromiseSection";
+import { CaptureSection } from "./components/CaptureSection";
+import { PricingSection } from "./components/PricingSection";
+import { SecuritySection } from "./components/SecuritySection";
 import { FaqSection } from "./components/FaqSection";
 import { Footer } from "./components/Footer";
 
@@ -81,7 +84,10 @@ export default function LandingPage({ loggedIn }: { loggedIn: boolean }) {
             <FeaturesSection />
             <QuoteSection />
             <UseCasesSection />
+            <CaptureSection />
             <PromiseSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
+            <PricingSection />
+            <SecuritySection />
             <FaqSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
             <Footer />
         </div>
