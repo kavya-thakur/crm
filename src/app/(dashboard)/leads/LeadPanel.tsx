@@ -44,7 +44,7 @@ import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 import { Avatar } from "@/components/Avatar";
 import { askLostReason, LostReasonValue } from "@/components/LostReasonPrompt";
-import { formatDate, timeAgo } from "@/lib/format";
+import { formatDate, timeAgo } from "@/lib/utils/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";

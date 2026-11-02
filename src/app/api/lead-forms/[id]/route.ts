@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { allAgentsInOrganization } from "@/lib/activities";
+import { allAgentsInOrganization } from "@/lib/work/activities";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { idParamSchema } from "@/lib/validations/common";

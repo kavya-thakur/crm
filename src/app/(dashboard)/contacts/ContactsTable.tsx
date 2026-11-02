@@ -18,7 +18,7 @@ import { SkeletonRows } from "@/components/Loader";
 import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, peopleColumns } from "@/components/DataTable";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import type { Agent, Contact } from "./shared";
 
 // Every column but Name is optional — shown, hidden, reordered (drag the

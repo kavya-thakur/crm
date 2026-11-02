@@ -20,7 +20,7 @@ import { DataCell, type DataColumn, type EditConfig } from "@/components/DataTab
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
-import { formatDate, formatDay } from "@/lib/format";
+import { formatDate, formatDay } from "@/lib/utils/format";
 import type { AgentOption } from "../shared/customFields";
 import { PRIORITY_OPTIONS, PriorityBadge } from "../shared/tasks";
 import { linkedRecord } from "../shared/linkedRecord";

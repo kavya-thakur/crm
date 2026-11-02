@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db/prisma";
 import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
-import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
+import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkLeadChangesSchema } from "@/lib/validations/leads";
-import { stageMessage } from "@/lib/leadStages";
+import { stageMessage } from "@/lib/leads/stages";
 import { firstName, notify } from "@/lib/realtime/notify";
 
 const leadIdsSchema = z.array(dbIdSchema).min(1).max(500);

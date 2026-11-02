@@ -47,7 +47,7 @@ import { Avatar } from "@/components/Avatar";
 import { askLostReason, LostReasonValue } from "@/components/LostReasonPrompt";
 import { MergeDealsPanel, PossibleDuplicateDeals } from "./MergeDeals";
 import { toast } from "@/components/Toast";
-import { formatDate, timeAgo } from "@/lib/format";
+import { formatDate, timeAgo } from "@/lib/utils/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";

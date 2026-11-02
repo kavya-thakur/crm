@@ -26,7 +26,7 @@ import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { formatDate, timeAgo } from "@/lib/format";
+import { formatDate, timeAgo } from "@/lib/utils/format";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { linkedRecord } from "../shared/linkedRecord";

@@ -1,7 +1,7 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { activityScope, contactScope, dealScope, leadScope } from "@/lib/auth/requirePermission";
-import { activityInclude, allAgentsInOrganization } from "@/lib/activities";
+import { activityInclude, allAgentsInOrganization } from "@/lib/work/activities";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { createScheduledActivitySchema, listScheduledActivitiesQuerySchema } from "@/lib/validations/scheduledActivities";

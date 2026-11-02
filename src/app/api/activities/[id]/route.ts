@@ -1,7 +1,7 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { activityScope } from "@/lib/auth/requirePermission";
-import { activityInclude, allAgentsInOrganization } from "@/lib/activities";
+import { activityInclude, allAgentsInOrganization } from "@/lib/work/activities";
 import { prisma } from "@/lib/db/prisma";
 import { updateScheduledActivitySchema } from "@/lib/validations/scheduledActivities";
 import { idParamSchema } from "@/lib/validations/common";

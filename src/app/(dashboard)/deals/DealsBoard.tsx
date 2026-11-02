@@ -9,7 +9,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 import { askLostReason } from "@/components/LostReasonPrompt";
-import { formatMoneyShort } from "@/lib/format";
+import { formatMoneyShort } from "@/lib/utils/format";
 import { formatDealAmount, refreshDeals, type Deal, type DealFilters, type PipelineStage } from "./shared";
 
 interface DealsBoardProps {

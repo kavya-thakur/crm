@@ -17,6 +17,7 @@ import {
     FilterBar,
     FilterChip,
     ListHeader,
+    ExportButton,
     SearchBox,
     SortMenu,
     ViewSwitcher,
@@ -291,6 +292,8 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                     />
 
                     <SortMenu fields={SORT_FIELDS} sortBy={filters.sortBy} sortOrder={filters.sortOrder} onChange={updateFilters} />
+
+                    <ExportButton endpoint="/deals" filters={filters} />
 
                     <OptionsMenuButton
                         columns={dealColumns}

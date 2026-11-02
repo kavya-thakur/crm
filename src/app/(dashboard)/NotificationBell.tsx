@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconBell, IconChecks } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
-import { timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/utils/format";
 import { Dropdown } from "@/components/Dropdown";
 import { SectionIcon, type Section } from "@/components/SectionIcon";
 
@@ -27,6 +27,7 @@ const SECTION_OF: Record<string, Section> = {
     ACTIVITY_INVITED: "activities",
     REMINDER: "activities",
     MENTIONED: "notes",
+    IMPORT_FINISHED: "leads",
 };
 
 /**

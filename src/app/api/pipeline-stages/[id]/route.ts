@@ -1,7 +1,7 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
-import { closedAtFor } from "@/lib/pipelineStages";
+import { closedAtFor } from "@/lib/deals/stages";
 import { idParamSchema } from "@/lib/validations/common";
 import { updatePipelineStageSchema } from "@/lib/validations/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";

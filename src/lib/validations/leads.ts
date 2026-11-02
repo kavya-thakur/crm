@@ -58,6 +58,9 @@ export const listLeadsQuerySchema = paginationSchema.extend({
         .enum(["createdAt", "updatedAt", "name"])
         .default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
+    // "csv": the whole filtered list as a download; "ids": just the ids of every match,
+    // for "select all" bulk actions
+    format: z.enum(["csv", "ids"]).optional(),
 });
 
 // The fields that can differ between two copies of a lead, where merging asks which to keep

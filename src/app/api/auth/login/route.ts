@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 import { createToken } from "@/lib/auth/jwt";
 import { loginSchema } from "@/lib/validations/auth";
+import { tooManyAttempts, visitorOf } from "@/lib/api/rateLimit";
 import { z } from "zod";
 
 export async function POST(req: NextRequest) {
@@ -23,6 +24,15 @@ export async function POST(req: NextRequest) {
         }
 
         const { email, password } = parsed.data;
+
+        // password guessing: 10 tries per 15 minutes from one place for one account. Per place
+        // and account together, so nobody can lock a real user out from somewhere else.
+        if (await tooManyAttempts(`login:${visitorOf(req.headers)}:${email.toLowerCase()}`, 10, 15 * 60 * 1000)) {
+            return NextResponse.json(
+                { ok: false, message: "Too many sign-in attempts. Please wait 15 minutes and try again." },
+                { status: 429 }
+            );
+        }
 
         const user = await prisma.user.findUnique({
             where: {

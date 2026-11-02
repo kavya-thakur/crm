@@ -19,6 +19,15 @@ export async function requirePermission(permissionName: string) {
     return user
 }
 
+// The person behind a background job (an import, a bulk delete), loaded the way a request
+// would see them, so the job runs within what they may do *now*, not when they started it
+export function userForJob(userId: number): Promise<CurrentUser | null> {
+    return prisma.user.findUnique({
+        where: { id: userId },
+        include: { organization: true, role: { include: { permissions: { include: { permission: true } } } } },
+    });
+}
+
 // Every leads query starts from this: lead:all sees the whole org, everyone else only
 // the leads assigned to them. Leads outside it simply don't match, so routes answer 404
 // and never confirm that the id exists.

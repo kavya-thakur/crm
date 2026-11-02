@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { contactScope, dealScope, leadScope, taskScope } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
-import { addTaskToTimeline, dueDateToDb, startOfToday, taskInclude } from "@/lib/tasks";
+import { addTaskToTimeline, dueDateToDb, startOfToday, taskInclude } from "@/lib/work/tasks";
 import { createTaskSchema, listTasksQuerySchema } from "@/lib/validations/tasks";
 import { searchParamsToObject } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";

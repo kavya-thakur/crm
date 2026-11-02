@@ -48,6 +48,9 @@ export const listContactsQuerySchema = paginationSchema.extend({
         .enum(["name", "email", "createdAt", "updatedAt"])
         .default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
+    // "csv": the whole filtered list as a download; "ids": just the ids of every match,
+    // for "select all" bulk actions
+    format: z.enum(["csv", "ids"]).optional(),
 });
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;

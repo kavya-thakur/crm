@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { contactScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
-import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
+import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkContactChangesSchema } from "@/lib/validations/contact";
 
 const contactIdsSchema = z.array(dbIdSchema).min(1).max(500);

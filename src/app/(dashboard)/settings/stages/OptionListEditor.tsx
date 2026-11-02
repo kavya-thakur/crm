@@ -10,7 +10,7 @@ import { StageBadge } from "@/components/StageBadge";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { STAGE_COLOR_PALETTE } from "@/lib/stageColors";
+import { STAGE_COLOR_PALETTE } from "@/lib/settings/stageColors";
 
 /**
  * twenty.com's way of editing a list of options: every option in one card, renamed in

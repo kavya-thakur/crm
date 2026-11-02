@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { IconCheck } from "@tabler/icons-react";
 
-import { LOST_REASONS } from "@/lib/lostReasons";
+import { LOST_REASONS } from "@/lib/leads/lostReasons";
 import { Modal } from "./Modal";
 
 // The reason picked, null for "skip", or undefined when the move was called off

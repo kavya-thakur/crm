@@ -5,7 +5,7 @@ import { useMutation, useQueries, useQueryClient, type QueryClient } from "@tans
 import { IconAlertTriangle, IconCheck, IconChevronDown, IconGitMerge } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import { SidePanel } from "./SidePanel";
 import { Dropdown, MenuItem } from "./Dropdown";
 import { Spinner } from "./Loader";

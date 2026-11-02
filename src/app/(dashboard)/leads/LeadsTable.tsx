@@ -23,7 +23,7 @@ import { SkeletonRows } from "@/components/Loader";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { askLostReason } from "@/components/LostReasonPrompt";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import {
     StageLabel,
     type Agent,

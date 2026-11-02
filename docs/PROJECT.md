@@ -6,7 +6,8 @@ updates. It's a portfolio project, built to be clean and production-minded rathe
 feature-for-feature with Salesforce.
 
 **Docs:** this file (what, why, status) · [ARCHITECTURE.md](ARCHITECTURE.md) (how it's
-built, folder structure, how each feature works) · [REALTIME.md](REALTIME.md) (Socket.IO).
+built, folder structure, how each feature works) · [REALTIME.md](REALTIME.md) (Socket.IO) ·
+[QUEUES.md](QUEUES.md) (Redis, background jobs, rate limits).
 They're updated whenever a feature lands.
 
 _Last updated: 2026-11-02_
@@ -18,7 +19,8 @@ _Last updated: 2026-11-02_
 | Layer | Choice | Why |
 |---|---|---|
 | App | **Next.js 16** (App Router), React 19, TypeScript | one codebase for pages and API; server components check permissions before anything renders. This Next version has breaking changes, so the docs in `node_modules/next/dist/docs` come first |
-| Server | **`server.ts`**: Next.js + **Socket.IO** on one Node process | route handlers can't keep WebSockets open; one process lets routes push events directly ([REALTIME.md](REALTIME.md)) |
+| Server | **`server.ts`**: Next.js + **Socket.IO** + the queue worker on one Node process | route handlers can't keep WebSockets open; one process lets routes push events directly ([REALTIME.md](REALTIME.md)) |
+| Jobs & limits | **Redis** + **BullMQ** | CSV imports run in the background with retries and live progress; rate limits shared and kept across restarts ([QUEUES.md](QUEUES.md)) |
 | Database | **PostgreSQL** + **Prisma 7** (pg driver adapter) | relational data (workspaces, roles, records, timelines), JSONB for custom fields, `pg_trgm` for fast search, triggers where they keep data honest |
 | Auth | JWT in an **httpOnly cookie** (`access_token`, 1 day), bcrypt passwords | simple, no third party; the same cookie authenticates the socket |
 | Validation | **zod 4**, shared by forms (react-hook-form) and routes | one set of rules on both sides |
@@ -31,7 +33,8 @@ _Last updated: 2026-11-02_
 ## 2. Running it
 
 ```bash
-cp .env.example .env              # DATABASE_URL, JWT_SECRET (+ optional DEMO_FORM_KEY)
+brew install redis && brew services start redis   # Redis, for the job queue and rate limits
+cp .env.example .env              # DATABASE_URL, JWT_SECRET, REDIS_URL (+ optional DEMO_FORM_KEY)
 npm install
 npx prisma migrate deploy --config prisma7.config.ts
 npx prisma generate --config prisma7.config.ts
@@ -82,6 +85,18 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Duplicates**: one open lead per person (enforced), warning while typing, "possible
       duplicates" filter, **merge** for leads and deals
 
+### Data in and out
+- [x] **CSV import** of leads (Leads → Import ▾, which also has Export and a sample CSV built from the
+      workspace's own fields): column mapping with automatic guesses (incl. every custom field;
+      teammates by name or email for "Assigned to" and Agent fields), defaults
+      for stage/source/owner, preview, background job (BullMQ on Redis) with live progress, retries
+      that resume where they stopped, duplicate checks, and a downloadable file of rows not added
+- [x] **CSV export** of leads, deals and contacts: streamed, follows the filters on screen,
+      safe against spreadsheet formula injection, re-importable
+- [x] **Bulk delete of thousands**: "select all N matching" the filters, deleted as a background
+      job in batches with a progress card on every page (small selections stay instant)
+- [x] **Rate limits** on Redis: web forms, sign-in attempts, imports, big bulk actions
+
 ### Real time
 - [x] Socket.IO: other people's changes appear live on every list, board, panel and dashboard
 - [x] **Notifications** with a bell: assigned a lead/deal/task, added to a meeting, @mentioned,
@@ -93,7 +108,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] Onboarding intro
 
 ### Engineering
-- [x] 107 integration tests across 21 files; CI with Postgres
+- [x] 120 integration tests across 24 files; CI with Postgres
 - [x] Large-data checked: 10k+ leads, lists and boards in tens of milliseconds (indexes, paging)
 
 ---
@@ -101,8 +116,8 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 ## 4. What's next (candidates, roughly in order)
 
 1. **Campaign tracking (UTM tags)** on web forms, captured into the lead automatically
-2. **CSV import & export**: bring a spreadsheet in with column mapping and duplicate checks
-3. **Speed-to-lead rule**: alert the owner (then their manager) if a new lead isn't contacted in X hours
+2. **Demo mode** for the live site: one-click Manager/Agent login, nightly reset (a repeatable job)
+3. **Speed-to-lead rule**: alert the owner (then their manager) if a new lead isn't contacted in X hours (a delayed job)
 4. **Booking link**: a public page where a visitor picks a free slot → lead + meeting
 5. Email from the CRM (templates, logged on the timeline)
 6. Webhooks / API keys for integrations
@@ -121,6 +136,13 @@ Newest first. The reason matters more than the choice.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-02 | `src/lib` **grouped into folders by purpose** (auth, db, api, realtime, jobs, leads, deals, work, settings, dashboard, utils, validations) | 30 loose files were hard to find your way around; a folder's name now says what's inside |
+| 2026-11-02 | **Redis + BullMQ** for background jobs (over a Postgres-backed queue) | the standard Node stack; also gives delayed/repeatable jobs and shared rate limits; worth learning |
+| 2026-11-02 | Jobs carry **only ids**; imports save each batch **with its counters in one transaction** | Redis is never the source of truth; a retried job resumes exactly where it stopped, importing nothing twice |
+| 2026-11-02 | Big bulk deletes **snapshot the ids** and run as a job; up to 200 stay instant | "all matching" means what was matching when you clicked; small deletes don't need a queue's overhead |
+| 2026-11-02 | The worker runs **inside `server.ts`** for now | one command, one deploy; it can move to its own process with no other change |
+| 2026-11-02 | Rate limits **fail open** when Redis is down | an unlimited form for a minute beats a site that's down because of its limiter |
+| 2026-11-02 | Export is **streamed, not queued** | memory stays flat and the download starts at once; a queue only pays off at far larger sizes |
 | 2026-11-02 | Web form setup in **one `settings` JSON column** with zod defaults | old forms keep working with no data change; the builder, the hosted page, the embed code and the endpoint all read it through `readFormSettings()` |
 | 2026-11-02 | Name and phone are **always** on a form; email/company/message can be required, optional or off | every lead and its contact need a name and phone (duplicates are matched on them) |
 | 2026-11-02 | Form answers go into the lead's **real custom fields**; a returning lead only gets its **empty** fields filled | filterable and reportable, and a second submission never overwrites what sales already knows |

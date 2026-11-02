@@ -33,7 +33,7 @@ export function broadcastChange(organizationId: number, topic: string, exceptSoc
     (exceptSocketId ? room?.except(exceptSocketId) : room)?.emit("changed", { topic });
 }
 
-export type NotificationType = "LEAD_ASSIGNED" | "DEAL_ASSIGNED" | "TASK_ASSIGNED" | "ACTIVITY_INVITED" | "MENTIONED" | "REMINDER";
+export type NotificationType = "LEAD_ASSIGNED" | "DEAL_ASSIGNED" | "TASK_ASSIGNED" | "ACTIVITY_INVITED" | "MENTIONED" | "REMINDER" | "IMPORT_FINISHED";
 
 /**
  * Puts a notification in each recipient's bell and pushes it to them live:

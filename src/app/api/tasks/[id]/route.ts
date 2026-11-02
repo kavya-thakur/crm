@@ -2,7 +2,7 @@ import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { taskScope } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
-import { addTaskToTimeline, dueDateToDb, taskInclude } from "@/lib/tasks";
+import { addTaskToTimeline, dueDateToDb, taskInclude } from "@/lib/work/tasks";
 import { updateTaskSchema } from "@/lib/validations/tasks";
 import { idParamSchema } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";

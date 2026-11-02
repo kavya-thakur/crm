@@ -24,6 +24,9 @@ export const listDealsQuerySchema = paginationSchema.extend({
         .enum(["createdAt", "updatedAt", "title", "amount", "expectedCloseDate"])
         .default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
+    // "csv": the whole filtered list as a download; "ids": just the ids of every match,
+    // for "select all" bulk actions
+    format: z.enum(["csv", "ids"]).optional(),
 });
 
 // A deal's fields, with no defaults: the update schema below is built from these, and in

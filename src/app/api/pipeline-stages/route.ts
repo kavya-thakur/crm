@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/requirePermission";
-import { placeholderName, planOptionList } from "@/lib/optionLists";
-import { closedAtFor } from "@/lib/pipelineStages";
+import { placeholderName, planOptionList } from "@/lib/settings/optionLists";
+import { closedAtFor } from "@/lib/deals/stages";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { createPipelineStageSchema, savePipelineStagesSchema } from "@/lib/validations/pipelineStages";
 

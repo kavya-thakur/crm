@@ -10,6 +10,7 @@ import {
     IconCheck,
     IconChevronDown,
     IconChevronRight,
+    IconDownload,
     IconHash,
     IconLayoutKanban,
     IconLayoutList,
@@ -28,6 +29,7 @@ import { Avatar } from "./Avatar";
 import { SectionIcon, type Section } from "./SectionIcon";
 import { Dropdown, MenuItem, SearchableItems } from "./Dropdown";
 import { Spinner } from "./Loader";
+import { toQueryParams } from "@/lib/api/client";
 import { Modal } from "./Modal";
 import { SidePanel } from "./SidePanel";
 import type { SelectOption } from "./Select";
@@ -76,6 +78,33 @@ export function ListHeader({
                 </button>
             )}
         </header>
+    );
+}
+
+// The toolbar's quiet buttons (Filter, Sort, Options, Import, Export) all look like this
+export const toolbarButtonClassName = "flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill";
+
+/**
+ * Downloads the list as a CSV: the same endpoint as the list, with ?format=csv and the
+ * filters on screen, so the file is exactly what's shown. A plain link, so the browser
+ * handles the download (and the login cookie goes with it).
+ */
+// Starts a download from a menu item, as a plain download link would: the page stays put
+export function downloadFile(url: string) {
+    Object.assign(document.createElement("a"), { href: url, download: "" }).click();
+}
+
+export function exportUrl(endpoint: string, filters: object) {
+    const params = new URLSearchParams(Object.entries({ ...toQueryParams(filters), format: "csv" }).map(([key, value]) => [key, String(value)]));
+    return `/api${endpoint}?${params}`;
+}
+
+export function ExportButton({ endpoint, filters }: { endpoint: string; filters: object }) {
+    return (
+        <a href={exportUrl(endpoint, filters)} download className={toolbarButtonClassName} title="Download what's on screen as a CSV file">
+            <IconDownload size={14} />
+            Export
+        </a>
     );
 }
 

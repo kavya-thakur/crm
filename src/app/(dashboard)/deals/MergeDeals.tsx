@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import { Avatar } from "@/components/Avatar";
 import { DuplicateSuggestions, MergePanel, type MergeFieldSpec, type MergePair } from "@/components/MergePanel";
 import { formatDealAmount, refreshDeals, StageLabel, type Deal } from "./shared";

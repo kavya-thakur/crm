@@ -26,7 +26,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
-import { formatDate, formatDateTime, formatDay, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatDay, formatMoney } from "@/lib/utils/format";
 import { Avatar } from "@/components/Avatar";
 import { Spinner } from "@/components/Loader";
 import { SectionIcon, type Section } from "@/components/SectionIcon";

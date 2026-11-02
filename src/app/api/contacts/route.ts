@@ -5,7 +5,9 @@ import { contactScope, hasPermission, requirePermission } from "@/lib/auth/requi
 import { createContactSchema, listContactsQuerySchema } from "@/lib/validations/contact";
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { validateCustomFieldValues } from "@/lib/customFields";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
+import { exportContacts } from "@/lib/api/csvExport";
+import { MAX_BULK } from "@/lib/jobs/bulkActions";
 
 export async function POST(req: NextRequest) {
     try {
@@ -146,7 +148,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, companyId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder } = query.data;
+        const { page, limit, search, companyId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } = query.data;
 
         const term = search && escapeLike(search);
         const createdAt = dayRange(createdFrom, createdTo);
@@ -210,6 +212,17 @@ export async function GET(req: NextRequest) {
             // last, so the ?assignedTo filter can't override the scope
             ...contactScope(user),
         };
+
+        // the same filters and permissions, as a file
+        if (format === "csv") {
+            return exportContacts(user.organizationId, where);
+        }
+
+        // every match's id (up to the bulk limit), for "select all N" and a bulk action on them
+        if (format === "ids") {
+            const rows = await prisma.contact.findMany({ where, select: { id: true }, orderBy: { id: "asc" }, take: MAX_BULK });
+            return NextResponse.json({ ok: true, data: rows.map((row) => row.id) });
+        }
 
         const [contacts, total] = await Promise.all([
             prisma.contact.findMany({
