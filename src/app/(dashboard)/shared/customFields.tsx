@@ -8,6 +8,7 @@ import { IconSettings } from "@tabler/icons-react";
 import { api } from "@/lib/api/client";
 import { Select, type SelectOption } from "@/components/Select";
 import type { DataColumn, EditConfig } from "@/components/DataTable";
+import type { BulkField } from "@/components/ListPage";
 import { controlClassName, renderSelectControl, type FilterFieldDef } from "@/components/FilterPanel";
 import { formatDate } from "@/lib/format";
 import { FormFieldRow, FormSection } from "./FullPageForm";
@@ -365,4 +366,37 @@ export function createCustomColumn<TRecord>(
             return String(value);
         },
     };
+}
+
+// Custom fields as bulk-edit choices: each one sends { customFields: { key: value } },
+// which the bulk route merges into every selected record's own custom fields
+export function customBulkFields(defs: CustomFieldDef[], agents?: AgentOption[]): BulkField[] {
+    return defs.flatMap((def): BulkField[] => {
+        const base = { key: `custom_${def.key}`, label: def.label, clearable: !def.required };
+        const send = (value: unknown) => ({ customFields: { [def.key]: value } });
+
+        switch (def.type) {
+            case "TEXT":
+            case "DATE":
+                return [{ ...base, type: def.type === "TEXT" ? "text" : "date", toChanges: (value) => send(value || null) }];
+            case "NUMBER":
+                return [{ ...base, type: "number", toChanges: (value) => send(value === "" ? null : Number(value)) }];
+            case "SELECT":
+                return [{ ...base, type: "select", options: (def.options ?? []).map((option) => ({ value: option, label: option })), toChanges: (value) => send(value || null) }];
+            case "BOOLEAN":
+                return [
+                    {
+                        ...base,
+                        type: "select",
+                        options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }],
+                        toChanges: (value) => send(value === "" ? null : value === "true"),
+                    },
+                ];
+            case "AGENT":
+                // without the team list there's nothing to pick from
+                return agents
+                    ? [{ ...base, type: "select", options: agents.map((agent) => ({ value: String(agent.id), label: agent.name })), toChanges: (value) => send(value ? Number(value) : null) }]
+                    : [];
+        }
+    });
 }

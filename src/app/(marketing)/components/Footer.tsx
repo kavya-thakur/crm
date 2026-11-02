@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconBolt } from "@tabler/icons-react";
+import { LogoMark } from "@/components/Logo";
 
 import { CONTAINER } from "./Eyebrow";
 
@@ -7,19 +7,20 @@ const COLUMNS = [
     {
         title: "Product",
         links: [
-            { label: "Leads", href: "#product" },
-            { label: "Deals", href: "#product" },
-            { label: "Contacts", href: "#product" },
-            { label: "Tasks & activities", href: "#how-it-works" },
-            { label: "Roles & permissions", href: "#how-it-works" },
+            { label: "Leads", href: "/#product" },
+            { label: "Deals", href: "/#product" },
+            { label: "Contacts", href: "/#product" },
+            { label: "Tasks & activities", href: "/#how-it-works" },
+            { label: "Roles & permissions", href: "/#how-it-works" },
         ],
     },
     {
         title: "Explore",
         links: [
-            { label: "How it works", href: "#how-it-works" },
-            { label: "Pricing", href: "#pricing" },
-            { label: "FAQ", href: "#pricing" },
+            { label: "How it works", href: "/#how-it-works" },
+            { label: "Book a demo", href: "/demo" },
+            { label: "Pricing", href: "/#pricing" },
+            { label: "FAQ", href: "/#pricing" },
         ],
     },
     {
@@ -46,10 +47,8 @@ export function Footer() {
             <div className={`${CONTAINER} grid gap-12 pt-20 pb-12 min-[921px]:grid-cols-[1fr_2fr]`}>
                 <div>
                     <Link href="/" aria-label="Flash home" className="inline-flex items-center gap-2.5 text-white">
-                        <span className="flex size-9 items-center justify-center rounded-lg bg-[#4a38f5]">
-                            <IconBolt size={18} />
-                        </span>
-                        <span className="text-[20px] font-medium tracking-[-0.03em]">Flash</span>
+                        <LogoMark size={36} dark />
+                        <span className="text-[21px] font-semibold tracking-[-0.045em]">Flash</span>
                     </Link>
                     <p className="mt-4 max-w-70 text-[14px] leading-[1.55] text-white/45">The CRM that keeps up with how fast your team sells.</p>
                 </div>

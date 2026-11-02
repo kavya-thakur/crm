@@ -7,6 +7,26 @@ export const api = axios.create({
     },
 });
 
+// A list's filters as query params. Lists of ids (several stages, say) travel as "1,4,7",
+// and custom-field filters as one JSON-encoded param, the way the list routes read them.
+// Used by every list and board, so each sends its filters the same way.
+export function toQueryParams(filters: object) {
+    const params: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(filters)) {
+        if (value === undefined || value === "") continue;
+        if (Array.isArray(value)) {
+            if (value.length > 0) params[key] = value.join(",");
+        } else if (key === "customFields" && typeof value === "object" && value !== null) {
+            if (Object.keys(value).length > 0) params[key] = JSON.stringify(value);
+        } else {
+            params[key] = value;
+        }
+    }
+
+    return params;
+}
+
 // The API's own message: a field error first ("Invalid email"), then the general one
 // ("Email is already registered")
 export function errorMessage(error: unknown) {

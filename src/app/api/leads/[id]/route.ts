@@ -139,7 +139,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 where: { organizationId: user.organizationId, entity: "lead" },
             });
 
-            const result = validateCustomFieldValues(definitions, submittedCustomFields);
+            const result = validateCustomFieldValues(definitions, submittedCustomFields, { partial: true });
 
             if (!result.ok) {
                 return NextResponse.json(
@@ -164,6 +164,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
             data: {
                 ...fields,
                 stageId,
+                updatedById: user.id,
                 ...(customFields && { customFields }),
                 // same timeline entry the bulk route logs, saved in the same query as the update
                 ...(stageChanged && {

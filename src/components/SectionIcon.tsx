@@ -4,6 +4,7 @@ import {
     IconBriefcase,
     IconCalendarEvent,
     IconCheckbox,
+    IconForms,
     IconLayoutDashboard,
     IconLayoutKanban,
     IconNotes,
@@ -36,7 +37,6 @@ type Icon = ComponentType<{ size?: number; className?: string; stroke?: number; 
 
 // The exact icon colours Twenty's sidebar uses: step 10 of its colour scale, written in
 // display-p3 (twenty-ui ThemeLight.ts), which Mac screens show richer than plain hex.
-// Kept as bare channels so the same colour can also be used see-through (tiles, washes).
 const INKS = {
     red: "0.798 0.294 0.285",
     green: "0.308 0.595 0.417",
@@ -47,16 +47,10 @@ const INKS = {
     grey: "0.4 0.4 0.4",
 } as const;
 
-// A section's colour, optionally see-through (0 to 1)
-function ink(section: Section, alpha = 1) {
-    return `color(display-p3 ${INKS[SECTIONS[section].ink]} / ${alpha})`;
+function ink(section: Section) {
+    return `color(display-p3 ${INKS[SECTIONS[section].ink]})`;
 }
 
-// The page header's background: a soft wash of the section's colour fading out
-// from the left, over the usual pale header grey
-export function headerWash(section: Section): CSSProperties {
-    return { backgroundImage: `linear-gradient(90deg, ${ink(section, 0.09)}, ${ink(section, 0.03)} 35%, transparent 70%)` };
-}
 
 // Every part of the app, with its icon and colour. The icons are the same Tabler icons
 // twenty.com's sidebar uses wherever there's a match (target, user, checkbox, notes). The sidebar, the page headers and
@@ -75,13 +69,13 @@ export const SECTIONS = {
     roles: { icon: IconShieldLock, ink: "grey" },
     stages: { icon: IconLayoutKanban, ink: "grey" },
     customFields: { icon: IconAdjustmentsHorizontal, ink: "grey" },
+    leadForms: { icon: IconForms, ink: "grey" },
 } satisfies Record<string, { icon: Icon; ink: keyof typeof INKS }>;
 
 export type Section = keyof typeof SECTIONS;
 
-// A section's icon in its own colour. "sm" (sidebar) is the bare icon, as on twenty.com;
-// "md" (page headers) sits on a tile tinted with the same colour, like Twenty's object
-// icons; "lg" sits on a quiet grey tile at the top of a settings page.
+// A section's icon in its own colour. "sm" (sidebar) and "md" (page headers) are the bare
+// icon, as on twenty.com; "lg" sits on a quiet grey tile at the top of a settings page.
 export function SectionIcon({ section, size = "sm" }: { section: Section; size?: "sm" | "md" | "lg" }) {
     const { icon: Icon } = SECTIONS[section];
 
@@ -89,18 +83,6 @@ export function SectionIcon({ section, size = "sm" }: { section: Section; size?:
         return (
             <span aria-hidden className="inline-flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-line bg-paper">
                 <Icon size={20} stroke={1.8} style={{ color: ink(section) }} />
-            </span>
-        );
-    }
-
-    if (size === "md") {
-        return (
-            <span
-                aria-hidden
-                className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg"
-                style={{ backgroundColor: ink(section, 0.12), boxShadow: `inset 0 0 0 1px ${ink(section, 0.2)}` }}
-            >
-                <Icon size={16} stroke={2} style={{ color: ink(section) }} />
             </span>
         );
     }

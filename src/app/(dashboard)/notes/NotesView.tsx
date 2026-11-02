@@ -7,13 +7,12 @@ import { IconAddressBook, IconCurrencyRupee, IconTargetArrow } from "@tabler/ico
 
 import { api } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
-import { SectionIcon, headerWash } from "@/components/SectionIcon";
+import { SectionIcon } from "@/components/SectionIcon";
 import { ViewSwitcher } from "@/components/ListPage";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/Loader";
 import { timeAgo } from "@/lib/format";
 import { renderNoteBody } from "../shared/notes";
-import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import type { NoteFeedEntity, NoteFeedItem } from "@/app/api/notes/route";
 import NotesBoard from "./NotesBoard";
@@ -41,7 +40,6 @@ const EMPTY_MESSAGE: Record<Scope, string> = {
 export default function NotesView({ meId, entities }: { meId: number; entities: NoteFeedEntity[] }) {
     const [view, setView] = useState<"table" | "board">("table");
     const [scope, setScope] = useState<Scope>("all");
-    const enterRef = usePanelEnter<HTMLDivElement>();
 
     const notesQuery = useQuery({
         queryKey: ["notes-feed", scope],
@@ -57,8 +55,8 @@ export default function NotesView({ meId, entities }: { meId: number; entities: 
     });
 
     return (
-        <div ref={enterRef} className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("notes")}>
+        <div className="flex h-full flex-col">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
                 <SectionIcon section="notes" size="md" />
                 <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Notes</h1>
                 {notesQuery.data && <span className="text-faint">{notesQuery.data.length}</span>}

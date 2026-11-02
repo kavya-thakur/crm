@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { IconBolt } from "@tabler/icons-react";
 
+import { LogoMark } from "@/components/Logo";
 import { Button } from "./Button";
 
 const LINKS = [
-    { href: "#product", label: "Product" },
-    { href: "#how-it-works", label: "How it works" },
-    { href: "#pricing", label: "Pricing" },
+    { href: "/#product", label: "Product" },
+    { href: "/#how-it-works", label: "How it works" },
+    { href: "/#pricing", label: "Pricing" },
+    { href: "/demo", label: "Book a demo" },
 ];
 
 // Thin vertical rule between two links
@@ -48,10 +49,9 @@ export function Nav({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolean
             }`}
         >
             <div className="mx-auto flex min-h-16 w-full max-w-378 items-center justify-between gap-5 px-4 min-[921px]:px-10">
-                <Link href="/" aria-label="Flash home" className="flex shrink-0 items-center">
-                    <span className={`flex size-10 items-center justify-center rounded-sm transition-colors duration-300 ${dark ? "bg-white text-[#1c1c1c]" : "bg-[#1c1c1c] text-white"}`}>
-                        <IconBolt size={20} />
-                    </span>
+                <Link href="/" aria-label="Flash home" className="flex shrink-0 items-center gap-2.5">
+                    <LogoMark size={34} dark={dark} />
+                    <span className="font-(family-name:--font-host-grotesk) text-[21px] font-semibold tracking-[-0.045em]">Flash</span>
                 </Link>
 
                 <nav aria-label="Main" className="hidden items-center gap-x-8 min-[921px]:flex">

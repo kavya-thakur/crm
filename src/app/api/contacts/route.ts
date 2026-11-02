@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { contactScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { createContactSchema, listContactsQuerySchema } from "@/lib/validations/contact";
-import { createdAtRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
+import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/customFields";
 
@@ -100,6 +100,8 @@ export async function POST(req: NextRequest) {
                 assignedToId,
                 customFields: customFields.data as Prisma.InputJsonObject,
                 organizationId: user.organizationId,
+                createdById: user.id,
+                updatedById: user.id,
                 // nested create: the contact and its first timeline entry are saved in one query
                 timeline: {
                     create: {
@@ -144,10 +146,11 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, companyId, assignedTo, createdFrom, createdTo, customFields: customFieldsParam, sortBy, sortOrder } = query.data;
+        const { page, limit, search, companyId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder } = query.data;
 
         const term = search && escapeLike(search);
-        const createdAt = createdAtRange(createdFrom, createdTo);
+        const createdAt = dayRange(createdFrom, createdTo);
+        const updatedAt = dayRange(updatedFrom, updatedTo);
 
         let customFieldFilters: Prisma.ContactWhereInput[] = [];
 
@@ -196,6 +199,12 @@ export async function GET(req: NextRequest) {
                             : assignedTo,
             }),
 
+            ...(createdBy !== undefined && { createdById: createdBy === "me" ? user.id : createdBy }),
+
+            ...(updatedBy !== undefined && { updatedById: updatedBy === "me" ? user.id : updatedBy }),
+
+            ...(updatedAt && { updatedAt }),
+
             ...(createdAt && { createdAt }),
 
             // last, so the ?assignedTo filter can't override the scope
@@ -217,6 +226,9 @@ export async function GET(req: NextRequest) {
                     assignedTo: {
                         select: { id: true, name: true, email: true },
                     },
+                    // who made it and who changed it last, for the table's columns
+                    createdBy: { select: { id: true, name: true } },
+                    updatedBy: { select: { id: true, name: true } },
                 },
             }),
 

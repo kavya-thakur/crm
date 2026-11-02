@@ -2,19 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
-import { Board, BoardCard, BoardColumn, CardControl, ColumnTitle } from "@/components/Board";
+import { Board, BoardCard, BoardColumn, CardControl, ColumnTitle, useBoardColumn } from "@/components/Board";
 import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/format";
 import { NoteComposer, renderNoteBody } from "../shared/notes";
 import type { AgentOption } from "../shared/customFields";
 import type { NoteFeedEntity, NoteFeedItem } from "@/app/api/notes/route";
-
-const COLUMN_LIMIT = 50;
 
 export const NOTE_ENTITIES: Record<NoteFeedEntity, { label: string; color: string; href: string; path: string }> = {
     lead: { label: "Lead notes", color: "#ce2c31", href: "/leads", path: "/leads" },
@@ -48,22 +46,18 @@ function EntityColumn({ entity, scope, meId, agents }: { entity: NoteFeedEntity;
     const router = useRouter();
     const meta = NOTE_ENTITIES[entity];
 
-    const notesQuery = useQuery({
-        queryKey: ["notes-feed", scope, entity],
-        queryFn: () =>
-            api.get<{ data: NoteFeedItem[] }>("/notes", { params: { scope, entity, limit: COLUMN_LIMIT } }).then((res) => res.data.data),
-    });
-
-    const notes = notesQuery.data ?? [];
+    const column = useBoardColumn<NoteFeedItem>(["notes-feed", scope, entity], "/notes", { scope, entity });
+    const notes = column.items;
 
     return (
         <BoardColumn
             id={entity}
             title={<ColumnTitle color={meta.color}>{meta.label}</ColumnTitle>}
-            count={notesQuery.data?.length}
-            loading={notesQuery.isPending}
-            error={notesQuery.error}
-            onRetry={() => notesQuery.refetch()}
+            count={column.total}
+            more={column.more}
+            loading={column.loading}
+            error={column.error}
+            onRetry={column.retry}
             emptyText="No notes"
         >
             {notes.map((note) => (
@@ -75,7 +69,6 @@ function EntityColumn({ entity, scope, meId, agents }: { entity: NoteFeedEntity;
                     onOpen={() => router.push(`${meta.href}?open=${note.recordId}`)}
                 />
             ))}
-            {notes.length === COLUMN_LIMIT && <p className="py-1 text-center text-sm text-faint">Showing the latest {COLUMN_LIMIT}</p>}
         </BoardColumn>
     );
 }

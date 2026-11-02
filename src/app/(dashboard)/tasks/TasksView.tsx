@@ -9,7 +9,6 @@ import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ListHeader, ViewSwitcher } from "@/components/ListPage";
 import { toast } from "@/components/Toast";
-import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { PriorityBadge } from "../shared/tasks";
 import NewTaskDialog from "./NewTaskDialog";
@@ -31,7 +30,6 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
     const router = useRouter();
     const queryClient = useQueryClient();
     const searchParams = useSearchParams();
-    const enterRef = usePanelEnter<HTMLDivElement>();
 
     const [view, setView] = useState<"table" | "board">("table");
     const [scope, setScope] = useState<TaskScope>("open");
@@ -105,7 +103,7 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
     }
 
     return (
-        <div ref={enterRef} className="flex h-full flex-col">
+        <div className="flex h-full flex-col">
             <ListHeader section="tasks" title="Tasks" count={total} createLabel="New Task" onCreate={() => setCreating(true)} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">

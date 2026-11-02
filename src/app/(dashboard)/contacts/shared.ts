@@ -16,6 +16,9 @@ export interface Contact {
     createdAt: string;
     updatedAt: string;
     assignedTo: { id: number; name: string; email: string } | null;
+    // who made it / changed it last; null for records from before this was tracked
+    createdBy?: { id: number; name: string } | null;
+    updatedBy?: { id: number; name: string } | null;
     customFields: Record<string, unknown> | null;
 }
 
@@ -46,6 +49,10 @@ export interface ContactFilters {
     assignedTo?: string; // "me" | "unassigned" | agent id
     createdFrom?: string; // "YYYY-MM-DD"
     createdTo?: string;
+    createdBy?: string; // "me" | agent id
+    updatedBy?: string;
+    updatedFrom?: string; // "YYYY-MM-DD"
+    updatedTo?: string;
     // values for fields marked "show in filter", keyed by CustomFieldDefinition.key
     customFields?: Record<string, unknown>;
     sortBy: "name" | "email" | "createdAt" | "updatedAt";

@@ -16,7 +16,7 @@ import {
 
 import { Avatar } from "@/components/Avatar";
 import { StageBadge } from "@/components/StageBadge";
-import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig } from "@/components/DataTable";
+import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, peopleColumns } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Loader";
 import type { useTableColumns } from "@/components/FilterPanel";
@@ -57,6 +57,7 @@ export const LEAD_COLUMNS: LeadColumn[] = [
         ),
     },
     { key: "createdAt", label: "Created", icon: IconCalendar, width: 150, cell: (lead) => formatDate(lead.createdAt) },
+    ...peopleColumns<Lead>(),
 ];
 
 // Attaches inline-edit behavior to the base columns above — kept separate
@@ -211,7 +212,7 @@ export default function LeadsTable({
                             <tr
                                 key={lead.id}
                                 className={`[&>td]:h-8 [&>td]:border-r [&>td]:border-b [&>td]:border-line-light [&>td]:px-2 [&>td]:whitespace-nowrap
-                                    ${isSelected ? "[&>td]:bg-accent-faint" : "[&>td]:bg-surface"}`}
+                                    ${isSelected ? "[&>td]:bg-accent-faint" : "[&>td]:bg-surface hover:[&>td]:bg-[#fbfaff]"} animate-[fade-in_0.25s_ease-out]`}
                             >
                                 <td className="sticky left-0 z-1 px-0! text-center">
                                     {selectable && (

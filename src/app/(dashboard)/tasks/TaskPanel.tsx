@@ -21,7 +21,7 @@ import {
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmDeleteModal } from "@/components/ListPage";
-import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { Dropdown, MenuItem, SearchableItems } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
@@ -192,15 +192,17 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
                                     >
                                         {(close) => (
                                             <>
-                                                {agents.map((agent) => (
-                                                    <MenuItem
-                                                        key={agent.id}
-                                                        selected={agent.id === task.assignedTo.id}
-                                                        onClick={() => { if (agent.id !== task.assignedTo.id) update.mutate({ assignedToId: agent.id }); close(); }}
-                                                    >
-                                                        <Avatar name={agent.name} /> {agent.name}
-                                                    </MenuItem>
-                                                ))}
+                                                <SearchableItems items={agents} label={(agent) => agent.name}>
+                                                    {(agent) => (
+                                                        <MenuItem
+                                                            key={agent.id}
+                                                            selected={agent.id === task.assignedTo.id}
+                                                            onClick={() => { if (agent.id !== task.assignedTo.id) update.mutate({ assignedToId: agent.id }); close(); }}
+                                                        >
+                                                            <Avatar name={agent.name} /> {agent.name}
+                                                        </MenuItem>
+                                                    )}
+                                                </SearchableItems>
                                             </>
                                         )}
                                     </Dropdown>

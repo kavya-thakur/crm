@@ -15,7 +15,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Loader";
-import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig } from "@/components/DataTable";
+import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, peopleColumns } from "@/components/DataTable";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { formatDate } from "@/lib/format";
@@ -46,6 +46,7 @@ export const CONTACT_COLUMNS: ContactColumn[] = [
         ),
     },
     { key: "createdAt", label: "Created", icon: IconCalendar, width: 150, cell: (contact) => formatDate(contact.createdAt) },
+    ...peopleColumns<Contact>(),
 ];
 
 // Attaches inline-edit behavior to the base columns above — kept separate
@@ -175,7 +176,7 @@ export default function ContactsTable({
                             <tr
                                 key={contact.id}
                                 className={`[&>td]:h-8 [&>td]:border-r [&>td]:border-b [&>td]:border-line-light [&>td]:px-2 [&>td]:whitespace-nowrap
-                                    ${isSelected ? "[&>td]:bg-accent-faint" : "[&>td]:bg-surface"}`}
+                                    ${isSelected ? "[&>td]:bg-accent-faint" : "[&>td]:bg-surface hover:[&>td]:bg-[#fbfaff]"} animate-[fade-in_0.25s_ease-out]`}
                             >
                                 <td className="sticky left-0 z-1 px-0! text-center">
                                     {selectable && (

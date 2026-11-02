@@ -16,4 +16,6 @@ export const listNoteFeedQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).default(30),
     // only one kind of record's notes, for a column of the notes board
     entity: z.enum(["lead", "deal", "contact"]).optional(),
+    // with an entity, the board loads a column page by page
+    page: z.coerce.number().int().min(1).default(1),
 });

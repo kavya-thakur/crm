@@ -1,17 +1,15 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { Board, BoardCard, BoardColumn, CardFields, ColumnTitle } from "@/components/Board";
+import { Board, BoardCard, BoardColumn, CardFields, ColumnTitle, useBoardColumn } from "@/components/Board";
 import type { DataColumn } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 import { formatMoneyShort } from "@/lib/format";
-import { formatDealAmount, refreshDeals, type Deal, type DealFilters, type Paginated, type PipelineStage } from "./shared";
-
-const COLUMN_LIMIT = 100;
+import { formatDealAmount, refreshDeals, type Deal, type DealFilters, type PipelineStage } from "./shared";
 
 interface DealsBoardProps {
     filters: DealFilters;
@@ -44,8 +42,9 @@ export default function DealsBoard({ filters, columns, canMove, onOpen, onCreate
         );
     }
 
-    const stages =
-        filters.pipelineStageId === undefined ? stagesQuery.data : stagesQuery.data.filter((stage) => stage.id === filters.pipelineStageId);
+    // filtered to some stages: just those columns
+    const picked = filters.pipelineStageIds;
+    const stages = picked ? stagesQuery.data.filter((stage) => picked.includes(stage.id)) : stagesQuery.data;
 
     if (stages.length === 0) {
         return <p className="p-4 text-sm text-faint">No pipeline stages configured yet.</p>;
@@ -81,15 +80,10 @@ function StageColumn({
 }: Omit<DealsBoardProps, "columns" | "onCreate"> & { stage: PipelineStage; fields: DataColumn<Deal>[]; onAdd?: () => void }) {
     const queryClient = useQueryClient();
 
-    const dealsQuery = useQuery({
-        queryKey: ["deals", "board", { ...filters, pipelineStageId: stage.id }],
-        queryFn: () =>
-            api
-                .get<Paginated<Deal>>("/deals", {
-                    params: { ...filters, search: filters.search || undefined, pipelineStageId: stage.id, page: 1, limit: COLUMN_LIMIT },
-                })
-                .then((response) => response.data),
-        placeholderData: keepPreviousData,
+    const column = useBoardColumn<Deal>(["deals", "board", { ...filters, pipelineStageId: stage.id }], "/deals", {
+        ...filters,
+        search: filters.search || undefined,
+        pipelineStageId: stage.id,
     });
 
     const moveDeal = useMutation({
@@ -101,21 +95,23 @@ function StageColumn({
         onError: (error) => toast.error(errorMessage(error)),
     });
 
-    const deals = dealsQuery.data?.data ?? [];
-    const total = deals.reduce((sum, deal) => sum + Number(deal.amount), 0);
-    // past the column limit the sum only covers what's loaded, so it's marked as "at least"
-    const partial = (dealsQuery.data?.pagination.total ?? 0) > deals.length;
+    const deals = column.items;
 
     return (
         <BoardColumn
             id={String(stage.id)}
             title={<ColumnTitle color={stage.color}>{stage.name}</ColumnTitle>}
-            count={dealsQuery.data?.pagination.total}
-            aside={deals.length > 0 && <span className="ml-auto font-display text-sm font-medium text-muted tabular-nums">{partial ? "≥ " : ""}{formatMoneyShort(total)}</span>}
-            shown={deals.length}
-            loading={dealsQuery.isPending}
-            error={dealsQuery.error}
-            onRetry={() => dealsQuery.refetch()}
+            count={column.total}
+            // the whole column's value, added up by the server, not just the cards loaded so far
+            aside={
+                (column.total ?? 0) > 0 && (
+                    <span className="ml-auto font-display text-sm font-medium text-muted tabular-nums">{formatMoneyShort(column.totalAmount ?? 0)}</span>
+                )
+            }
+            more={column.more}
+            loading={column.loading}
+            error={column.error}
+            onRetry={column.retry}
             emptyText="No deals"
             onDropCard={canMove ? (id) => !moveDeal.isPending && moveDeal.mutate(id) : undefined}
             onAdd={onAdd}

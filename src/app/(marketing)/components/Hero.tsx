@@ -57,8 +57,8 @@ export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolea
                     <div data-hero-line className="mt-9 flex flex-wrap justify-center gap-3">
                         <Button href={primaryHref}>{primaryLabel}</Button>
                         {!loggedIn && (
-                            <Button href="#how-it-works" variant="outlined">
-                                See how it works
+                            <Button href="/demo" variant="outlined">
+                                Book a demo
                             </Button>
                         )}
                     </div>

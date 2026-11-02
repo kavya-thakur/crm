@@ -2,27 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api/client";
+import { api, toQueryParams } from "@/lib/api/client";
 
 interface Page<T> {
     data: T[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
-}
-
-// Custom-field filter values travel as a plain object in `filters.customFields`
-// (when a page has any), but the API expects one JSON-encoded query param —
-// handled generically here so no page needs to know about it.
-function toQueryParams<TFilters extends object>(filters: TFilters, page: number, limit: number) {
-    const params: Record<string, unknown> = { ...filters, page, limit };
-    const customFields = (filters as Record<string, unknown>).customFields;
-
-    if (customFields && typeof customFields === "object" && Object.keys(customFields).length > 0) {
-        params.customFields = JSON.stringify(customFields);
-    } else {
-        delete params.customFields;
-    }
-
-    return params;
 }
 
 interface UseListQueryOptions<TFilters> {
@@ -70,7 +54,7 @@ export function useListQuery<TItem, TFilters extends { sortBy: string; sortOrder
         queryKey: [key, "list", filters],
         queryFn: ({ pageParam }) =>
             api
-                .get<Page<TItem>>(url, { params: toQueryParams(filters, pageParam, pageSize) })
+                .get<Page<TItem>>(url, { params: { ...toQueryParams(filters), page: pageParam, limit: pageSize } })
                 .then((res) => res.data),
         initialPageParam: 1,
         getNextPageParam: ({ pagination }) =>

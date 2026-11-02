@@ -14,7 +14,7 @@ import { Avatar } from "@/components/Avatar";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Loader";
 import { StageBadge } from "@/components/StageBadge";
-import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig } from "@/components/DataTable";
+import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, peopleColumns } from "@/components/DataTable";
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { formatDate } from "@/lib/format";
@@ -31,7 +31,7 @@ export const DEAL_COLUMNS: DealColumn[] = [
         key: "pipelineStage", label: "Pipeline stage", icon: IconTargetArrow, width: 180,
         cell: (deal) => <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} />,
     },
-    { key: "lead", label: "Lead", icon: IconUser, width: 180, cell: (deal) => <span className="text-muted">{deal.lead?.name || "Empty"}</span> },
+    { key: "lead", label: "Lead", icon: IconUser, width: 180, cell: (deal) => (deal.lead?.name ? <span className="text-muted">{deal.lead.name}</span> : <span className="text-light">Empty</span>) },
     {
         key: "assignedTo", label: "Assigned to", icon: IconUserCircle, width: 180,
         cell: (deal) => deal.assignedTo ? (
@@ -54,13 +54,9 @@ export const DEAL_COLUMNS: DealColumn[] = [
     },
     {
         key: "expectedCloseDate", label: "Expected close", icon: IconCalendar, width: 170,
-        cell: (deal) => deal.expectedCloseDate ? (
-            <span className="inline-flex items-center gap-1.5 text-muted">
-                <IconCalendar size={14} className="text-faint" />
-                {formatDate(deal.expectedCloseDate)}
-            </span>
-        ) : <span className="text-light">Empty</span>,
+        cell: (deal) => deal.expectedCloseDate ? <span className="text-muted">{formatDate(deal.expectedCloseDate)}</span> : <span className="text-light">Empty</span>,
     },
+    ...peopleColumns<Deal>(),
 ];
 
 // Attaches inline-edit behavior to the base columns above — kept separate
@@ -219,7 +215,7 @@ export default function DealsTable({
                             <tr
                                 key={deal.id}
                                 className={`[&>td]:h-8 [&>td]:border-r [&>td]:border-b [&>td]:border-line-light [&>td]:px-2 [&>td]:whitespace-nowrap
-                                    ${isSelected ? "[&>td]:bg-accent-faint" : "[&>td]:bg-surface"}`}
+                                    ${isSelected ? "[&>td]:bg-accent-faint" : "[&>td]:bg-surface hover:[&>td]:bg-[#fbfaff]"} animate-[fade-in_0.25s_ease-out]`}
                             >
                                 <td className="sticky left-0 z-1 px-0! text-center">
                                     {selectable && (

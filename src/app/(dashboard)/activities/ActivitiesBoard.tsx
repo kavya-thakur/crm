@@ -1,18 +1,16 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconCircle, IconCircleCheckFilled } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { Board, BoardCard, BoardColumn, CardControl, CardFields, ColumnTitle } from "@/components/Board";
+import { Board, BoardCard, BoardColumn, CardControl, CardFields, ColumnTitle, useBoardColumn } from "@/components/Board";
 import type { DataColumn } from "@/components/DataTable";
 import { toast } from "@/components/Toast";
 import type { AgentOption } from "../shared/customFields";
 import { toggledStatus } from "../shared/activities";
 import { activityColumns } from "./ActivitiesTable";
-import { ACTIVITY_TYPES, isOverdue, refreshActivities, type Activity, type ActivityStatus, type Paginated } from "./shared";
-
-const COLUMN_LIMIT = 50;
+import { ACTIVITY_TYPES, isOverdue, refreshActivities, type Activity, type ActivityStatus } from "./shared";
 
 // In board order, with each column's dot colour
 const COLUMNS: { value: ActivityStatus; label: string; color: string; empty: string }[] = [
@@ -85,28 +83,22 @@ function StatusColumn({
     onOpen: (id: number) => void;
     onAdd?: () => void;
 }) {
-    const activitiesQuery = useQuery({
-        queryKey: ["activities", "board", column.value, mineOnly],
-        queryFn: () =>
-            api
-                .get<Paginated<Activity>>("/activities", {
-                    params: { scope: "all", status: column.value, assignedTo: mineOnly ? "me" : undefined, limit: COLUMN_LIMIT },
-                })
-                .then((res) => res.data),
-        placeholderData: keepPreviousData,
+    const paged = useBoardColumn<Activity>(["activities", "board", column.value, mineOnly], "/activities", {
+        scope: "all",
+        status: column.value,
+        assignedTo: mineOnly ? "me" : undefined,
     });
-
-    const activities = activitiesQuery.data?.data ?? [];
+    const activities = paged.items;
 
     return (
         <BoardColumn
             id={column.value}
             title={<ColumnTitle color={column.color}>{column.label}</ColumnTitle>}
-            count={activitiesQuery.data?.pagination.total}
-            shown={activities.length}
-            loading={activitiesQuery.isPending}
-            error={activitiesQuery.error}
-            onRetry={() => activitiesQuery.refetch()}
+            count={paged.total}
+            more={paged.more}
+            loading={paged.loading}
+            error={paged.error}
+            onRetry={paged.retry}
             emptyText={column.empty}
             onDropCard={(id) => onChange(id, column.value)}
             onAdd={onAdd}

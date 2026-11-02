@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconChevronRight, IconPlus, IconUsers } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { SectionIcon, headerWash } from "@/components/SectionIcon";
+import { SectionIcon } from "@/components/SectionIcon";
 import { Pill } from "@/components/Pill";
 import { SidePanel } from "@/components/SidePanel";
 import { ErrorState } from "@/components/ErrorState";
@@ -60,6 +60,7 @@ const SETUP = [
     { name: "lead-stages:manage", label: "Lead stages", hint: "The same for the leads board's stages." },
     { name: "lead-sources:manage", label: "Lead sources", hint: "The list of places leads come from." },
     { name: "custom-fields:manage", label: "Custom fields", hint: "Extra fields on leads, deals and contacts." },
+    { name: "lead-forms:manage", label: "Web forms", hint: "Forms on your website that create leads by themselves." },
 ];
 
 const ACTIONS = [
@@ -85,7 +86,7 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("roles")}>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
                 <SectionIcon section="roles" size="md" />
                 <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Roles</h1>
                 {roles.data && <span className="text-faint">{roles.data.length}</span>}

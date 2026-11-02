@@ -1,16 +1,5 @@
 import { z } from "zod";
-import {
-    capitalizeFirst,
-    capitalizeIfPresent,
-    dbIdSchema,
-    hasAnyField,
-    idParamSchema,
-    optionalEmail,
-    requiredPhone,
-    optionalText,
-    paginationSchema,
-    requiredText,
-} from "./common";
+import { capitalizeFirst, capitalizeIfPresent, dbIdSchema, hasAnyField, idParamSchema, optionalEmail, requiredPhone, optionalText, paginationSchema, requiredText, idListParamSchema, personParamSchema } from "./common";
 
 export const createLeadSchema = z.object({
     name: requiredText(200).transform(capitalizeFirst),
@@ -35,9 +24,23 @@ export const updateLeadSchema = createLeadSchema
     .partial()
     .refine(hasAnyField, "Provide at least one field to update");
 
+// What bulk edit can set on many leads at once (name, email and phone are each lead's own)
+export const bulkLeadChangesSchema = createLeadSchema
+    .pick({ companyName: true, sourceId: true, customFields: true })
+    .partial()
+    .refine(hasAnyField, "Pick a field to change");
+
 export const listLeadsQuerySchema = paginationSchema.extend({
     search: z.string().trim().max(100).optional(),
     stageId: idParamSchema.optional(),
+    // several stages at once ("1,4"), from the filter; stageId is one board column
+    stageIds: idListParamSchema.optional(),
+    // who created it / who changed it last: "me" or a user's id
+    createdBy: personParamSchema.optional(),
+    updatedBy: personParamSchema.optional(),
+    // when it was last changed, a day each
+    updatedFrom: z.iso.date().optional(),
+    updatedTo: z.iso.date().optional(),
     sourceId: idParamSchema.optional(),
     assignedTo: z
         .union([z.literal("me"), z.literal("unassigned"), idParamSchema])

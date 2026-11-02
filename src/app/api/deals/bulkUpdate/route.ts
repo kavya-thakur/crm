@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
+import { bulkDealChangesSchema } from "@/lib/validations/deals";
 import { closedAtFor } from "@/lib/pipelineStages";
 
 const dealIdsSchema = z.array(dbIdSchema).min(1).max(500);
@@ -20,6 +22,13 @@ const bulkDealSchema = z.discriminatedUnion("action", [
         action: z.literal("stage"),
         dealIds: dealIdsSchema,
         pipelineStageId: dbIdSchema,
+    }),
+
+    // the same value for one field (or custom field) on every selected deal
+    z.object({
+        action: z.literal("update"),
+        dealIds: dealIdsSchema,
+        changes: bulkDealChangesSchema,
     }),
 
     z.object({
@@ -126,6 +135,7 @@ export async function PATCH(req: NextRequest) {
                         },
                         data: {
                             assignedToId,
+                            updatedById: user.id,
                         },
                     });
 
@@ -196,6 +206,7 @@ export async function PATCH(req: NextRequest) {
                         data: {
                             pipelineStageId: data.pipelineStageId,
                             closedAt: closedAtFor(stage),
+                            updatedById: user.id,
                         },
                     });
 
@@ -214,6 +225,49 @@ export async function PATCH(req: NextRequest) {
                 ok: true,
                 message: `${changed.length} deals updated successfully`,
                 affected: changed.length,
+            });
+        }
+
+        /*
+         * UPDATE: the same value for one field (or custom field) on every selected deal
+         */
+        if (data.action === "update") {
+            const { customFields: submittedCustomFields, ...fields } = data.changes;
+
+            let customFields: Record<string, unknown> | undefined;
+
+            if (submittedCustomFields) {
+                const result = await validateCustomFieldEdit(user.organizationId, "deal", submittedCustomFields);
+
+                if (!result.ok) {
+                    return NextResponse.json(
+                        { ok: false, message: "Invalid custom field values", errors: result.errors },
+                        { status: 400 }
+                    );
+                }
+
+                customFields = result.data;
+            }
+
+            // one statement for the plain fields and one for the custom fields, however many
+            // deals are selected; together, so either all of them change or none do
+            await prisma.$transaction(async (tx) => {
+                if (Object.keys(fields).length > 0) {
+                    await tx.deal.updateMany({
+                        where: { id: { in: dealIds }, organizationId: user.organizationId },
+                        data: { ...fields, updatedById: user.id },
+                    });
+                }
+
+                if (customFields) {
+                    await tx.$executeRaw(mergeCustomFieldsSql("Deal", dealIds, user, customFields));
+                }
+            });
+
+            return NextResponse.json({
+                ok: true,
+                message: `${dealIds.length} deals updated successfully`,
+                affected: dealIds.length,
             });
         }
 

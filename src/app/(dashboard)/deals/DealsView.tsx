@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconTargetArrow } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCurrencyRupee, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
 
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
 import { toast } from "@/components/Toast";
 import {
     AssignMenu,
+    BulkEditButton,
     BulkBar,
     ConfirmDeleteModal,
     FilterBar,
@@ -25,7 +26,9 @@ import {
     OptionsMenuButton,
     createAssignedToField,
     createCreatedRangeField,
-    renderSelectControl,
+    createModifiedRangeField,
+    createMultiSelectField,
+    createPersonField,
     useTableColumns,
     type FilterFieldDef,
 } from "@/components/FilterPanel";
@@ -44,8 +47,7 @@ import DealsTable, { DEAL_COLUMNS, withDealEdits } from "./DealsTable";
 import DealPanel from "./DealPanel";
 import NewDealDialog from "./NewDealDialog";
 import { useListQuery } from "../shared/useListQuery";
-import { createCustomColumn, createCustomFilterField, useCustomFields } from "../shared/customFields";
-import { usePanelEnter } from "../shared/usePanelEnter";
+import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
 
 const PAGE_SIZE = 50;
 
@@ -58,6 +60,7 @@ const SORT_FIELDS: { field: DealFilters["sortBy"]; label: string }[] = [
 ];
 
 type BulkAction =
+    | { action: "update"; changes: Record<string, unknown> }
     | { action: "stage"; pipelineStageId: number }
     | { action: "assign"; assignedToId: number | null }
     | { action: "delete" };
@@ -69,7 +72,6 @@ interface OptionsResponse<T> {
 
 export default function DealsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
-    const enterRef = usePanelEnter<HTMLDivElement>();
     const [view, setView] = useState<"table" | "board">("table");
     const searchParams = useSearchParams();
     // Lets a link elsewhere (e.g. the Notes feed) land straight on a deal's panel
@@ -123,7 +125,13 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         onSuccess: async ({ action, count }) => {
             const deals = `${count} ${count === 1 ? "deal" : "deals"}`;
             toast.success(
-                action.action === "delete" ? `${deals} deleted` : action.action === "assign" ? `${deals} assigned` : `${deals} moved`
+                action.action === "delete"
+                    ? `${deals} deleted`
+                    : action.action === "assign"
+                      ? `${deals} assigned`
+                      : action.action === "update"
+                        ? `${deals} updated`
+                        : `${deals} moved`
             );
             setSelected(new Set());
             setConfirmingDelete(false);
@@ -159,20 +167,14 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     // The only field here that's genuinely specific to Deals; assignedTo and
     // the created-date range are the exact same for every entity, so they
     // come from shared factories instead of being hand-written three times.
-    const pipelineStageField: FilterFieldDef<DealFilters> = {
+    // tick as many stages as you like: "Proposal or Negotiation"
+    const pipelineStageField = createMultiSelectField<DealFilters>({
         key: "pipelineStage",
         label: "Pipeline stage",
-        isActive: (f) => f.pipelineStageId !== undefined,
-        clear: () => ({ pipelineStageId: undefined }),
-        renderControl: (f, onChange) =>
-            renderSelectControl(
-                f.pipelineStageId,
-                (value) => onChange({ pipelineStageId: value ? Number(value) : undefined }),
-                stagesQuery.data?.map((stage) => ({ value: stage.id, label: stage.name })) ?? [],
-                "Any stage",
-            ),
-        renderChip: (f) => `Stage: ${stagesQuery.data?.find((stage) => stage.id === f.pipelineStageId)?.name ?? "Selected"}`,
-    };
+        get: (f) => f.pipelineStageIds,
+        set: (value) => ({ pipelineStageIds: value }),
+        options: stagesQuery.data?.map((stage) => ({ value: stage.id, label: stage.name, render: <StageLabel stage={stage} /> })) ?? [],
+    });
 
     const FILTER_FIELDS: FilterFieldDef<DealFilters>[] = [
         pipelineStageField,
@@ -183,7 +185,22 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
             }),
             agents: can.seeAgents ? agentsQuery.data : undefined,
         }),
+        createPersonField<DealFilters>({
+            key: "createdBy",
+            label: "Created by",
+            get: (f) => f.createdBy,
+            set: (value) => ({ createdBy: value }),
+            agents: can.seeAgents ? agentsQuery.data : undefined,
+        }),
+        createPersonField<DealFilters>({
+            key: "updatedBy",
+            label: "Modified by",
+            get: (f) => f.updatedBy,
+            set: (value) => ({ updatedBy: value }),
+            agents: can.seeAgents ? agentsQuery.data : undefined,
+        }),
         createCreatedRangeField<DealFilters>(),
+        createModifiedRangeField<DealFilters>(),
         ...customFields
             .filter((field) => field.showInFilter)
             .map((field) => createCustomFilterField<DealFilters>(field, { agents: can.seeAgents ? agentsQuery.data : undefined })),
@@ -235,7 +252,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     }
 
     return (
-        <div ref={enterRef} className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col">
             <ListHeader
                 section="deals"
                 title="Deals"
@@ -362,6 +379,29 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                     <AssignMenu
                         agents={agentsQuery.data}
                         onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                    />
+                )}
+
+                {can.update && (
+                    <BulkEditButton
+                        count={selected.size}
+                        noun="deal"
+                        pending={bulk.isPending}
+                        onApply={(changes) => bulk.mutate({ action: "update", changes })}
+                        fields={[
+                            { key: "amount", label: "Amount", icon: IconCurrencyRupee, type: "number", toChanges: (value) => ({ amount: Number(value) }) },
+                            { key: "probability", label: "Probability (%)", icon: IconPercentage, type: "number", toChanges: (value) => ({ probability: Math.round(Number(value)) }) },
+                            {
+                                key: "expectedCloseDate",
+                                label: "Expected close date",
+                                icon: IconCalendarDue,
+                                type: "date",
+                                clearable: true,
+                                // the API stores a moment; a picked day is midnight UTC of that day
+                                toChanges: (value) => ({ expectedCloseDate: value ? new Date(`${value}T00:00:00.000Z`).toISOString() : null }),
+                            },
+                            ...customBulkFields(customFields, can.seeAgents ? agentsQuery.data : undefined),
+                        ]}
                     />
                 )}
             </BulkBar>

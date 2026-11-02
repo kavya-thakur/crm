@@ -112,13 +112,24 @@ export const hasAnyField = (data: object) =>
 // escape them so "%" or "Sales_Rep" match literally
 export const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
+// "4,7,9" -> [4, 7, 9]: several ids in one query param, e.g. filtering on more than one stage
+export const idListParamSchema = z
+    .string()
+    .regex(/^[1-9]\d*(,[1-9]\d*)*$/, "Invalid list of ids")
+    .transform((value) => [...new Set(value.split(",").map(Number))])
+    .pipe(z.array(dbIdSchema).max(100));
+
+// A person filter, like "created by": "me" or a user's id
+export const personParamSchema = z.union([z.literal("me"), idParamSchema]);
+
 // ?createdFrom=2026-01-01&createdTo=2026-01-31 (plain dates, a day each) ->
-// a Prisma range covering the whole of both days, or undefined if neither was sent
-export function createdAtRange(createdFrom?: string, createdTo?: string) {
-    if (!createdFrom && !createdTo) return undefined;
+// a Prisma range covering the whole of both days, or undefined if neither was sent.
+// Used for the created and the last-modified date filters.
+export function dayRange(from?: string, to?: string) {
+    if (!from && !to) return undefined;
 
     return {
-        ...(createdFrom && { gte: new Date(`${createdFrom}T00:00:00.000Z`) }),
-        ...(createdTo && { lte: new Date(`${createdTo}T23:59:59.999Z`) }),
+        ...(from && { gte: new Date(`${from}T00:00:00.000Z`) }),
+        ...(to && { lte: new Date(`${to}T23:59:59.999Z`) }),
     };
 }

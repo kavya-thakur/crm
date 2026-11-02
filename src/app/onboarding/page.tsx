@@ -8,7 +8,8 @@ import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { SplitText } from "gsap/SplitText";
-import { IconArrowRight, IconBolt, IconCheck } from "@tabler/icons-react";
+import { IconArrowRight, IconCheck } from "@tabler/icons-react";
+import { LogoMark } from "@/components/Logo";
 
 import Scene, { type SceneControls } from "./Scene";
 
@@ -110,8 +111,8 @@ export default function OnboardingSpike() {
             <div className="pointer-events-none fixed inset-0 opacity-[0.04]" style={{ backgroundImage: GRAIN }} />
 
             <header className="ob-chrome fixed inset-x-0 top-0 z-20 flex items-center px-6 py-6 md:px-10">
-                <span className="flex items-center gap-2 text-[15px] font-medium tracking-tight">
-                    <IconBolt size={18} />
+                <span className="flex items-center gap-2 text-[16px] font-semibold tracking-[-0.04em]">
+                    <LogoMark size={24} dark />
                     Flash
                 </span>
             </header>

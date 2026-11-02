@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconBriefcase } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { toast } from "@/components/Toast";
 import {
     AssignMenu,
+    BulkEditButton,
     BulkBar,
     ConfirmDeleteModal,
     FilterBar,
@@ -23,6 +24,8 @@ import {
     OptionsMenuButton,
     createAssignedToField,
     createCreatedRangeField,
+    createModifiedRangeField,
+    createPersonField,
     useTableColumns,
 } from "@/components/FilterPanel";
 import {
@@ -36,8 +39,7 @@ import ContactsTable, { CONTACT_COLUMNS, withContactEdits } from "./ContactsTabl
 import ContactPanel from "./ContactPanel";
 import NewContactDialog from "./NewContactDialog";
 import { useListQuery } from "../shared/useListQuery";
-import { createCustomColumn, createCustomFilterField, useCustomFields } from "../shared/customFields";
-import { usePanelEnter } from "../shared/usePanelEnter";
+import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
 
 const PAGE_SIZE = 50;
 
@@ -49,12 +51,12 @@ const SORT_FIELDS: { field: ContactFilters["sortBy"]; label: string }[] = [
 ];
 
 type BulkAction =
+    | { action: "update"; changes: Record<string, unknown> }
     | { action: "assign"; assignedToId: number | null }
     | { action: "delete" };
 
 export default function ContactsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
-    const enterRef = usePanelEnter<HTMLDivElement>();
 
     const searchParams = useSearchParams();
     // Lets a link elsewhere (e.g. the Notes feed) land straight on a contact's panel
@@ -100,6 +102,8 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
             toast.success(
                 body.action === "delete"
                     ? `${count} ${noun} deleted`
+                    : body.action === "update"
+                        ? `${count} ${noun} updated`
                     : body.assignedToId === null
                         ? `${count} ${noun} unassigned`
                         : `${count} ${noun} assigned`
@@ -142,7 +146,22 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
             set: (value) => ({ assignedTo: value }),
             agents: can.seeAgents ? agents.data : undefined,
         }),
+        createPersonField<ContactFilters>({
+            key: "createdBy",
+            label: "Created by",
+            get: (f) => f.createdBy,
+            set: (value) => ({ createdBy: value }),
+            agents: can.seeAgents ? agents.data : undefined,
+        }),
+        createPersonField<ContactFilters>({
+            key: "updatedBy",
+            label: "Modified by",
+            get: (f) => f.updatedBy,
+            set: (value) => ({ updatedBy: value }),
+            agents: can.seeAgents ? agents.data : undefined,
+        }),
         createCreatedRangeField<ContactFilters>(),
+        createModifiedRangeField<ContactFilters>(),
         ...customFields
             .filter((field) => field.showInFilter)
             .map((field) => createCustomFilterField<ContactFilters>(field, { agents: can.seeAgents ? agents.data : undefined })),
@@ -198,7 +217,7 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
     }
 
     return (
-        <div ref={enterRef} className="flex h-full flex-col">
+        <div className="flex h-full flex-col">
             <ListHeader
                 section="contacts"
                 title="Contacts"
@@ -272,6 +291,19 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                     <AssignMenu
                         agents={agents.data}
                         onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                    />
+                )}
+
+                {can.update && (
+                    <BulkEditButton
+                        count={selected.size}
+                        noun="contact"
+                        pending={bulk.isPending}
+                        onApply={(changes) => bulk.mutate({ action: "update", changes })}
+                        fields={[
+                            { key: "jobTitle", label: "Job title", icon: IconBriefcase, type: "text", clearable: true, toChanges: (value) => ({ jobTitle: value || null }) },
+                            ...customBulkFields(customFields, can.seeAgents ? agents.data : undefined),
+                        ]}
                     />
                 )}
             </BulkBar>

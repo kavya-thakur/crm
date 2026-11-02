@@ -20,12 +20,12 @@ const azeretMono = Azeret_Mono({
   subsets: ["latin"],
 });
 
-const appName = "CRM";
+const appName = "Flash";
 const description =
   "Manage leads, deals and your sales team in one workspace. Track every activity and close more deals.";
 
 export const metadata: Metadata = {
-  // Pages set just their own name ("Leads"), the template turns it into "Leads · CRM"
+  // Pages set just their own name ("Leads"), the template turns it into "Leads · Flash"
   title: {
     default: appName,
     template: `%s · ${appName}`,

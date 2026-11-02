@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requirePermission";
 import { createLeadSchema, listLeadsQuerySchema } from "@/lib/validations/leads";
-import { createdAtRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
+import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/customFields";
 
@@ -142,6 +142,8 @@ export async function POST(req: NextRequest) {
                     phone: fields.phone ?? null,
                     assignedToId,
                     organizationId: user.organizationId,
+                    createdById: user.id,
+                    updatedById: user.id,
                 },
             })).id;
 
@@ -152,6 +154,8 @@ export async function POST(req: NextRequest) {
                     assignedToId,
                     contactId: resolvedContactId,
                     customFields: customFields.data as Prisma.InputJsonObject,
+                    createdById: user.id,
+                    updatedById: user.id,
                     timeline: {
                         create: {
                             userId: user.id,
@@ -201,11 +205,12 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, stageId, sourceId, assignedTo, createdFrom, createdTo, customFields: customFieldsParam, sortBy, sortOrder } =
+        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder } =
             query.data;
 
         const term = search && escapeLike(search);
-        const createdAt = createdAtRange(createdFrom, createdTo);
+        const createdAt = dayRange(createdFrom, createdTo);
+        const updatedAt = dayRange(updatedFrom, updatedTo);
 
         let customFieldFilters: Prisma.LeadWhereInput[] = [];
 
@@ -244,6 +249,9 @@ export async function GET(req: NextRequest) {
                 ],
             }),
 
+            ...(stageIds && { stageId: { in: stageIds } }),
+
+            // one board column; within the filter's stages when both are sent
             ...(stageId && { stageId }),
 
             ...(sourceId && { sourceId }),
@@ -256,6 +264,12 @@ export async function GET(req: NextRequest) {
                             ? null
                             : assignedTo,
             }),
+
+            ...(createdBy !== undefined && { createdById: createdBy === "me" ? user.id : createdBy }),
+
+            ...(updatedBy !== undefined && { updatedById: updatedBy === "me" ? user.id : updatedBy }),
+
+            ...(updatedAt && { updatedAt }),
 
             ...(createdAt && { createdAt }),
 
@@ -281,6 +295,9 @@ export async function GET(req: NextRequest) {
                     },
                     stage: true,
                     source: true,
+                    // who made it and who changed it last, for the table's columns
+                    createdBy: { select: { id: true, name: true } },
+                    updatedBy: { select: { id: true, name: true } },
                 },
             }),
 

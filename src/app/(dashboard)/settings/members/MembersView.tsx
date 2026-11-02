@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { SectionIcon, headerWash } from "@/components/SectionIcon";
+import { SectionIcon } from "@/components/SectionIcon";
 import { Pill } from "@/components/Pill";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
@@ -26,6 +26,7 @@ import { Avatar } from "@/components/Avatar";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { Modal } from "@/components/Modal";
 import { SidePanel } from "@/components/SidePanel";
+import { Select } from "@/components/Select";
 
 interface Member {
     id: number;
@@ -113,7 +114,7 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("members")}>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
                 <SectionIcon section="members" size="md" />
                 <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Members</h1>
                 {members.data && <span className="text-faint">{members.data.length}</span>}
@@ -326,6 +327,7 @@ interface AddMemberFormProps {
 function AddMemberForm({ roles, onClose, onSaved }: AddMemberFormProps) {
     const {
         register,
+        control,
         handleSubmit,
         formState: { errors },
     } = useForm({
@@ -398,20 +400,19 @@ function AddMemberForm({ roles, onClose, onSaved }: AddMemberFormProps) {
                 </div>
 
                 <div>
-                    <label htmlFor="member-role" className="mb-1 block text-sm font-medium text-muted">
-                        Role
-                    </label>
-                    <select
-                        id="member-role"
-                        {...register("roleId", { valueAsNumber: true })}
-                        className="h-8 w-full rounded-lg border border-line bg-surface px-1.5 outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
-                    >
-                        {roles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                                {role.name}
-                            </option>
-                        ))}
-                    </select>
+                    <p className="mb-1 block text-sm font-medium text-muted">Role</p>
+                    <Controller
+                        name="roleId"
+                        control={control}
+                        render={({ field }) => (
+                            <Select
+                                value={field.value !== undefined ? String(field.value) : undefined}
+                                onChange={(value) => field.onChange(value === undefined ? undefined : Number(value))}
+                                placeholder="Pick a role"
+                                options={roles.map((role) => ({ value: String(role.id), label: role.name }))}
+                            />
+                        )}
+                    />
                 </div>
 
                 {create.isError && (

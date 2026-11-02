@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, type ComponentType, type ReactNode } from "react";
-import { IconPencil } from "@tabler/icons-react";
+import { IconPencil, IconUserEdit, IconUserPlus } from "@tabler/icons-react";
+import { Avatar } from "./Avatar";
 import { Select, type SelectOption } from "./Select";
 
 /**
@@ -33,6 +34,25 @@ export interface DataColumn<TRecord> {
     cell: (record: TRecord) => ReactNode;
     /** lets this column be edited in place from the table, via a hover pencil */
     edit?: EditConfig<TRecord>;
+}
+
+type Person = { id: number; name: string } | null | undefined;
+
+// "Created by" and "Last modified by", the same two columns on leads, deals and contacts.
+// Read-only: they change by themselves whenever someone creates or edits the record.
+export function peopleColumns<TRecord extends { createdBy?: Person; updatedBy?: Person }>(): DataColumn<TRecord>[] {
+    const person = (who: Person) =>
+        who && (
+            <span className="flex items-center gap-1.5">
+                <Avatar name={who.name} />
+                <span className="truncate">{who.name}</span>
+            </span>
+        );
+
+    return [
+        { key: "createdBy", label: "Created by", icon: IconUserPlus, width: 170, cell: (record) => person(record.createdBy) },
+        { key: "updatedBy", label: "Last modified by", icon: IconUserEdit, width: 170, cell: (record) => person(record.updatedBy) },
+    ];
 }
 
 // ---------------------------------------------------------------------------

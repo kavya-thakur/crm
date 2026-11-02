@@ -3,7 +3,7 @@ import { dealScope, requirePermission } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { createDealSchema, listDealsQuerySchema } from "@/lib/validations/deals";
-import { createdAtRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
+import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { validateCustomFieldValues } from "@/lib/customFields";
 import { closedAtFor } from "@/lib/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";
@@ -20,11 +20,12 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, pipelineStageId, assignedTo, createdFrom, createdTo, customFields: customFieldsParam, sortBy, sortOrder } =
+        const { page, limit, search, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder } =
             query.data;
 
         const term = search && escapeLike(search);
-        const createdAt = createdAtRange(createdFrom, createdTo);
+        const createdAt = dayRange(createdFrom, createdTo);
+        const updatedAt = dayRange(updatedFrom, updatedTo);
 
         let customFieldFilters: Prisma.DealWhereInput[] = [];
 
@@ -58,6 +59,9 @@ export async function GET(req: NextRequest) {
                 title: { contains: term, mode: "insensitive" },
             }),
 
+            ...(pipelineStageIds && { pipelineStageId: { in: pipelineStageIds } }),
+
+            // one board column; within the filter's stages when both are sent
             ...(pipelineStageId && { pipelineStageId }),
 
             ...(assignedTo !== undefined && {
@@ -69,13 +73,19 @@ export async function GET(req: NextRequest) {
                             : assignedTo,
             }),
 
+            ...(createdBy !== undefined && { createdById: createdBy === "me" ? user.id : createdBy }),
+
+            ...(updatedBy !== undefined && { updatedById: updatedBy === "me" ? user.id : updatedBy }),
+
+            ...(updatedAt && { updatedAt }),
+
             ...(createdAt && { createdAt }),
 
             // last, so the ?assignedTo filter can't override the scope
             ...dealScope(user),
         };
 
-        const [deals, total] = await Promise.all([
+        const [deals, total, sum] = await Promise.all([
             prisma.deal.findMany({
                 where,
                 // id as tie-breaker: without it, rows with equal sort values can
@@ -91,10 +101,17 @@ export async function GET(req: NextRequest) {
                         select: { id: true, name: true, email: true },
                     },
                     pipelineStage: true,
+                    // who made it and who changed it last, for the table's columns
+                    createdBy: { select: { id: true, name: true } },
+                    updatedBy: { select: { id: true, name: true } },
                 },
             }),
 
             prisma.deal.count({ where }),
+
+            // the board's column header shows the column's total value; adding it up only on
+            // the first page keeps "load more" pages as cheap as before
+            page === 1 ? prisma.deal.aggregate({ where, _sum: { amount: true } }) : null,
         ]);
 
         return NextResponse.json({
@@ -106,6 +123,7 @@ export async function GET(req: NextRequest) {
                 total,
                 totalPages: Math.ceil(total / limit),
             },
+            ...(sum && { totalAmount: Number(sum._sum.amount ?? 0) }),
         });
     } catch (error) {
         return handleRouteError(error, "Get deals");
@@ -217,6 +235,8 @@ export async function POST(req: NextRequest) {
                 assignedToId: assignedToId ?? null,
                 pipelineStageId,
                 closedAt: closedAtFor(stage),
+                createdById: user.id,
+                updatedById: user.id,
                 expectedCloseDate: expectedCloseDate
                     ? new Date(expectedCloseDate)
                     : null,
