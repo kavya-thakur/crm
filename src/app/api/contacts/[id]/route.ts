@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { updateContactSchema } from "@/lib/validations/contact";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { validateCustomFieldValues } from "@/lib/customFields";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };

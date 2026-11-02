@@ -4,8 +4,8 @@ import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requireP
 import { createDealSchema } from "@/lib/validations/deals";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { closedAtFor } from "@/lib/pipelineStages";
-import { dealLeadSelect } from "@/lib/deals";
+import { closedAtFor } from "@/lib/deals/stages";
+import { dealLeadSelect } from "@/lib/deals/select";
 
 // Only what a deal needs beyond the lead itself: the lead and its current
 // assignee carry over as-is, so neither is asked for here. Deal custom fields

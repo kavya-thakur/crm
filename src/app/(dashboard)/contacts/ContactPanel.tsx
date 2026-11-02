@@ -35,7 +35,7 @@ import { Avatar } from "@/components/Avatar";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { formatDate, timeAgo } from "@/lib/format";
+import { formatDate, timeAgo } from "@/lib/utils/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";

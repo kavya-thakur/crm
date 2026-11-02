@@ -5,7 +5,7 @@ import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requireP
 import { mergeDealsSchema, MERGE_DEAL_FIELDS } from "@/lib/validations/deals";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { dealLeadSelect } from "@/lib/deals";
+import { dealLeadSelect } from "@/lib/deals/select";
 
 type MergeField = (typeof MERGE_DEAL_FIELDS)[number];
 

@@ -3,9 +3,9 @@ import type { CustomFieldType, LeadForm, Prisma } from "@/generated/prisma/clien
 import { prisma } from "@/lib/db/prisma";
 import { optionalEmail, optionalText, requiredPhone, requiredText } from "@/lib/validations/common";
 import { formTexts, readFormSettings } from "@/lib/validations/leadForms";
-import { validateCustomFieldValues } from "@/lib/customFields";
-import { addTaskToTimeline, startOfToday } from "@/lib/tasks";
-import { findOpenCopy } from "@/lib/leadDuplicates";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
+import { addTaskToTimeline, startOfToday } from "@/lib/work/tasks";
+import { findOpenCopy } from "@/lib/leads/duplicates";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
 
 // What a web form sends. Name and phone always (every lead and contact needs them); the

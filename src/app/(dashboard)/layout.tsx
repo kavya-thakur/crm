@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/auth/requirePermission";
 import { Avatar } from "@/components/Avatar";
 import { LostReasonPrompt } from "@/components/LostReasonPrompt";
 import { LiveUpdates } from "./LiveUpdates";
+import { BackgroundJobs } from "./BackgroundJobs";
 import { NotificationBell } from "./NotificationBell";
 import CommandMenu, { SearchButton, type MenuPage, type SearchKind } from "./CommandMenu";
 import SidebarNav, { type NavGroup } from "./SidebarNav";
@@ -120,6 +121,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
             <LostReasonPrompt />
             {/* the live connection: other people's changes and notifications arrive here */}
             <LiveUpdates />
+            <BackgroundJobs />
         </div>
     );
 }

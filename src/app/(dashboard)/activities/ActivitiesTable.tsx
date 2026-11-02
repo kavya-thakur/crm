@@ -21,7 +21,7 @@ import { DataCell, type DataColumn, type EditConfig } from "@/components/DataTab
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/utils/format";
 import type { AgentOption } from "../shared/customFields";
 import { linkedRecord } from "../shared/linkedRecord";
 import { ActivityTypeLabel, AttendeeStack, DURATION_OPTIONS, StatusBadge, TYPE_OPTIONS, toggledStatus } from "../shared/activities";

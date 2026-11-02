@@ -15,7 +15,8 @@ Browser (React, client components)
   │  pages fetch data with React Query  ──►  axios  ──►  /api/...  (JSON)
   │  one Socket.IO connection per tab   ◄──────────────  live events
   ▼
-server.ts  ── one Node process: Next.js + Socket.IO (see REALTIME.md)
+server.ts  ── one Node process: Next.js + Socket.IO + job worker (REALTIME.md, QUEUES.md)
+  │            uses Redis for the job queue and rate limits
   │
   ├─ src/proxy.ts            optimistic check: no login cookie → /login
   ├─ app/(dashboard)/…/page.tsx   server component: who's signed in, what may they do → passes `can` flags
@@ -83,7 +84,8 @@ crm/
 │   │   ├── (dashboard)/      the app itself (signed in)
 │   │   │   ├── layout.tsx    sidebar, ⌘K search, bell, LiveUpdates, LostReasonPrompt
 │   │   │   ├── dashboard/    charts, team table, source performance, lost reasons
-│   │   │   ├── leads/  deals/  contacts/   each: page.tsx (server) + XView (client) +
+│   │   │   ├── leads/import/  the CSV import screen (QUEUES.md)
+│   │   ├── leads/  deals/  contacts/   each: page.tsx (server) + XView (client) +
 │   │   │   │                               XTable, XBoard, XPanel, NewXDialog, shared.tsx
 │   │   │   ├── tasks/  activities/  notes/
 │   │   │   ├── settings/     profile, members, roles, stages & sources, custom fields, web forms
@@ -96,17 +98,24 @@ crm/
 │   │   └── providers/        React Query provider
 │   ├── components/           app-wide UI: DataTable, Board, FilterPanel, Dropdown, Select,
 │   │                         Modal, SidePanel, MergePanel, Toast, LostReasonPrompt, ...
-│   └── lib/                  server + shared logic, no React
-│       ├── auth/             JWT, passwords, getCurrentUser, requirePermission + scopes
-│       ├── db/prisma.ts      the one Prisma client (kept on globalThis in dev)
-│       ├── api/              client.ts (axios + helpers), http.ts (parseBody, handleRouteError)
-│       ├── validations/      zod schemas, one file per resource, shared by forms and routes
-│       ├── realtime/         Socket.IO server, notify(), broadcastChange()
-│       ├── customFields.ts   validating and merging custom field values
-│       ├── leadCapture.ts    web form submission → lead (+ contact, task, rotation)
-│       ├── leadDuplicates.ts matching people by phone/email, "already a lead" rule
-│       ├── dashboard.ts      date ranges and buckets for the charts
-│       └── ...               stages, sources, tasks, activities, formatting, rate limiting
+│   └── lib/                  logic without React, grouped by what it's for:
+│       ├── auth/             who's signed in: getCurrentUser, jwt, password, requirePermission (+ the scopes)
+│       ├── db/               connections to our two databases: prisma.ts (Postgres), redis.ts (Redis)
+│       ├── api/              for API routes and the browser's API client:
+│       │                     client.ts (axios, browser), http.ts (parseBody, handleRouteError),
+│       │                     rateLimit.ts (limits in Redis), csvExport.ts (streamed CSV downloads)
+│       ├── realtime/         Socket.IO: socketServer.ts (the server), notify.ts (notify(), broadcastChange())
+│       ├── jobs/             background work on the Redis queue (QUEUES.md): queues.ts, worker.ts,
+│       │                     leadImport.ts (CSV import, batch by batch), bulkActions.ts (big bulk deletes)
+│       ├── leads/            lead rules: capture.ts (web form → lead), duplicates.ts (matching people,
+│       │                     "already a lead"), stages.ts, sources.ts (defaults), lostReasons.ts
+│       ├── deals/            deal rules: stages.ts (pipeline defaults, closedAt), select.ts (its lead's contact details)
+│       ├── work/             tasks.ts and activities.ts: what their API responses include, timeline entries
+│       ├── settings/         what admins set up: customFields.ts (validating values), optionLists.ts
+│       │                     (stage/source editing), stageColors.ts
+│       ├── dashboard/        periods.ts: date ranges and chart buckets
+│       ├── utils/            format.ts: dates, money, "2 hours ago"
+│       └── validations/      zod schemas, one file per resource, shared by forms and routes
 ├── tests/
 │   ├── helpers.ts            createOrgWithUser, cleanupOrg, ...
 │   └── integration/          Vitest against a real Postgres (crm_test), one file per feature
@@ -136,6 +145,8 @@ Organization ─┬─ User ── Role ── RolePermission ── Permission
               ├─ Task, ScheduledActivity (+ attendees)        (linked to at most one lead/deal/contact)
               ├─ LeadForm                                      (web forms)
               ├─ SavedFilter                                   (per user)
+              ├─ ImportJob                                     (a CSV import: file, mapping, progress, problem rows)
+              ├─ BulkJob                                       (a big bulk delete: the ids, progress)
               └─ Notification                                  (the bell)
 ```
 
@@ -200,6 +211,8 @@ helpers), and mirrored in the UI by the `can` flags.
   into a Prisma `where`. Filters can be saved (`SavedFilter`).
 - **Inline edit:** a column with an `edit` config gets a pencil; saving `PUT`s one field.
 - **Bulk actions:** select rows → stage, assign, edit a field for all, merge (2 selected), delete.
+  On leads, "Select all N matching" selects every lead the filters match; deleting more than 200
+  runs as a background job with a progress card ([QUEUES.md](QUEUES.md)).
 - **Kanban boards** (`Board.tsx`): one column per stage, each column its own paged query
   (`useBoardColumn`, 25 cards at a time). Dragging a card `PUT`s its new stage.
   Leads, deals, tasks (by status), activities and notes all have boards.
@@ -214,7 +227,7 @@ so any link (notes feed, search, notification) can land on a record.
 "converted" stage. Stages are flagged `isConverted`/`isLost` (leads) and `isWon`/`isLost`
 (deals). Moving a deal into won/lost sets `closedAt`, which the dashboard counts by.
 A deal has no phone or email of its own: it shows its **lead's** (`dealLeadSelect` in
-`src/lib/deals.ts`), as Phone/Email columns and a Contact section in the deal panel, where
+`src/lib/deals/select.ts`), as Phone/Email columns and a Contact section in the deal panel, where
 the lead can also be linked or changed. A deal without a lead has no way to reach anyone.
 
 ### Lost reasons
@@ -234,7 +247,7 @@ on the record and in the timeline, cleared if it reopens, and charted on the das
 
 ### Web forms and lead capture
 An admin creates a form (Settings → Web forms) and gets a key, embed code and a JSON
-endpoint. `POST /api/public/forms/:key` (`lib/leadCapture.ts`) validates, drops bots (a
+endpoint. `POST /api/public/forms/:key` (`lib/leads/capture.ts`) validates, drops bots (a
 hidden honeypot field), rate-limits, then either adds to the existing open lead or creates
 lead + contact + a "Reply to <name>" task due today.
 
@@ -260,6 +273,15 @@ others see their own numbers.
 ### Global search (⌘K)
 `GET /api/search?q=` searches leads, deals, contacts, tasks and activities you're allowed
 to see (trigram indexes), with a preview pane and type filters in `CommandMenu.tsx`.
+
+### Import and export
+Leads → **Import ▾** opens a menu: *Import leads from CSV*, *Export these leads to CSV*, and *Download
+sample CSV* (`GET /api/imports/sample`: the usual columns plus every lead custom field, with an example
+row from this workspace's stages, sources and people). Importing: pick a CSV, map its columns (guessed
+from the headers), choose defaults, then a **BullMQ job** imports it with live progress. Teammates are
+written by name or email ("Assigned to", Agent fields); a name that matches nobody goes to the problem
+file rather than silently to someone else. Deals and Contacts have an **Export** button.
+See [QUEUES.md](QUEUES.md).
 
 ### Real time
 See [REALTIME.md](REALTIME.md).

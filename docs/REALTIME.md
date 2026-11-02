@@ -182,7 +182,7 @@ and the tests still pass.
 
 | Type | When | Where in the code |
 |---|---|---|
-| `LEAD_ASSIGNED` | someone assigns you a lead (one, or several in bulk), creates one for you, or a web form gives you one | `api/leads/[id]/assign`, `api/leads/bulkUpdate`, `api/leads` POST, `lib/leadCapture.ts` |
+| `LEAD_ASSIGNED` | someone assigns you a lead (one, or several in bulk), creates one for you, or a web form gives you one | `api/leads/[id]/assign`, `api/leads/bulkUpdate`, `api/leads` POST, `lib/leads/capture.ts` |
 | `DEAL_ASSIGNED` | the same for deals | `api/deals/[id]/assign`, `api/deals/bulkUpdate`, `api/deals` POST |
 | `TASK_ASSIGNED` | someone writes a task for you, or hands you one | `api/tasks` POST, `api/tasks/[id]` PUT |
 | `ACTIVITY_INVITED` | you're made the owner of, or tagged on, a call/meeting (only when newly added) | `api/activities` POST, `api/activities/[id]` PUT |

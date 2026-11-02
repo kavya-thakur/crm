@@ -7,6 +7,7 @@ import { io } from "socket.io-client";
 
 import { api } from "@/lib/api/client";
 import { toast } from "@/components/Toast";
+import { trackBulkJob, type BulkProgress } from "./BackgroundJobs";
 
 // What to refetch when the server says a kind of record changed. The keys are the first
 // part of the React Query keys the pages use (["leads", ...], ["lead", 12], ...); a change
@@ -27,6 +28,7 @@ const REFRESH: Record<string, string[]> = {
     roles: ["roles", "permissions"],
     // read in another of your tabs (sent only to you)
     notifications: ["notifications"],
+    imports: ["imports"],
 };
 
 // Changes to these can change what the signed-in person may see (their role, the
@@ -44,6 +46,8 @@ interface PushedNotification {
  * opened once signed in. The login cookie goes with it, so the server knows who this is.
  *  - "changed" { topic }: someone else changed some records, so refetch what's on screen
  *  - "notification": something for this person, so update the bell and show a toast
+ *  - "import-progress": how far one of this person's CSV imports has got (the import page shows it)
+ *  - "bulk-progress": how far one of their big bulk actions has got (the corner card shows it)
  * Renders nothing; it's mounted once in the dashboard layout.
  */
 export function LiveUpdates() {
@@ -79,6 +83,15 @@ export function LiveUpdates() {
             const show = notification.type === "REMINDER" ? toast.warning : toast.info;
             show(notification.title, notification.body ?? undefined);
         });
+
+        // the worker's progress goes straight into the import page's data, so its bar moves live
+        socket.on("import-progress", (progress: { id: number }) => {
+            queryClient.setQueryData(["import", progress.id], (current: object | undefined) => (current ? { ...current, ...progress } : current));
+            void queryClient.invalidateQueries({ queryKey: ["imports"] });
+        });
+
+        // big bulk actions: their corner card follows along (see trackBulkJob)
+        socket.on("bulk-progress", (progress: BulkProgress) => trackBulkJob(queryClient, progress));
 
         return () => {
             socket.disconnect();

@@ -28,8 +28,8 @@ import {
 } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
-import type { DashboardRange } from "@/lib/dashboard";
-import { formatDay, formatMoney, formatMoneyShort } from "@/lib/format";
+import type { DashboardRange } from "@/lib/dashboard/periods";
+import { formatDay, formatMoney, formatMoneyShort } from "@/lib/utils/format";
 import { ErrorState } from "@/components/ErrorState";
 import { Skeleton } from "@/components/Loader";
 import { SectionIcon, TONES, type Tone } from "@/components/SectionIcon";

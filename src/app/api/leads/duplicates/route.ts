@@ -3,7 +3,7 @@ import { z } from "zod";
 import { hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { handleRouteError, validationError } from "@/lib/api/http";
 import { idParamSchema, searchParamsToObject } from "@/lib/validations/common";
-import { findSimilarLeads, isOpen, matchKeys } from "@/lib/leadDuplicates";
+import { findSimilarLeads, isOpen, matchKeys } from "@/lib/leads/duplicates";
 
 const duplicatesQuerySchema = z.object({
     email: z.string().trim().max(254).optional(),

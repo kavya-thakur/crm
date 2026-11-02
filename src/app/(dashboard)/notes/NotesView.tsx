@@ -11,7 +11,7 @@ import { SectionIcon } from "@/components/SectionIcon";
 import { ViewSwitcher } from "@/components/ListPage";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/Loader";
-import { timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/utils/format";
 import { renderNoteBody } from "../shared/notes";
 import type { AgentOption } from "../shared/customFields";
 import type { NoteFeedEntity, NoteFeedItem } from "@/app/api/notes/route";

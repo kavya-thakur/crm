@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { idParamSchema } from "./validations/common";
-import { startOfToday } from "./tasks";
+import { idParamSchema } from "@/lib/validations/common";
+import { startOfToday } from "@/lib/work/tasks";
 
 // The periods the dashboard can show. Days are UTC days, the same "today" tasks use.
 export const DASHBOARD_RANGES = ["7d", "30d", "90d", "12m"] as const;

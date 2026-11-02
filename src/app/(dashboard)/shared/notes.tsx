@@ -9,7 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/utils/format";
 import type { AgentOption } from "./customFields";
 
 type NoteEntity = "lead" | "deal" | "contact";

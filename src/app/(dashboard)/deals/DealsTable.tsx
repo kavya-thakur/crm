@@ -21,7 +21,7 @@ import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, people
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { askLostReason } from "@/components/LostReasonPrompt";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import { StageLabel, formatDealAmount, type Deal, type DealUser, type PipelineStage } from "./shared";
 
 // Every column but Deal (title) is optional — shown, hidden, reordered (drag

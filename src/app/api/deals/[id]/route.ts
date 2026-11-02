@@ -4,10 +4,10 @@ import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { idParamSchema } from "@/lib/validations/common";
 import { updateDealSchema } from "@/lib/validations/deals";
-import { validateCustomFieldValues } from "@/lib/customFields";
-import { closedAtFor } from "@/lib/pipelineStages";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
+import { closedAtFor } from "@/lib/deals/stages";
 import { NextRequest, NextResponse } from "next/server";
-import { dealLeadSelect } from "@/lib/deals";
+import { dealLeadSelect } from "@/lib/deals/select";
 
 type Params = { params: Promise<{ id: string }> };
 

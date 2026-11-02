@@ -10,7 +10,7 @@ import { Select, type SelectOption } from "@/components/Select";
 import type { DataColumn, EditConfig } from "@/components/DataTable";
 import type { BulkField } from "@/components/ListPage";
 import { controlClassName, renderSelectControl, type FilterFieldDef } from "@/components/FilterPanel";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import { FormFieldRow, FormSection } from "./FullPageForm";
 
 export type CustomFieldType = "TEXT" | "NUMBER" | "DATE" | "SELECT" | "BOOLEAN" | "AGENT";

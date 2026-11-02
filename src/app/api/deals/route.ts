@@ -4,11 +4,13 @@ import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { createDealSchema, listDealsQuerySchema } from "@/lib/validations/deals";
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
-import { validateCustomFieldValues } from "@/lib/customFields";
-import { closedAtFor } from "@/lib/pipelineStages";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
+import { closedAtFor } from "@/lib/deals/stages";
 import { NextRequest, NextResponse } from "next/server";
 import { firstName, notify } from "@/lib/realtime/notify";
-import { dealLeadSelect } from "@/lib/deals";
+import { dealLeadSelect } from "@/lib/deals/select";
+import { exportDeals } from "@/lib/api/csvExport";
+import { MAX_BULK } from "@/lib/jobs/bulkActions";
 
 export async function GET(req: NextRequest) {
     try {
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder } =
+        const { page, limit, search, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } =
             query.data;
 
         const term = search && escapeLike(search);
@@ -86,6 +88,17 @@ export async function GET(req: NextRequest) {
             // last, so the ?assignedTo filter can't override the scope
             ...dealScope(user),
         };
+
+        // the same filters and permissions, as a file
+        if (format === "csv") {
+            return exportDeals(user.organizationId, where);
+        }
+
+        // every match's id (up to the bulk limit), for "select all N" and a bulk action on them
+        if (format === "ids") {
+            const rows = await prisma.deal.findMany({ where, select: { id: true }, orderBy: { id: "asc" }, take: MAX_BULK });
+            return NextResponse.json({ ok: true, data: rows.map((row) => row.id) });
+        }
 
         const [deals, total, sum] = await Promise.all([
             prisma.deal.findMany({

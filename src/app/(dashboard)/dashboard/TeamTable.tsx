@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { IconArrowDown } from "@tabler/icons-react";
 
-import { formatMoney, formatMoneyShort } from "@/lib/format";
+import { formatMoney, formatMoneyShort } from "@/lib/utils/format";
 import { Avatar } from "@/components/Avatar";
 
 export interface TeamMember {

@@ -20,7 +20,7 @@ import { Pill } from "@/components/Pill";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/utils/format";
 import { createAgentSchema } from "@/lib/validations/agents";
 import { Avatar } from "@/components/Avatar";
 import { Dropdown, MenuItem } from "@/components/Dropdown";

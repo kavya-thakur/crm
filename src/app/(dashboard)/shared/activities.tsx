@@ -12,7 +12,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList, Spinner } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
 import { toast } from "@/components/Toast";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/utils/format";
 import {
     ACTIVITY_TYPES,
     DURATIONS,

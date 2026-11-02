@@ -1,4 +1,4 @@
-import { STAGE_COLORS } from "./stageColors";
+import { STAGE_COLORS } from "@/lib/settings/stageColors";
 
 // Every organization starts with these sources (created on register, back-filled by the seed).
 export const DEFAULT_LEAD_SOURCES = [

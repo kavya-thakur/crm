@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { captureLead, formSubmissionSchema } from "@/lib/leadCapture";
-import { tooManyAttempts } from "@/lib/rateLimit";
+import { captureLead, formSubmissionSchema } from "@/lib/leads/capture";
+import { tooManyAttempts, visitorOf } from "@/lib/api/rateLimit";
 import { handleRouteError } from "@/lib/api/http";
 
 type Params = { params: Promise<{ key: string }> };
@@ -34,8 +34,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
 
         // a few submissions per visitor every 10 minutes is plenty for a person, not for a bot
-        const visitor = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
-        if (tooManyAttempts(`${visitor}:${key}`, 5, 10 * 60 * 1000)) {
+        if (await tooManyAttempts(`form:${visitorOf(req.headers)}:${key}`, 5, 10 * 60 * 1000)) {
             return reply(htmlForm, 429, "Too many tries. Please wait a few minutes and send it again.");
         }
 

@@ -9,7 +9,7 @@ import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { Board, BoardCard, BoardColumn, CardControl, ColumnTitle, useBoardColumn } from "@/components/Board";
 import { toast } from "@/components/Toast";
-import { timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/utils/format";
 import { NoteComposer, renderNoteBody } from "../shared/notes";
 import type { AgentOption } from "../shared/customFields";
 import type { NoteFeedEntity, NoteFeedItem } from "@/app/api/notes/route";

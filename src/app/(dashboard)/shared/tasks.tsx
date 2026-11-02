@@ -12,7 +12,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList, Spinner } from "@/components/Loader";
 import type { SelectOption } from "@/components/Select";
 import { toast } from "@/components/Toast";
-import { formatDay } from "@/lib/format";
+import { formatDay } from "@/lib/utils/format";
 import { TASK_PRIORITIES, isOverdue, refreshTasks, type Paginated, type Task, type TaskLink, type TaskPriority } from "../tasks/shared";
 
 type TaskEntity = "lead" | "deal" | "contact";

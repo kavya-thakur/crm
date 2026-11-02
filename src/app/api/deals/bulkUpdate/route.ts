@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db/prisma";
 import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
-import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
+import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkDealChangesSchema } from "@/lib/validations/deals";
-import { closedAtFor } from "@/lib/pipelineStages";
+import { closedAtFor } from "@/lib/deals/stages";
 import { firstName, notify } from "@/lib/realtime/notify";
 
 const dealIdsSchema = z.array(dbIdSchema).min(1).max(500);

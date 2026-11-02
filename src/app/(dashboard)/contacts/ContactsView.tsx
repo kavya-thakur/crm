@@ -15,6 +15,7 @@ import {
     FilterBar,
     FilterChip,
     ListHeader,
+    ExportButton,
     SearchBox,
     SortMenu,
 } from "@/components/ListPage";
@@ -242,6 +243,8 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                 />
 
                 <SortMenu fields={SORT_FIELDS} sortBy={filters.sortBy} sortOrder={filters.sortOrder} onChange={updateFilters} />
+
+                <ExportButton endpoint="/contacts" filters={filters} />
 
                 <OptionsMenuButton columns={contactColumns} columnPrefs={columnPrefs} canManageCustomFields={can.manageCustomFields} />
             </div>

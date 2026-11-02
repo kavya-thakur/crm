@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/requirePermission";
-import { placeholderName, planOptionList } from "@/lib/optionLists";
+import { placeholderName, planOptionList } from "@/lib/settings/optionLists";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { createLeadStageSchema, saveLeadStagesSchema } from "@/lib/validations/leadStages";
 

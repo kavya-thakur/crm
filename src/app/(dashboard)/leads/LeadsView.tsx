@@ -1,11 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconBuilding, IconGitMerge, IconProgress, IconTag } from "@tabler/icons-react";
+import {
+    IconArrowDown,
+    IconArrowUp,
+    IconBuilding,
+    IconChevronDown,
+    IconDownload,
+    IconFileSpreadsheet,
+    IconGitMerge,
+    IconProgress,
+    IconTag,
+    IconUpload,
+} from "@tabler/icons-react";
 
-import { api, errorMessage } from "@/lib/api/client";
+import { api, errorMessage, toQueryParams } from "@/lib/api/client";
+import { INSTANT_BULK_LIMIT } from "@/lib/validations/common";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { toast } from "@/components/Toast";
 import { askLostReason } from "@/components/LostReasonPrompt";
@@ -17,6 +29,10 @@ import {
     FilterBar,
     FilterChip,
     ListHeader,
+    ExportButton,
+    exportUrl,
+    downloadFile,
+    toolbarButtonClassName,
     SearchBox,
     SortMenu,
     ViewSwitcher,
@@ -48,6 +64,7 @@ import LeadsTable, { LEAD_COLUMNS, withLeadEdits } from "./LeadsTable";
 import LeadsBoard from "./LeadsBoard";
 import LeadPanel from "./LeadPanel";
 import { MergeLeadsPanel } from "./MergeLeads";
+import { trackBulkJob, type BulkProgress } from "../BackgroundJobs";
 import NewLeadDialog from "./NewLeadDialog";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
@@ -68,6 +85,7 @@ type BulkAction =
 
 export default function LeadsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
+    const router = useRouter();
 
     const [view, setView] = useState<"table" | "board">("table");
     const searchParams = useSearchParams();
@@ -102,6 +120,22 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         { pageSize: PAGE_SIZE, onSearch: (trimmed) => ({ search: trimmed || undefined }) },
     );
 
+    // "Select all 4,230 matching leads": every lead the filters match, not just the ones loaded.
+    // Changing the filters changes what "all" means, so it's dropped then.
+    const [allMatching, setAllMatching] = useState(false);
+    const filtersKey = JSON.stringify(filters);
+    const [filtersWhenAll, setFiltersWhenAll] = useState(filtersKey);
+    if (filtersKey !== filtersWhenAll) {
+        setFiltersWhenAll(filtersKey);
+        if (allMatching) setAllMatching(false);
+    }
+    const selectedCount = allMatching ? (total ?? selected.size) : selected.size;
+    const allLoadedSelected = leads.length > 0 && leads.every((lead) => selected.has(lead.id));
+    const clearSelection = () => {
+        setAllMatching(false);
+        setSelected(new Set());
+    };
+
     // For the assignee filter and the assign menus
     const agents = useQuery({
         queryKey: ["agents"],
@@ -120,6 +154,24 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     const sourcesQuery = useQuery({
         queryKey: ["leadSource"],
         queryFn: () => api.get<{ data: LeadSource[] }>("/lead-sources").then((res) => res.data.data),
+    });
+
+    // More than a couple of hundred: deleted in the background by the job queue (docs/QUEUES.md),
+    // with a progress card in the corner. "All matching" first asks for every match's id.
+    const bulkDelete = useMutation({
+        mutationFn: async () => {
+            const ids = allMatching
+                ? (await api.get<{ data: number[] }>("/leads", { params: { ...toQueryParams(filters), format: "ids" } })).data.data
+                : [...selected];
+            return (await api.post<{ data: BulkProgress }>("/bulk-jobs", { entity: "lead", action: "delete", ids })).data.data;
+        },
+        onSuccess: (job) => {
+            // its progress card appears now; the worker's messages move it from here
+            trackBulkJob(queryClient, job);
+            clearSelection();
+            setConfirmingDelete(false);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const bulk = useMutation({
@@ -328,6 +380,37 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
                     <SortMenu fields={SORT_FIELDS} sortBy={filters.sortBy} sortOrder={filters.sortOrder} onChange={updateFilters} />
 
+                    {/* getting leads in and out, in one menu */}
+                    {can.create ? (
+                        <Dropdown
+                            align="right"
+                            buttonClassName={toolbarButtonClassName}
+                            label={
+                                <>
+                                    <IconUpload size={14} />
+                                    Import
+                                    <IconChevronDown size={13} className="text-faint" />
+                                </>
+                            }
+                        >
+                            {(close) => (
+                                <>
+                                    <MenuItem onClick={() => { close(); router.push("/leads/import"); }}>
+                                        <IconUpload size={15} className="text-faint" /> Import leads from CSV
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { close(); downloadFile(exportUrl("/leads", filters)); }}>
+                                        <IconDownload size={15} className="text-faint" /> Export these leads to CSV
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { close(); downloadFile("/api/imports/sample"); }}>
+                                        <IconFileSpreadsheet size={15} className="text-faint" /> Download sample CSV
+                                    </MenuItem>
+                                </>
+                            )}
+                        </Dropdown>
+                    ) : (
+                        <ExportButton endpoint="/leads" filters={filters} />
+                    )}
+
                     <OptionsMenuButton
                         columns={columns}
                         columnPrefs={columnPrefs}
@@ -358,6 +441,27 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                 <ActiveFilterChips fields={FILTER_FIELDS} filters={filters} onChange={updateFilters} />
             </FilterBar>
 
+            {/* everything loaded is ticked, but the filters match more: offer to take them all */}
+            {view === "table" && can.delete && (allMatching || (allLoadedSelected && (total ?? 0) > leads.length)) && (
+                <div className="flex h-9 shrink-0 items-center justify-center gap-2 border-b border-line-light bg-accent-faint text-sm text-ink">
+                    {allMatching ? (
+                        <>
+                            All {(total ?? 0).toLocaleString()} leads matching your filters are selected.
+                            <button type="button" onClick={clearSelection} className="font-medium text-accent hover:underline">
+                                Clear selection
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            All {leads.length.toLocaleString()} leads shown are selected.
+                            <button type="button" onClick={() => setAllMatching(true)} className="font-medium text-accent hover:underline">
+                                Select all {(total ?? 0).toLocaleString()} matching leads
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+
             <div className="relative min-h-0 flex-1 overflow-auto">
                 {view === "table" ? (
                     <LeadsTable
@@ -374,7 +478,11 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         onLoadMore={leadsQuery.fetchNextPage}
                         selectable={can.update || can.delete}
                         selected={selected}
-                        onSelect={setSelected}
+                        onSelect={(next) => {
+                            // unticking a row means it's no longer "all of them"
+                            setAllMatching(false);
+                            setSelected(next);
+                        }}
                         onOpen={setOpenLeadId}
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
@@ -391,11 +499,12 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
             {/* Bulk actions, Twenty's floating bar */}
             <BulkBar
-                count={selected.size}
-                onClear={() => setSelected(new Set())}
+                count={selectedCount}
+                onClear={clearSelection}
                 onDelete={can.delete ? () => setConfirmingDelete(true) : undefined}
             >
-                {can.update && stagesQuery.data && (
+                {/* with every match selected, only Delete applies (it runs as a background job) */}
+                {!allMatching && can.update && stagesQuery.data && (
                     <Dropdown
                         openUp
                         buttonClassName="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
@@ -418,14 +527,14 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     </Dropdown>
                 )}
 
-                {can.assign && agents.data && (
+                {!allMatching && can.assign && agents.data && (
                     <AssignMenu
                         agents={agents.data}
                         onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
                     />
                 )}
 
-                {can.update && can.delete && selected.size === 2 && (
+                {!allMatching && can.update && can.delete && selected.size === 2 && (
                     <button
                         type="button"
                         onClick={() => {
@@ -438,7 +547,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     </button>
                 )}
 
-                {can.update && (
+                {!allMatching && can.update && (
                     <BulkEditButton
                         count={selected.size}
                         noun="lead"
@@ -477,12 +586,16 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
             <ConfirmDeleteModal
                 open={confirmingDelete}
-                count={selected.size}
+                count={selectedCount}
                 noun="lead"
-                description="Their timeline history is deleted too. This can't be undone."
-                pending={bulk.isPending}
+                description={
+                    allMatching || selectedCount > INSTANT_BULK_LIMIT
+                        ? "Their timelines, notes, tasks and activities go too. It runs in the background, so you can keep working. This can't be undone."
+                        : "Their timeline history is deleted too. This can't be undone."
+                }
+                pending={bulk.isPending || bulkDelete.isPending}
                 onCancel={() => setConfirmingDelete(false)}
-                onConfirm={() => bulk.mutate({ action: "delete" })}
+                onConfirm={() => (allMatching || selectedCount > INSTANT_BULK_LIMIT ? bulkDelete.mutate() : bulk.mutate({ action: "delete" }))}
             />
         </div>
     );

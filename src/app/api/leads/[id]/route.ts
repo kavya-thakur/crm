@@ -4,9 +4,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { updateLeadSchema } from "@/lib/validations/leads";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { validateCustomFieldValues } from "@/lib/customFields";
-import { stageMessage } from "@/lib/leadStages";
-import { alreadyALead, findOpenCopy, isOpen } from "@/lib/leadDuplicates";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
+import { stageMessage } from "@/lib/leads/stages";
+import { alreadyALead, findOpenCopy, isOpen } from "@/lib/leads/duplicates";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };

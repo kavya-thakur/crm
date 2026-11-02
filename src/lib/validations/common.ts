@@ -133,3 +133,8 @@ export function dayRange(from?: string, to?: string) {
         ...(to && { lte: new Date(`${to}T23:59:59.999Z`) }),
     };
 }
+
+// Bulk actions: up to INSTANT_BULK_LIMIT records are done in the request itself; more (up to
+// MAX_BULK) become a background job on the queue (src/lib/jobs/bulkActions.ts, docs/QUEUES.md)
+export const INSTANT_BULK_LIMIT = 200;
+export const MAX_BULK = 50_000;

@@ -5,8 +5,8 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { dealScope, hasPermission, leadScope, type CurrentUser } from "@/lib/auth/requirePermission";
 import { handleRouteError, validationError } from "@/lib/api/http";
 import { searchParamsToObject } from "@/lib/validations/common";
-import { startOfToday } from "@/lib/tasks";
-import { bucketIndex, dashboardPeriod, dashboardQuerySchema } from "@/lib/dashboard";
+import { startOfToday } from "@/lib/work/tasks";
+import { bucketIndex, dashboardPeriod, dashboardQuerySchema } from "@/lib/dashboard/periods";
 
 type Period = ReturnType<typeof dashboardPeriod>;
 

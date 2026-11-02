@@ -5,9 +5,11 @@ import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requireP
 import { createLeadSchema, listLeadsQuerySchema } from "@/lib/validations/leads";
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
-import { validateCustomFieldValues } from "@/lib/customFields";
-import { alreadyALead, duplicateLeadsWhere, findOpenCopy, withDuplicateHints } from "@/lib/leadDuplicates";
+import { validateCustomFieldValues } from "@/lib/settings/customFields";
+import { alreadyALead, duplicateLeadsWhere, findOpenCopy, withDuplicateHints } from "@/lib/leads/duplicates";
 import { firstName, notify } from "@/lib/realtime/notify";
+import { exportLeads } from "@/lib/api/csvExport";
+import { MAX_BULK } from "@/lib/jobs/bulkActions";
 
 export async function POST(req: NextRequest) {
     try {
@@ -225,7 +227,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, duplicates, customFields: customFieldsParam, sortBy, sortOrder } =
+        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, duplicates, customFields: customFieldsParam, sortBy, sortOrder, format } =
             query.data;
 
         const term = search && escapeLike(search);
@@ -299,6 +301,17 @@ export async function GET(req: NextRequest) {
             // last, so the ?assignedTo filter can't override the scope
             ...leadScope(user),
         };
+
+        // the same filters and permissions, as a file
+        if (format === "csv") {
+            return exportLeads(user.organizationId, where);
+        }
+
+        // every match's id (up to the bulk limit), for "select all N" and a bulk action on them
+        if (format === "ids") {
+            const rows = await prisma.lead.findMany({ where, select: { id: true }, orderBy: { id: "asc" }, take: MAX_BULK });
+            return NextResponse.json({ ok: true, data: rows.map((row) => row.id) });
+        }
 
         const [leads, total] = await Promise.all([
             prisma.lead.findMany({

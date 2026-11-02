@@ -54,6 +54,10 @@ model User {
   // the bell: things that happened for this person, and the ones they caused for others
   notifications      Notification[]      @relation("NotificationRecipient")
   sentNotifications  Notification[]      @relation("NotificationActor")
+  // CSV imports this person started
+  importJobs         ImportJob[]
+  // big bulk actions (deleting thousands of records) this person started
+  bulkJobs           BulkJob[]
 
   @@index([organizationId])
   @@index([roleId])
@@ -80,6 +84,8 @@ model Organization {
   tasks                  Task[]
   leadForms              LeadForm[]
   notifications          Notification[]
+  importJobs             ImportJob[]
+  bulkJobs               BulkJob[]
 }
 
 model Role {
@@ -712,4 +718,72 @@ model Notification {
   // the bell's list (newest first) and its unread count
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+// One CSV import: the file, how its columns map to fields, and how far it's got. The upload
+// saves this row and puts its id on the BullMQ queue (Redis); the worker in server.ts reads
+// the file from here, works through it in batches and keeps the counts up to date (see
+// docs/QUEUES.md). Kept afterwards as the import's history, with the rows that failed.
+model ImportJob {
+  id             Int       @id @default(autoincrement())
+  organizationId Int
+  // who started it: the leads are created as them, and they're told when it's done
+  userId         Int
+  // what's being imported: "lead" for now
+  entity         String
+  fileName       String
+  // QUEUED → RUNNING → DONE, or FAILED (the whole job; single rows that fail are counted below)
+  status         String    @default("QUEUED")
+  // { "<CSV column>": "name" | "email" | "phone" | ... | "cf:<custom field key>" }
+  mapping        Json
+  // what rows get when their own column is empty or unmapped: { stageId, sourceId, ownerId }
+  defaults       Json      @default("{}")
+  // the file itself; cleared once it's done
+  csv            String?   @db.Text
+  total          Int       @default(0)
+  processed      Int       @default(0)
+  created        Int       @default(0)
+  // people who were already open leads (or appeared twice in the file)
+  skipped        Int       @default(0)
+  failed         Int       @default(0)
+  // the rows that failed, as CSV with a "Problem" column, for downloading
+  errorsCsv      String?   @db.Text
+  // why the whole job failed, if it did
+  error          String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+// A bulk action too big for one request, e.g. deleting 4,000 leads: which records were
+// picked (a snapshot taken when it started) and how far it's got. Run by the BullMQ worker
+// in batches, like an import (see docs/QUEUES.md).
+model BulkJob {
+  id             Int       @id @default(autoincrement())
+  organizationId Int
+  // who started it: the records are changed as them, within what they may do
+  userId         Int
+  // "lead" | "deal" | "contact"
+  entity         String
+  // "delete" for now
+  action         String
+  ids            Int[]
+  // QUEUED → RUNNING → DONE, or FAILED
+  status         String    @default("QUEUED")
+  total          Int
+  processed      Int       @default(0)
+  // how many were actually changed (some may have gone already, or be out of reach now)
+  affected       Int       @default(0)
+  error          String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
 }

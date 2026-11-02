@@ -18,7 +18,8 @@ import { broadcastChange, notify, orgRoom, setSocketServer, userRoom } from "./n
  */
 
 // Writes that don't change anything other people are looking at
-const QUIET = new Set(["auth", "me", "public", "notifications", "saved-filters"]);
+// (bulk-jobs and imports report their own progress as they go)
+const QUIET = new Set(["auth", "me", "public", "notifications", "saved-filters", "bulk-jobs"]);
 
 function cookieValue(header: string | undefined, name: string) {
     const pair = header?.split(";").find((part) => part.trim().startsWith(`${name}=`));
