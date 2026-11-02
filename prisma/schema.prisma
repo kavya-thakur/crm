@@ -24,13 +24,20 @@ model User {
 
   organization       Organization        @relation(fields: [organizationId], references: [id])
   role               Role                @relation(fields: [roleId], references: [id])
-  assignedLeads      Lead[]
+  assignedLeads      Lead[]              @relation("LeadAssignee")
+  // who created / last changed each lead, deal and contact
+  createdLeads       Lead[]              @relation("LeadCreatedBy")
+  updatedLeads       Lead[]              @relation("LeadUpdatedBy")
   leadTimeline       LeadTimeline[]
   leadNotes          LeadNote[]
   assignedDeals      Deal[]              @relation("DealAssignee")
+  createdDeals       Deal[]              @relation("DealCreatedBy")
+  updatedDeals       Deal[]              @relation("DealUpdatedBy")
   dealTimeline       DealTimeline[]
   dealNotes          DealNote[]
-  contacts           Contact[]
+  contacts           Contact[]           @relation("ContactAssignee")
+  createdContacts    Contact[]           @relation("ContactCreatedBy")
+  updatedContacts    Contact[]           @relation("ContactUpdatedBy")
   contactTimeline    ContactTimeline[]
   contactNotes       ContactNote[]
   savedFilters       SavedFilter[]
@@ -42,6 +49,8 @@ model User {
   // to-dos — the person who has to do it, and whoever wrote it down
   assignedTasks      Task[]              @relation("TaskAssignee")
   createdTasks       Task[]              @relation("TaskCreator")
+  // web forms whose leads go to this person
+  leadForms          LeadForm[]          @relation("LeadFormOwner")
 
   @@index([organizationId])
   @@index([roleId])
@@ -66,6 +75,7 @@ model Organization {
   customFieldDefinitions CustomFieldDefinition[]
   scheduledActivities    ScheduledActivity[]
   tasks                  Task[]
+  leadForms              LeadForm[]
 }
 
 model Role {
@@ -120,11 +130,17 @@ model Lead {
   // by definition.key — e.g. { "budget_range": "50k-100k" }
   customFields Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  // who made it, and who last changed it (any field, its stage or owner); null for
+  // records from before this was tracked, or when that person has been removed
+  createdById Int?
+  updatedById Int?
 
   organization        Organization        @relation(fields: [organizationId], references: [id])
-  assignedTo          User?               @relation(fields: [assignedToId], references: [id])
+  assignedTo          User?               @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  createdBy           User?               @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy           User?               @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   contact             Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
   stage               LeadStage           @relation(fields: [stageId], references: [id])
   source              LeadSource?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
@@ -135,6 +151,11 @@ model Lead {
   deals               Deal[]
 
   @@index([organizationId])
+  @@index([organizationId, createdById])
+  @@index([organizationId, updatedById])
+  // newest-first lists, and the board's columns (one stage, newest first), without sorting every row
+  @@index([organizationId, createdAt])
+  @@index([organizationId, stageId, createdAt])
   @@index([assignedToId])
   @@index([stageId])
   @@index([sourceId])
@@ -177,6 +198,7 @@ model LeadSource {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   leads        Lead[]
+  leadForms    LeadForm[]
 
   @@unique([organizationId, name])
   @@index([organizationId, order])
@@ -298,12 +320,18 @@ model Deal {
   // The dashboard counts "won this month" from it (updatedAt changes on any edit)
   closedAt          DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  // who made it, and who last changed it (any field, its stage or owner); null for
+  // records from before this was tracked, or when that person has been removed
+  createdById Int?
+  updatedById Int?
 
   organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
   assignedTo    User?         @relation("DealAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy     User?         @relation("DealCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?         @relation("DealUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   pipelineStage PipelineStage @relation(fields: [pipelineStageId], references: [id])
 
   timeline            DealTimeline[]
@@ -312,7 +340,11 @@ model Deal {
   tasks               Task[]
 
   @@index([organizationId])
-  @@index([organizationId, pipelineStageId])
+  @@index([organizationId, createdById])
+  @@index([organizationId, updatedById])
+  // newest-first lists, and the board's columns (one stage, newest first)
+  @@index([organizationId, createdAt])
+  @@index([organizationId, pipelineStageId, createdAt])
   @@index([assignedToId])
   @@index([leadId])
   @@index([expectedCloseDate])
@@ -376,12 +408,18 @@ model Contact {
   // values for this org's CustomFieldDefinition rows (entity "contact")
   customFields Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  // who made it, and who last changed it (any field, its stage or owner); null for
+  // records from before this was tracked, or when that person has been removed
+  createdById Int?
+  updatedById Int?
 
   organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   company             Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  assignedTo          User?               @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo          User?               @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy           User?               @relation("ContactCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy           User?               @relation("ContactUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   // every lead sourced from (or linked to) this contact — a contact isn't
   // limited to a single lead, e.g. the same person re-engaging later
   leads               Lead[]
@@ -392,6 +430,10 @@ model Contact {
 
   @@unique([organizationId, phone])
   @@index([organizationId])
+  @@index([organizationId, createdById])
+  @@index([organizationId, updatedById])
+  // newest-first lists
+  @@index([organizationId, createdAt])
   @@index([organizationId, email])
   @@index([companyId])
   @@index([assignedToId])
@@ -561,6 +603,8 @@ model Task {
   title          String
   description    String?
   status         TaskStatus   @default(PENDING)
+  // when it was ticked off; null while it's still to do. The dashboard counts work done from it
+  completedAt    DateTime?
   priority       TaskPriority @default(MEDIUM)
   dueDate        DateTime     @db.Date
 
@@ -585,10 +629,34 @@ model Task {
   contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, status, dueDate])
+  @@index([organizationId, completedAt])
   @@index([assignedToId, status, dueDate])
   @@index([leadId])
   @@index([dealId])
   @@index([contactId])
   // trigram indexes: make the global search's "contains" matching (ILIKE '%acme%') fast
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+// A web form that creates leads: a website's "contact us" or "book a demo" form posts to
+// /api/public/forms/<key>, no login needed. Each new lead is tagged with the form's source,
+// given to its owner along with a task to reply, and skipped if that person is already a lead.
+model LeadForm {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  // "Website demo requests"
+  name           String
+  // the form's public id, in its link and embed code: long and random, so it can't be guessed
+  key            String   @unique
+  // what new leads are tagged with, and who gets them (null = left unassigned)
+  sourceId       Int?
+  ownerId        Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source       LeadSource?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  owner        User?        @relation("LeadFormOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
 }

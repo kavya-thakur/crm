@@ -5,13 +5,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { SectionIcon, headerWash } from "@/components/SectionIcon";
+import { SectionIcon } from "@/components/SectionIcon";
 import { Pill } from "@/components/Pill";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
+import { Select } from "@/components/Select";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, type CustomFieldType } from "../../shared/customFields";
 
 const TYPE_LABELS: Record<CustomFieldType, string> = {
@@ -50,7 +51,7 @@ export default function CustomFieldsView() {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("customFields")}>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
                 <SectionIcon section="customFields" size="md" />
                 <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Custom Fields</h1>
                 {fieldsQuery.data && <span className="text-faint">{fieldsQuery.data.length}</span>}
@@ -273,22 +274,20 @@ function CustomFieldForm({
                 )}
 
                 <div>
-                    <label htmlFor="field-type" className="mb-1 block text-sm font-medium text-muted">
-                        Type
-                    </label>
-                    <select
-                        id="field-type"
+                    <p className="mb-1 block text-sm font-medium text-muted">Type</p>
+                    <Select
                         value={type}
-                        onChange={(e) => setType(e.target.value as CustomFieldType)}
-                        className="h-8 w-full rounded-lg border border-line bg-surface px-2 outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
-                    >
-                        <option value="TEXT">Text</option>
-                        <option value="NUMBER">Number</option>
-                        <option value="DATE">Date</option>
-                        <option value="SELECT">Select</option>
-                        <option value="BOOLEAN">Yes / No</option>
-                        <option value="AGENT">Agent</option>
-                    </select>
+                        onChange={(value) => value && setType(value as CustomFieldType)}
+                        placeholder="Pick a type"
+                        options={[
+                            { value: "TEXT", label: "Text" },
+                            { value: "NUMBER", label: "Number" },
+                            { value: "DATE", label: "Date" },
+                            { value: "SELECT", label: "Select" },
+                            { value: "BOOLEAN", label: "Yes / No" },
+                            { value: "AGENT", label: "Agent" },
+                        ]}
+                    />
                     {field && (
                         <p className="mt-1 text-sm text-faint">
                             Changing the type doesn&apos;t convert values already saved under the old type.

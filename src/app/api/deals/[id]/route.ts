@@ -151,7 +151,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 where: { organizationId: user.organizationId, entity: "deal" },
             });
 
-            const result = validateCustomFieldValues(definitions, submittedCustomFields);
+            const result = validateCustomFieldValues(definitions, submittedCustomFields, { partial: true });
 
             if (!result.ok) {
                 return NextResponse.json(
@@ -177,6 +177,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...fields,
                 pipelineStageId,
                 leadId,
+                updatedById: user.id,
                 ...(customFields && { customFields }),
                 ...(stageChanged && {
                     closedAt,

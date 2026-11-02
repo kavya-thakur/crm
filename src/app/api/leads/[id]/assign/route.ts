@@ -117,6 +117,7 @@ export async function POST(
             },
             data: {
                 assignedToId,
+                updatedById: user.id,
                 timeline: {
                     create: {
                         userId: user.id,

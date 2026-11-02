@@ -1,18 +1,15 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
-import { Board, BoardCard, BoardColumn, CardFields, ColumnTitle } from "@/components/Board";
+import { Board, BoardCard, BoardColumn, CardFields, ColumnTitle, useBoardColumn } from "@/components/Board";
 import type { DataColumn } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { refreshLeads, type Lead, type LeadFilters, type LeadStage, type Paginated } from "./shared";
-
-// ponytail: each column shows its first 100 leads; add "load more" per column when that's not enough
-const COLUMN_LIMIT = 100;
+import { refreshLeads, type Lead, type LeadFilters, type LeadStage } from "./shared";
 
 interface LeadsBoardProps {
     filters: LeadFilters;
@@ -49,7 +46,9 @@ export default function LeadsBoard({ filters, columns, canMove, onOpen, onCreate
         );
     }
 
-    const stages = filters.stageId === undefined ? stagesQuery.data : stagesQuery.data.filter((stage) => stage.id === filters.stageId);
+    // filtered to some stages: just those columns
+    const picked = filters.stageIds;
+    const stages = picked ? stagesQuery.data.filter((stage) => picked.includes(stage.id)) : stagesQuery.data;
 
     if (stages.length === 0) {
         return <p className="p-4 text-sm text-faint">No lead stages configured yet.</p>;
@@ -85,12 +84,7 @@ function StageColumn({
 }: Omit<LeadsBoardProps, "columns" | "onCreate"> & { stage: LeadStage; fields: DataColumn<Lead>[]; onAdd?: () => void }) {
     const queryClient = useQueryClient();
 
-    const leadsQuery = useQuery({
-        queryKey: ["leads", "board", { ...filters, stageId: stage.id }],
-        queryFn: () =>
-            api.get<Paginated<Lead>>("/leads", { params: { ...filters, stageId: stage.id, limit: COLUMN_LIMIT } }).then((res) => res.data),
-        placeholderData: keepPreviousData,
-    });
+    const column = useBoardColumn<Lead>(["leads", "board", { ...filters, stageId: stage.id }], "/leads", { ...filters, stageId: stage.id });
 
     const move = useMutation({
         mutationFn: (id: number) => api.put(`/leads/${id}`, { stageId: stage.id }),
@@ -101,17 +95,17 @@ function StageColumn({
         onError: (error) => toast.error(errorMessage(error)),
     });
 
-    const leads = leadsQuery.data?.data ?? [];
+    const leads = column.items;
 
     return (
         <BoardColumn
             id={String(stage.id)}
             title={<ColumnTitle color={stage.color}>{stage.name}</ColumnTitle>}
-            count={leadsQuery.data?.pagination.total}
-            shown={leads.length}
-            loading={leadsQuery.isPending}
-            error={leadsQuery.error}
-            onRetry={() => leadsQuery.refetch()}
+            count={column.total}
+            more={column.more}
+            loading={column.loading}
+            error={column.error}
+            onRetry={column.retry}
             emptyText="No leads"
             onDropCard={canMove ? (id) => move.mutate(id) : undefined}
             onAdd={onAdd}

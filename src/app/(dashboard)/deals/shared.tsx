@@ -37,14 +37,22 @@ export type Deal = Omit<
     lead: DealLead | null;
     assignedTo: DealUser | null;
     pipelineStage: PipelineStage;
+    // who made it / changed it last; null for records from before this was tracked
+    createdBy?: { id: number; name: string } | null;
+    updatedBy?: { id: number; name: string } | null;
     customFields: Record<string, unknown> | null;
 };
 export interface DealFilters {
     search: string;
-    pipelineStageId?: number;
+    // several stages at once; the board shows just these columns
+    pipelineStageIds?: number[];
     assignedTo?: "me" | "unassigned" | number;
     createdFrom?: string; // "YYYY-MM-DD"
     createdTo?: string;
+    createdBy?: string; // "me" | agent id
+    updatedBy?: string;
+    updatedFrom?: string; // "YYYY-MM-DD"
+    updatedTo?: string;
     // values for fields marked "show in filter", keyed by CustomFieldDefinition.key
     customFields?: Record<string, unknown>;
     sortBy: "title" | "amount" | "expectedCloseDate" | "createdAt" | "updatedAt";
@@ -72,6 +80,8 @@ export function formatDealAmount(amount: number | string) {
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
+        // "₹3,20,000", with paise only when there are any
+        minimumFractionDigits: 0,
         maximumFractionDigits: 2,
     }).format(Number(amount));
 }

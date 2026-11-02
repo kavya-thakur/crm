@@ -31,7 +31,7 @@ import type { DashboardRange } from "@/lib/dashboard";
 import { formatDay, formatMoney, formatMoneyShort } from "@/lib/format";
 import { ErrorState } from "@/components/ErrorState";
 import { Skeleton } from "@/components/Loader";
-import { SectionIcon, TONES, headerWash, type Tone } from "@/components/SectionIcon";
+import { SectionIcon, TONES, type Tone } from "@/components/SectionIcon";
 import { Select } from "@/components/Select";
 import { Avatar } from "@/components/Avatar";
 import { PriorityBadge } from "../shared/tasks";
@@ -136,7 +136,7 @@ export default function DashboardView({ firstName, userId }: { firstName: string
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("dashboard")}>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
                 <SectionIcon section="dashboard" size="md" />
                 <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Dashboard</h1>
             </header>

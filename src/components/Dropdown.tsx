@@ -1,8 +1,9 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import gsap from "gsap";
-import { IconCheck } from "@tabler/icons-react";
+import { IconCheck, IconSearch } from "@tabler/icons-react";
 
 interface DropdownProps {
     label: ReactNode;
@@ -13,12 +14,20 @@ interface DropdownProps {
     onClose?: () => void;
     // overrides the default menu size/padding for a richer panel (e.g. FilterPanel)
     panelClassName?: string;
+    /** make the menu exactly as wide as its button, like a form select */
+    matchWidth?: boolean;
     // gets close() so an item can shut the menu after it runs
     children: (close: () => void) => ReactNode;
 }
 
-// Twenty-style menu: frosted white box, thin border, strong shadow
-export function Dropdown({ label, buttonClassName, align = "left", openUp = false, disabled, onClose, panelClassName, children }: DropdownProps) {
+// Twenty-style menu: frosted white box, thin border, strong shadow.
+//
+// On a normal page the menu is drawn on <body> (a portal) at a fixed spot next to its
+// button, so no scrolling box or overflow-hidden parent around the button can cut it off:
+// a select inside the filter panel, an editor on a board card at the bottom of a column.
+// Inside a native <dialog> (Modal, SidePanel) it stays in place, since anything on <body>
+// would sit behind the dialog.
+export function Dropdown({ label, buttonClassName, align = "left", openUp = false, disabled, onClose, panelClassName, matchWidth, children }: DropdownProps) {
     const [open, setOpen] = useState(false);
     // Stays true through the close animation — open itself flips first so the
     // tween direction is right, then this unmounts the panel once it's done.
@@ -26,15 +35,44 @@ export function Dropdown({ label, buttonClassName, align = "left", openUp = fals
     // Measured against the real panel height once it's open, so it works no
     // matter how tall any particular dropdown's content is.
     const [flipUp, setFlipUp] = useState(openUp);
+    // where the floating menu sits on screen; null while it's drawn in place (in a dialog)
+    const [spot, setSpot] = useState<CSSProperties | null>(null);
+    const [floating, setFloating] = useState(false);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
 
     const openMenu = () => {
         // both before the layout effect below, so the panel already exists
         // in the DOM (and is measurable) the moment it runs
+        setFloating(!buttonRef.current?.closest("dialog"));
         setRendered(true);
         setOpen(true);
     };
+
+    // The floating menu's fixed position: under the button (or above it, when flipped),
+    // lined up with its left or right edge
+    function place(flip: boolean) {
+        const rect = buttonRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setSpot({
+            ...(flip ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+            ...(align === "right" ? { right: window.innerWidth - rect.right } : { left: rect.left }),
+            ...(matchWidth && { width: rect.width }),
+        });
+    }
+
+    // While open, the floating menu follows its button when anything scrolls or the window resizes
+    useEffect(() => {
+        if (!open || !floating) return;
+        const follow = () => place(flipUp);
+        window.addEventListener("scroll", follow, true);
+        window.addEventListener("resize", follow);
+        return () => {
+            window.removeEventListener("scroll", follow, true);
+            window.removeEventListener("resize", follow);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, floating, flipUp]);
 
     const close = () => {
         setOpen(false);
@@ -65,20 +103,37 @@ export function Dropdown({ label, buttonClassName, align = "left", openUp = fals
                     : spaceBelow < panelHeight && spaceAbove > spaceBelow;
 
                 setFlipUp(flip);
+                if (floating) place(flip);
             }
 
+            // Expands out of the button: it grows taller from the edge touching the button
+            // while fading in. Only transform and opacity change, so the graphics card does
+            // the work and it stays smooth. overwrite stops a half-finished collapse (a quick
+            // re-open) from fighting it.
             gsap.fromTo(
                 panel,
-                { opacity: 0, y: flip ? 6 : -6, scale: 0.97 },
-                { opacity: 1, y: 0, scale: 1, duration: 0.14, ease: "power2.out" }
+                { opacity: 0, scaleY: 0.85, scaleX: 0.97, y: flip ? 4 : -4 },
+                {
+                    opacity: 1,
+                    scaleY: 1,
+                    scaleX: 1,
+                    y: 0,
+                    duration: 0.3,
+                    ease: "expo.out",
+                    overwrite: true,
+                    transformOrigin: `${align === "right" ? "right" : "left"} ${flip ? "bottom" : "top"}`,
+                }
             );
         } else if (rendered) {
+            // ...and collapses back into it
             gsap.to(panel, {
                 opacity: 0,
-                y: flipUp ? 6 : -6,
-                scale: 0.97,
-                duration: 0.1,
+                scaleY: 0.85,
+                scaleX: 0.97,
+                y: flipUp ? 4 : -4,
+                duration: 0.18,
                 ease: "power2.in",
+                overwrite: true,
                 onComplete: () => setRendered(false),
             });
         }
@@ -107,23 +162,30 @@ export function Dropdown({ label, buttonClassName, align = "left", openUp = fals
                 {label}
             </button>
 
-            {rendered && (
+            {rendered && floatingOrInPlace(
+                floating,
                 <>
                     {/* invisible layer over the page: clicking anywhere outside closes the menu */}
                     <div className="fixed inset-0 z-40" onClick={close} />
                     <div
                         ref={panelRef}
-                        className={`absolute z-50 overflow-y-auto rounded-lg border border-line bg-surface/95 font-normal shadow-strong backdrop-blur-md
-                            ${align === "right" ? "right-0" : "left-0"}
-                            ${flipUp ? "bottom-full mb-1" : "top-full mt-1"}
+                        style={floating ? spot ?? { top: -9999, left: -9999 } : undefined}
+                        className={`z-50 overflow-y-auto rounded-lg border border-line bg-surface font-normal shadow-strong will-change-transform
+                            ${floating ? "fixed" : `absolute ${align === "right" ? "right-0" : "left-0"} ${flipUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+                            ${matchWidth && !floating ? "w-full" : ""}
                             ${panelClassName ?? "max-h-80 min-w-50 p-1"}`}
                     >
                         {children(close)}
                     </div>
-                </>
+                </>,
             )}
         </div>
     );
+}
+
+// The menu goes on <body> when it floats, or stays where it is (in a dialog)
+function floatingOrInPlace(floating: boolean, menu: ReactNode) {
+    return floating ? createPortal(menu, document.body) : menu;
 }
 
 interface MenuItemProps {
@@ -144,5 +206,32 @@ export function MenuItem({ onClick, children, selected, danger }: MenuItemProps)
             {children}
             {selected && <IconCheck size={14} className="ml-auto text-ink" />}
         </button>
+    );
+}
+
+// The items of a menu that can get long (people, options): once there are more than
+// 8, a search box sits on top and narrows the list as you type
+export function SearchableItems<T>({ items, label, children }: { items: T[]; label: (item: T) => string; children: (item: T) => ReactNode }) {
+    const [query, setQuery] = useState("");
+    const term = query.trim().toLowerCase();
+    const shown = term ? items.filter((item) => label(item).toLowerCase().includes(term)) : items;
+
+    return (
+        <>
+            {items.length > 8 && (
+                <div className="sticky top-0 z-1 mb-1 flex h-8 items-center gap-1.5 rounded-lg bg-app px-2">
+                    <IconSearch size={14} className="shrink-0 text-faint" />
+                    <input
+                        autoFocus
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search..."
+                        className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-light"
+                    />
+                </div>
+            )}
+            {shown.length === 0 && <p className="px-1.5 py-2 text-sm text-faint">No matches</p>}
+            {shown.map(children)}
+        </>
     );
 }

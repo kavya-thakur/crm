@@ -1,12 +1,20 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import {
     IconArrowDown,
+    IconArrowLeft,
     IconArrowUp,
     IconArrowsSort,
+    IconCalendar,
+    IconCheck,
     IconChevronDown,
+    IconChevronRight,
+    IconHash,
     IconLayoutKanban,
+    IconLetterCase,
+    IconList,
+    IconPencil,
     IconPlus,
     IconSearch,
     IconTable,
@@ -17,10 +25,12 @@ import {
 } from "@tabler/icons-react";
 
 import { Avatar } from "./Avatar";
-import { SectionIcon, headerWash, type Section } from "./SectionIcon";
-import { Dropdown, MenuItem } from "./Dropdown";
+import { SectionIcon, type Section } from "./SectionIcon";
+import { Dropdown, MenuItem, SearchableItems } from "./Dropdown";
 import { Spinner } from "./Loader";
 import { Modal } from "./Modal";
+import { SidePanel } from "./SidePanel";
+import type { SelectOption } from "./Select";
 
 /**
  * Shared chrome for an entity list page (Leads, Deals, ...): header, view
@@ -50,7 +60,7 @@ export function ListHeader({
     onCreate?: () => void;
 }) {
     return (
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash(section)}>
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
             <SectionIcon section={section} size="md" />
             <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">{title}</h1>
             {count !== undefined && <span className="text-faint">{count}</span>}
@@ -285,14 +295,235 @@ export function AssignMenu({
                     <MenuItem onClick={() => { onAssign(null); close(); }}>
                         <IconUserOff size={16} /> Unassigned
                     </MenuItem>
-                    {agents.map((agent) => (
-                        <MenuItem key={agent.id} onClick={() => { onAssign(agent.id); close(); }}>
-                            <Avatar name={agent.name} /> {agent.name}
-                        </MenuItem>
-                    ))}
+                    <SearchableItems items={agents} label={(agent) => agent.name}>
+                        {(agent) => (
+                            <MenuItem key={agent.id} onClick={() => { onAssign(agent.id); close(); }}>
+                                <Avatar name={agent.name} /> {agent.name}
+                            </MenuItem>
+                        )}
+                    </SearchableItems>
                 </>
             )}
         </Dropdown>
+    );
+}
+
+// One field bulk edit can set, and how its value is sent to the bulk API
+export interface BulkField {
+    key: string;
+    label: string;
+    type: "text" | "number" | "date" | "select";
+    /** defaults to an icon for the field's type */
+    icon?: ComponentType<{ size?: number; className?: string }>;
+    options?: SelectOption[];
+    /** can be emptied on every selected record */
+    clearable?: boolean;
+    /** the picked value ("" = empty) as the bulk API's changes, e.g. { sourceId: 4 } */
+    toChanges: (value: string) => Record<string, unknown>;
+}
+
+const TYPE_ICONS = { text: IconLetterCase, number: IconHash, date: IconCalendar, select: IconList };
+
+// "Edit field" in the bulk bar: opens a side panel, like a record's, where you pick a field
+// and give it a value that every selected record gets. Other fields aren't touched.
+export function BulkEditButton({
+    count,
+    noun,
+    fields,
+    pending,
+    onApply,
+}: {
+    count: number;
+    /** singular, e.g. "lead" */
+    noun: string;
+    fields: BulkField[];
+    pending: boolean;
+    onApply: (changes: Record<string, unknown>) => void;
+}) {
+    const [open, setOpen] = useState(false);
+
+    if (fields.length === 0) return null;
+
+    return (
+        <>
+            <button type="button" onClick={() => setOpen(true)} className="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill">
+                <IconPencil size={14} /> Edit field
+            </button>
+
+            {/* SidePanel mounts its content fresh each time it opens, so the form always starts at step 1 */}
+            <SidePanel open={open} onClose={() => setOpen(false)}>
+                <BulkEditForm
+                    nouns={`${count} ${count === 1 ? noun : `${noun}s`}`}
+                    noun={noun}
+                    fields={fields}
+                    pending={pending}
+                    onCancel={() => setOpen(false)}
+                    onApply={(changes) => {
+                        onApply(changes);
+                        setOpen(false);
+                    }}
+                />
+            </SidePanel>
+        </>
+    );
+}
+
+// Two steps, and no dropdowns (a panel's own scroll would hide their menus): pick a field
+// from a list, then pick its value from a list, or type it.
+function BulkEditForm({
+    nouns,
+    noun,
+    fields,
+    pending,
+    onCancel,
+    onApply,
+}: {
+    nouns: string;
+    noun: string;
+    fields: BulkField[];
+    pending: boolean;
+    onCancel: () => void;
+    onApply: (changes: Record<string, unknown>) => void;
+}) {
+    const [key, setKey] = useState<string | null>(null);
+    // "" is a real choice ("Empty") for a field that can be cleared
+    const [value, setValue] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
+
+    const field = fields.find((item) => item.key === key);
+    const ready = field !== undefined && value !== null && (value !== "" || field.clearable);
+    const shownFields = fields.filter((item) => item.label.toLowerCase().includes(search.trim().toLowerCase()));
+
+    function pick(next: BulkField) {
+        setKey(next.key);
+        // typed values start empty; list values start with nothing picked
+        setValue(next.type === "select" ? null : "");
+    }
+
+    return (
+        <form
+            className="flex h-full flex-col"
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (field && ready) onApply(field.toChanges(value));
+            }}
+        >
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line-light px-4">
+                <IconPencil size={16} className="text-faint" />
+                <h2 className="font-semibold">Edit {nouns}</h2>
+                <button
+                    type="button"
+                    aria-label="Close"
+                    onClick={onCancel}
+                    className="ml-auto flex size-7 items-center justify-center rounded-lg text-faint hover:bg-fill hover:text-ink"
+                >
+                    <IconX size={16} />
+                </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                {!field ? (
+                    <>
+                        <p className="text-muted">Pick a field. Every selected {noun} gets the value you give it; their other fields stay as they are.</p>
+
+                        {fields.length > 7 && (
+                            <label className="mt-4 flex h-8 items-center gap-2 rounded-lg border border-line px-2 focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft">
+                                <IconSearch size={14} className="shrink-0 text-faint" />
+                                <input
+                                    autoFocus
+                                    value={search}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    placeholder="Search fields"
+                                    className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-light"
+                                />
+                            </label>
+                        )}
+
+                        <ul className="mt-3 flex flex-col gap-0.5">
+                            {shownFields.map((item) => {
+                                const Icon = item.icon ?? TYPE_ICONS[item.type];
+                                return (
+                                    <li key={item.key}>
+                                        <button
+                                            type="button"
+                                            onClick={() => pick(item)}
+                                            className="group flex h-9 w-full items-center gap-2.5 rounded-lg px-2 text-left hover:bg-fill"
+                                        >
+                                            <Icon size={16} className="shrink-0 text-faint" />
+                                            <span className="flex-1 text-ink">{item.label}</span>
+                                            <IconChevronRight size={14} className="text-light group-hover:text-muted" />
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                            {shownFields.length === 0 && <li className="px-2 py-3 text-faint">No field called &ldquo;{search}&rdquo;</li>}
+                        </ul>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setKey(null)}
+                            className="-ml-1 flex h-7 items-center gap-1 rounded-lg px-1 text-sm font-medium text-muted hover:bg-fill hover:text-ink"
+                        >
+                            <IconArrowLeft size={14} /> All fields
+                        </button>
+
+                        <h3 className="mt-3 text-[15px] font-semibold text-ink">{field.label}</h3>
+                        <p className="mt-0.5 text-sm text-faint">The new value for all {nouns}</p>
+
+                        {field.type === "select" ? (
+                            <ul role="radiogroup" aria-label={field.label} className="mt-3 flex flex-col gap-0.5">
+                                {[...(field.clearable ? [{ value: "", label: "Empty" }] : []), ...(field.options ?? [])].map((option) => {
+                                    const picked = value === option.value;
+                                    return (
+                                        <li key={option.value}>
+                                            <button
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={picked}
+                                                onClick={() => setValue(option.value)}
+                                                className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2 text-left ${
+                                                    picked ? "bg-accent-faint text-ink ring-1 ring-accent/30 ring-inset" : "hover:bg-fill"
+                                                }`}
+                                            >
+                                                <span className="min-w-0 flex-1 truncate">
+                                                    {option.value === "" ? <span className="text-faint">Empty (clear it)</span> : (option.render ?? option.label)}
+                                                </span>
+                                                {picked && <IconCheck size={15} className="shrink-0 text-accent" />}
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <input
+                                autoFocus
+                                type={field.type}
+                                value={value ?? ""}
+                                onChange={(event) => setValue(event.target.value)}
+                                placeholder={field.clearable ? "Leave empty to clear it" : `New ${field.label.toLowerCase()}`}
+                                className="mt-3 h-9 w-full rounded-lg border border-line px-2.5 outline-none placeholder:text-light focus:border-accent focus:ring-3 focus:ring-accent-soft"
+                            />
+                        )}
+                    </>
+                )}
+            </div>
+
+            <footer className="flex shrink-0 justify-end gap-2 border-t border-line-light px-4 py-3">
+                <button type="button" onClick={onCancel} className="h-8 rounded-lg border border-fill bg-black/2 px-3 font-medium text-muted hover:bg-app">
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    disabled={!ready || pending}
+                    className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
+                >
+                    {pending && <Spinner size={14} />}
+                    Apply to {nouns}
+                </button>
+            </footer>
+        </form>
     );
 }
 

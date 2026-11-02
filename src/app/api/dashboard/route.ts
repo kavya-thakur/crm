@@ -82,7 +82,13 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
     const today = startOfToday();
     const isOpen = { isWon: false, isLost: false };
 
-    const [won, previousWon, lost, previousLost, openStages, openDeals] = await Promise.all([
+    const open = { ...where, pipelineStage: isOpen };
+    // open deals expected to close in the next 30 days
+    const closingSoon = { ...open, expectedCloseDate: { gte: today, lt: new Date(today.getTime() + 30 * DAY) } };
+
+    // Totals are added up by Postgres; only the won deals' dates and amounts come back as
+    // rows, for the trend lines and the average time to close
+    const [won, previousWon, lost, previousLost, openStages, byStage, byProbability, closing, closingItems, pastDue] = await Promise.all([
         prisma.deal.findMany({
             where: { ...where, pipelineStage: { isWon: true }, closedAt: { gte: start, lt: end } },
             select: { amount: true, closedAt: true, createdAt: true },
@@ -98,12 +104,18 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
             orderBy: [{ order: "asc" }, { id: "asc" }],
             select: { id: true, name: true, color: true },
         }),
-        // ponytail: every open deal is loaded to weight it by its probability; switch to a
-        // SUM(amount * probability) query if an org ever has tens of thousands open
+        prisma.deal.groupBy({ by: ["pipelineStageId"], where: open, _count: { _all: true }, _sum: { amount: true } }),
+        // probability is a whole 0-100, so grouping by it is at most 101 rows: enough to
+        // weight every open deal without loading any of them
+        prisma.deal.groupBy({ by: ["probability"], where: open, _sum: { amount: true } }),
+        prisma.deal.aggregate({ where: closingSoon, _count: { _all: true }, _sum: { amount: true } }),
         prisma.deal.findMany({
-            where: { ...where, pipelineStage: isOpen },
+            where: closingSoon,
+            orderBy: [{ expectedCloseDate: "asc" }, { id: "asc" }],
+            take: 5,
             select: { id: true, title: true, amount: true, probability: true, expectedCloseDate: true, pipelineStageId: true },
         }),
+        prisma.deal.count({ where: { ...open, expectedCloseDate: { lt: today } } }),
     ]);
 
     const wonValue = won.reduce((sum, deal) => sum + Number(deal.amount), 0);
@@ -114,15 +126,9 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
 
     // every open stage in board order, including the empty ones
     const stages = openStages.map((stage) => {
-        const inStage = openDeals.filter((deal) => deal.pipelineStageId === stage.id);
-        return { ...stage, count: inStage.length, value: inStage.reduce((sum, deal) => sum + Number(deal.amount), 0) };
+        const row = byStage.find((group) => group.pipelineStageId === stage.id);
+        return { ...stage, count: row?._count._all ?? 0, value: Number(row?._sum.amount ?? 0) };
     });
-
-    // open deals expected to close in the next 30 days, soonest first
-    const in30Days = new Date(today.getTime() + 30 * DAY);
-    const closingSoon = openDeals
-        .filter((deal) => deal.expectedCloseDate && deal.expectedCloseDate >= today && deal.expectedCloseDate < in30Days)
-        .sort((a, b) => a.expectedCloseDate!.getTime() - b.expectedCloseDate!.getTime());
 
     return {
         won: {
@@ -138,16 +144,16 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
         lost: { count: lost, previousCount: previousLost },
         open: {
             value: stages.reduce((sum, stage) => sum + stage.value, 0),
-            count: openDeals.length,
+            count: stages.reduce((sum, stage) => sum + stage.count, 0),
             // what the open deals are worth if each closes as likely as its probability says
-            weighted: openDeals.reduce((sum, deal) => sum + (Number(deal.amount) * deal.probability) / 100, 0),
+            weighted: byProbability.reduce((sum, group) => sum + (Number(group._sum.amount ?? 0) * group.probability) / 100, 0),
             stages,
         },
         closing: {
-            total: closingSoon.length,
-            value: closingSoon.reduce((sum, deal) => sum + Number(deal.amount), 0),
-            pastDue: openDeals.filter((deal) => deal.expectedCloseDate && deal.expectedCloseDate < today).length,
-            items: closingSoon.slice(0, 5).map((deal) => ({
+            total: closing._count._all,
+            value: Number(closing._sum.amount ?? 0),
+            pastDue,
+            items: closingItems.map((deal) => ({
                 id: deal.id,
                 title: deal.title,
                 amount: Number(deal.amount),
@@ -160,14 +166,17 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
 }
 
 async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { start, end, previousStart, buckets }: Period) {
-    const [leads, previousCreated, previousConverted, stages, sources] = await Promise.all([
-        // the period's leads, counted three ways below (per day, per stage, per source)
-        prisma.lead.findMany({
-            where: { ...where, createdAt: { gte: start, lt: end } },
-            select: { createdAt: true, stageId: true, sourceId: true },
-        }),
-        prisma.lead.count({ where: { ...where, createdAt: { gte: previousStart, lt: start } } }),
-        prisma.lead.count({ where: { ...where, createdAt: { gte: previousStart, lt: start }, stage: { isConverted: true } } }),
+    const thisPeriod = { ...where, createdAt: { gte: start, lt: end } };
+    const lastPeriod = { ...where, createdAt: { gte: previousStart, lt: start } };
+
+    // counted by Postgres; only each lead's creation time comes back, for the chart
+    const [createdAt, byStage, bySource, converted, previousCreated, previousConverted, stages, sources] = await Promise.all([
+        prisma.lead.findMany({ where: thisPeriod, select: { createdAt: true } }),
+        prisma.lead.groupBy({ by: ["stageId"], where: thisPeriod, _count: { _all: true } }),
+        prisma.lead.groupBy({ by: ["sourceId"], where: thisPeriod, _count: { _all: true } }),
+        prisma.lead.count({ where: { ...thisPeriod, stage: { isConverted: true } } }),
+        prisma.lead.count({ where: lastPeriod }),
+        prisma.lead.count({ where: { ...lastPeriod, stage: { isConverted: true } } }),
         prisma.leadStage.findMany({
             where: { organizationId: user.organizationId },
             orderBy: [{ order: "asc" }, { id: "asc" }],
@@ -179,23 +188,22 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
         }),
     ]);
 
-    const convertedStages = new Set(stages.filter((stage) => stage.isConverted).map((stage) => stage.id));
-    const perDay = perBucket(buckets, leads, (lead) => lead.createdAt, () => 1);
+    const perDay = perBucket(buckets, createdAt, (lead) => lead.createdAt, () => 1);
 
     // leads without a source get their own row; sources nobody used this period are left out
     const sourceRows = [...sources, { id: null, name: "No source", color: null }]
-        .map((source) => ({ ...source, count: leads.filter((lead) => lead.sourceId === source.id).length }))
+        .map((source) => ({ ...source, count: bySource.find((group) => group.sourceId === source.id)?._count._all ?? 0 }))
         .filter((source) => source.count > 0)
         .sort((a, b) => b.count - a.count);
 
     return {
-        created: leads.length,
+        created: createdAt.length,
         previousCreated,
-        converted: leads.filter((lead) => convertedStages.has(lead.stageId)).length,
+        converted,
         previousConverted,
         trend: buckets.map((bucket, index) => ({ start: bucket.toISOString(), value: perDay[index] })),
         // where this period's leads are now, stage by stage in board order
-        stages: stages.map((stage) => ({ ...stage, count: leads.filter((lead) => lead.stageId === stage.id).length })),
+        stages: stages.map((stage) => ({ ...stage, count: byStage.find((group) => group.stageId === stage.id)?._count._all ?? 0 })),
         sources: sourceRows,
     };
 }
@@ -236,8 +244,8 @@ async function teamPerformance(user: CurrentUser, { start, end }: Period) {
         seesLeads
             ? prisma.lead.groupBy({ by: ["assignedToId"], where: { ...org, createdAt: inPeriod, stage: { isConverted: true } }, _count: { _all: true } })
             : none,
-        // tasks that were due this period and got done, and calls/meetings held this period
-        prisma.task.groupBy({ by: ["assignedToId"], where: { ...org, status: "COMPLETED", dueDate: inPeriod }, _count: { _all: true } }),
+        // tasks finished this period, and calls/meetings held this period
+        prisma.task.groupBy({ by: ["assignedToId"], where: { ...org, status: "COMPLETED", completedAt: inPeriod }, _count: { _all: true } }),
         prisma.scheduledActivity.groupBy({ by: ["assignedToId"], where: { ...org, status: "COMPLETED", scheduledAt: inPeriod }, _count: { _all: true } }),
     ]);
 

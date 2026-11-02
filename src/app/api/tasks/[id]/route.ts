@@ -102,6 +102,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
         // the scope in the where too, so the write itself is checked; if the task
         // is deleted in between, Prisma throws P2025 -> 404
+        const finished = fields.status === "COMPLETED" && existingTask.status !== "COMPLETED";
+        const reopened = fields.status !== undefined && fields.status !== "COMPLETED" && existingTask.status === "COMPLETED";
+
         const updatedTask = await prisma.$transaction(async (tx) => {
             const updated = await tx.task.update({
                 where: {
@@ -112,12 +115,15 @@ export async function PUT(req: NextRequest, { params }: Params) {
                     ...fields,
                     ...(assignedToId !== undefined && { assignedToId }),
                     ...(dueDate !== undefined && { dueDate: dueDateToDb(dueDate) }),
+                    // when it was ticked off, for the dashboard; reopening clears it
+                    ...(finished && { completedAt: new Date() }),
+                    ...(reopened && { completedAt: null }),
                 },
                 include: taskInclude,
             });
 
             // Only the moment it gets ticked off goes on the timeline, not every later save
-            if (fields.status === "COMPLETED" && existingTask.status !== "COMPLETED") {
+            if (finished) {
                 await addTaskToTimeline(tx, updated, user.id, "completed");
             }
 

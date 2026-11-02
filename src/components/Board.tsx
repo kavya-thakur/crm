@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { IconPencil, IconPlus } from "@tabler/icons-react";
 
+import { api, toQueryParams } from "@/lib/api/client";
 import { renderEditor, type DataColumn } from "./DataTable";
 import { ErrorState } from "./ErrorState";
-import { Skeleton } from "./Loader";
+import { Skeleton, Spinner } from "./Loader";
 
 /**
  * The pieces every kanban board is built from (leads, deals, tasks, activities, notes):
@@ -18,8 +20,49 @@ import { Skeleton } from "./Loader";
 const CARD_ID = "application/x-board-card";
 const FROM_COLUMN = "application/x-board-column";
 
+const PAGE_SIZE = 25;
+
+interface ColumnPage<T> {
+    data: T[];
+    pagination: { page: number; total: number; totalPages: number };
+    /** deals only: the whole column's value, sent with the first page */
+    totalAmount?: number;
+}
+
+// One column's cards, a page at a time: 25 to start, 25 more each time you near the end.
+// However big the column, the browser only ever holds what's been scrolled to.
+export function useBoardColumn<T>(queryKey: unknown[], endpoint: string, params: Record<string, unknown>) {
+    const query = useInfiniteQuery({
+        queryKey,
+        queryFn: ({ pageParam, signal }) =>
+            api.get<ColumnPage<T>>(endpoint, { params: { ...toQueryParams(params), page: pageParam, limit: PAGE_SIZE }, signal }).then((res) => res.data),
+        initialPageParam: 1,
+        getNextPageParam: ({ pagination }) => (pagination.page < pagination.totalPages ? pagination.page + 1 : undefined),
+        placeholderData: keepPreviousData,
+    });
+
+    const items = query.data?.pages.flatMap((page) => page.data) ?? [];
+    const first = query.data?.pages[0];
+
+    return {
+        items,
+        total: first?.pagination.total,
+        totalAmount: first?.totalAmount,
+        loading: query.isPending,
+        error: query.error,
+        retry: () => query.refetch(),
+        more: {
+            left: (first?.pagination.total ?? 0) - items.length,
+            loading: query.isFetchingNextPage,
+            load: () => {
+                if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
+            },
+        },
+    };
+}
+
 export function Board({ children }: { children: ReactNode }) {
-    return <div className="flex min-h-full w-max items-start gap-3 bg-paper p-3">{children}</div>;
+    return <div className="flex min-h-full w-max items-start gap-3 bg-surface p-3">{children}</div>;
 }
 
 export function BoardColumn({
@@ -33,7 +76,7 @@ export function BoardColumn({
     error,
     onRetry,
     emptyText,
-    shown,
+    more,
     children,
 }: {
     /** compared with the card's column, so dropping a card where it already is does nothing */
@@ -49,11 +92,23 @@ export function BoardColumn({
     error?: unknown;
     onRetry?: () => void;
     emptyText: string;
-    /** how many cards are on screen, to say "showing 100 of 240" when there are more */
-    shown?: number;
+    /** the next page of cards, when there is one (see useBoardColumn) */
+    more?: { left: number; loading: boolean; load: () => void };
     children: ReactNode;
 }) {
     const [over, setOver] = useState(false);
+    const moreRef = useRef<HTMLButtonElement>(null);
+    const canLoad = Boolean(more && more.left > 0 && !more.loading);
+
+    // The next page loads by itself as the end of the column scrolls into view (a little
+    // before, so it's usually there by the time you reach it); the button is the fallback
+    useEffect(() => {
+        const button = moreRef.current;
+        if (!button || !canLoad) return;
+        const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && more?.load(), { rootMargin: "300px" });
+        observer.observe(button);
+        return () => observer.disconnect();
+    }, [canLoad, more]);
 
     function handleDragOver(event: DragEvent) {
         // only board cards can land here, not files or text
@@ -76,39 +131,57 @@ export function BoardColumn({
                 if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(false);
             }}
             onDrop={handleDrop}
-            className={`flex w-72 shrink-0 flex-col rounded-xl transition-colors ${over ? "bg-accent-faint ring-1 ring-accent/25" : ""}`}
+            // a soft grey lane, so the white cards stand out on it; it tints while a card is dragged over
+            className={`group/column flex w-72 shrink-0 flex-col rounded-xl transition-colors ${
+                over ? "bg-accent-faint ring-1 ring-accent/30 ring-inset" : "bg-lane"
+            }`}
         >
-            <header className="sticky top-0 z-10 flex h-10 items-center gap-2 rounded-t-xl bg-paper/95 px-2 backdrop-blur-sm">
-                <div className="flex min-w-0 items-center gap-2 font-medium">{title}</div>
-                {count !== undefined && <span className="text-faint tabular-nums">{count}</span>}
-                {aside}
-                {onAdd && (
-                    <button
-                        type="button"
-                        aria-label="Add here"
-                        onClick={onAdd}
-                        className="ml-auto flex size-6 items-center justify-center rounded-md text-faint hover:bg-fill hover:text-ink"
-                    >
-                        <IconPlus size={15} />
-                    </button>
+            {/* stays put while the board scrolls; bg-inherit keeps it the lane's colour underneath */}
+            <header className="sticky top-0 z-10 flex h-11 items-center gap-2 rounded-t-xl bg-inherit px-2.5">
+                <div className="flex min-w-0 items-center">{title}</div>
+                {count !== undefined && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-black/5 px-1.5 text-xs font-medium text-muted tabular-nums">
+                        {count}
+                    </span>
                 )}
+                <div className="ml-auto flex items-center gap-1">
+                    {aside}
+                    {/* only shown when you're over the column, so the headers stay quiet */}
+                    {onAdd && (
+                        <button
+                            type="button"
+                            aria-label="Add here"
+                            onClick={onAdd}
+                            className="flex size-6 items-center justify-center rounded-md text-faint opacity-0 transition-opacity group-hover/column:opacity-100 hover:bg-black/5 hover:text-ink focus-visible:opacity-100"
+                        >
+                            <IconPlus size={15} />
+                        </button>
+                    )}
+                </div>
             </header>
 
-            <div className="flex flex-col gap-2 px-1 pb-3">
+            <div className="flex flex-col gap-2 px-2 pb-2">
                 {loading && [0, 1, 2].map((index) => <Skeleton key={index} className="h-28 rounded-lg" delay={index * 0.08} />)}
                 {!loading && error !== undefined && error !== null && (
                     <ErrorState variant="inline" title="Couldn't load this column" error={error} onRetry={onRetry} />
                 )}
                 {children}
                 {!loading && !error && count === 0 && (
-                    <p className="rounded-lg border border-dashed border-line-strong py-6 text-center text-sm text-light">
+                    <p className="rounded-lg border border-dashed border-black/10 py-6 text-center text-sm text-faint">
                         {onDropCard ? `${emptyText} · drop a card here` : emptyText}
                     </p>
                 )}
-                {count !== undefined && shown !== undefined && count > shown && (
-                    <p className="py-1 text-center text-sm text-faint">
-                        Showing {shown} of {count}
-                    </p>
+                {more && more.left > 0 && (
+                    <button
+                        ref={moreRef}
+                        type="button"
+                        onClick={more.load}
+                        disabled={more.loading}
+                        className="flex h-8 items-center justify-center gap-1.5 rounded-lg text-sm text-muted hover:bg-black/5 hover:text-ink disabled:opacity-70"
+                    >
+                        {more.loading ? <Spinner size={14} /> : null}
+                        {more.loading ? "Loading…" : `Load ${more.left} more`}
+                    </button>
                 )}
             </div>
         </section>
@@ -212,11 +285,14 @@ export function CardControl({ children, className = "" }: { children: ReactNode;
     );
 }
 
-// A column title: a coloured dot and a name
+// A column title: the name in a pill tinted with its own colour, the same look as a stage
+// badge in the table, so a stage reads the same everywhere
 export function ColumnTitle({ color, children }: { color: string; children: ReactNode }) {
     return (
-        <span className="flex min-w-0 items-center gap-2">
-            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span
+            className="inline-flex h-6 max-w-44 items-center rounded-md px-2 text-[13px] font-medium"
+            style={{ backgroundColor: `${color}1a`, color }}
+        >
             <span className="truncate">{children}</span>
         </span>
     );

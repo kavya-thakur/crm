@@ -28,7 +28,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { Dropdown, MenuItem, SearchableItems } from "@/components/Dropdown";
 import { Select } from "@/components/Select";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Avatar } from "@/components/Avatar";
@@ -219,15 +219,17 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                                                 >
                                                     <IconUserOff size={16} /> Unassigned
                                                 </MenuItem>
-                                                {agents.map((agent) => (
-                                                    <MenuItem
-                                                        key={agent.id}
-                                                        selected={agent.id === contact.assignedTo?.id}
-                                                        onClick={() => { if (agent.id !== contact.assignedTo?.id) assign.mutate(agent.id); close(); }}
-                                                    >
-                                                        <Avatar name={agent.name} /> {agent.name}
-                                                    </MenuItem>
-                                                ))}
+                                                <SearchableItems items={agents} label={(agent) => agent.name}>
+                                                    {(agent) => (
+                                                        <MenuItem
+                                                            key={agent.id}
+                                                            selected={agent.id === contact.assignedTo?.id}
+                                                            onClick={() => { if (agent.id !== contact.assignedTo?.id) assign.mutate(agent.id); close(); }}
+                                                        >
+                                                            <Avatar name={agent.name} /> {agent.name}
+                                                        </MenuItem>
+                                                    )}
+                                                </SearchableItems>
                                             </>
                                         )}
                                     </Dropdown>

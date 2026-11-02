@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/customFields";
+import { bulkLeadChangesSchema } from "@/lib/validations/leads";
 
 const leadIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -19,6 +21,13 @@ const bulkLeadSchema = z.discriminatedUnion("action", [
         action: z.literal("stage"),
         leadIds: leadIdsSchema,
         stageId: dbIdSchema,
+    }),
+
+    // the same value for one field (or custom field) on every selected lead
+    z.object({
+        action: z.literal("update"),
+        leadIds: leadIdsSchema,
+        changes: bulkLeadChangesSchema,
     }),
 
     z.object({
@@ -125,6 +134,7 @@ export async function PATCH(req: NextRequest) {
                         },
                         data: {
                             assignedToId,
+                            updatedById: user.id,
                         },
                     });
 
@@ -194,6 +204,7 @@ export async function PATCH(req: NextRequest) {
                         },
                         data: {
                             stageId: stage.id,
+                            updatedById: user.id,
                         },
                     });
 
@@ -212,6 +223,61 @@ export async function PATCH(req: NextRequest) {
                 ok: true,
                 message: `${changed.length} leads updated successfully`,
                 affected: changed.length,
+            });
+        }
+
+        /*
+         * UPDATE: the same value for one field (or custom field) on every selected lead
+         */
+        if (data.action === "update") {
+            const { customFields: submittedCustomFields, ...fields } = data.changes;
+
+            // a source has to be one of this organization's
+            if (fields.sourceId) {
+                const source = await prisma.leadSource.findFirst({
+                    where: { id: fields.sourceId, organizationId: user.organizationId },
+                    select: { id: true },
+                });
+
+                if (!source) {
+                    return NextResponse.json({ ok: false, message: "Invalid lead source" }, { status: 400 });
+                }
+            }
+
+            let customFields: Record<string, unknown> | undefined;
+
+            if (submittedCustomFields) {
+                const result = await validateCustomFieldEdit(user.organizationId, "lead", submittedCustomFields);
+
+                if (!result.ok) {
+                    return NextResponse.json(
+                        { ok: false, message: "Invalid custom field values", errors: result.errors },
+                        { status: 400 }
+                    );
+                }
+
+                customFields = result.data;
+            }
+
+            // one statement for the plain fields and one for the custom fields, however many
+            // leads are selected; together, so either all of them change or none do
+            await prisma.$transaction(async (tx) => {
+                if (Object.keys(fields).length > 0) {
+                    await tx.lead.updateMany({
+                        where: { id: { in: leadIds }, organizationId: user.organizationId },
+                        data: { ...fields, updatedById: user.id },
+                    });
+                }
+
+                if (customFields) {
+                    await tx.$executeRaw(mergeCustomFieldsSql("Lead", leadIds, user, customFields));
+                }
+            });
+
+            return NextResponse.json({
+                ok: true,
+                message: `${leadIds.length} leads updated successfully`,
+                affected: leadIds.length,
             });
         }
 

@@ -23,6 +23,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     const canSeeLeadStages = hasPermission(user, "lead-stages:manage");
     const canSeeLeadSources = hasPermission(user, "lead-sources:manage");
     const canSeeCustomFields = hasPermission(user, "custom-fields:manage");
+    const canSeeLeadForms = hasPermission(user, "lead-forms:manage");
     const canSeeNotes = hasPermission(user, "lead:read") || hasPermission(user, "deal:read") || hasPermission(user, "contact:read");
 
     // What this person can open: the workspace pages, and the settings pages grouped the
@@ -46,6 +47,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
             ? [{ href: "/settings/stages", label: "Stages & sources", section: "stages" as const }]
             : []),
         ...(canSeeCustomFields ? [{ href: "/settings/custom-fields", label: "Custom fields", section: "customFields" as const }] : []),
+        ...(canSeeLeadForms ? [{ href: "/settings/lead-forms", label: "Web forms", section: "leadForms" as const }] : []),
     ];
     const settings: NavGroup[] = [
         // everyone has their own profile, so Settings always has somewhere to land

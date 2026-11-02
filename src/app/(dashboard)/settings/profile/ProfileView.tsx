@@ -9,7 +9,7 @@ import type { z } from "zod";
 import { api, errorMessage } from "@/lib/api/client";
 import { changePasswordSchema, updateProfileSchema } from "@/lib/validations/auth";
 import { Avatar } from "@/components/Avatar";
-import { SectionIcon, headerWash } from "@/components/SectionIcon";
+import { SectionIcon } from "@/components/SectionIcon";
 import { Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 
@@ -31,7 +31,7 @@ export default function ProfileView({ profile }: { profile: Profile }) {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("profile")}>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
                 <SectionIcon section="profile" size="md" />
                 <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Profile</h1>
             </header>

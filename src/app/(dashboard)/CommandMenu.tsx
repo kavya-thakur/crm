@@ -300,6 +300,7 @@ export default function CommandMenu({ pages, kinds }: { pages: MenuPage[]; kinds
 function Palette({ pages, kinds, onClose }: { pages: MenuPage[]; kinds: SearchKind[]; onClose: () => void }) {
     const router = useRouter();
     const panelRef = useRef<HTMLDivElement>(null);
+    const overlayRef = useRef<HTMLDivElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const [text, setText] = useState("");
     const [term, setTerm] = useState("");
@@ -323,14 +324,37 @@ function Palette({ pages, kinds, onClose }: { pages: MenuPage[]; kinds: SearchKi
         staleTime: 30_000,
     });
 
-    // The panel drops in from slightly above
+    const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // The dimmed backdrop fades in while the panel drops in from slightly above
     useLayoutEffect(() => {
-        const media = gsap.matchMedia();
-        media.add("(prefers-reduced-motion: no-preference)", () => {
-            gsap.fromTo(panelRef.current, { opacity: 0, y: -8, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.16, ease: "power2.out" });
-        });
-        return () => media.revert();
+        if (still()) return;
+        gsap.fromTo(overlayRef.current, { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "power1.out" });
+        // grows downward from its top edge while fading in (transform and opacity only,
+        // so the graphics card animates it)
+        gsap.fromTo(
+            panelRef.current,
+            { opacity: 0, scaleY: 0.9, scaleX: 0.98, y: -8 },
+            { opacity: 1, scaleY: 1, scaleX: 1, y: 0, duration: 0.34, ease: "expo.out", transformOrigin: "50% 0%" }
+        );
     }, []);
+
+    // ...and both fade back out before it unmounts
+    function dismiss() {
+        if (still()) return onClose();
+        gsap.to(overlayRef.current, { opacity: 0, duration: 0.2, ease: "power2.in", overwrite: true });
+        // ...and shrinks back up into its top edge
+        gsap.to(panelRef.current, {
+            opacity: 0,
+            scaleY: 0.9,
+            scaleX: 0.98,
+            y: -8,
+            duration: 0.2,
+            ease: "power2.in",
+            overwrite: true,
+            onComplete: onClose,
+        });
+    }
 
     const typed = text.trim().toLowerCase();
     // pages only show when no kind is picked; a kind narrows everything to that kind
@@ -382,12 +406,12 @@ function Palette({ pages, kinds, onClose }: { pages: MenuPage[]; kinds: SearchKi
             choose(current);
         } else if (event.key === "Escape") {
             event.preventDefault();
-            onClose();
+            dismiss();
         }
     }
 
     return (
-        <div className="fixed inset-0 z-60 flex justify-center bg-black/25 px-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
+        <div ref={overlayRef} className="fixed inset-0 z-60 flex justify-center bg-black/25 px-4 pt-[10vh]" onMouseDown={dismiss}>
             <div
                 ref={panelRef}
                 role="dialog"

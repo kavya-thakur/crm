@@ -9,7 +9,6 @@ import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ListHeader, ViewSwitcher } from "@/components/ListPage";
 import { toast } from "@/components/Toast";
-import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { toggledStatus } from "../shared/activities";
 import ActivitiesTable from "./ActivitiesTable";
@@ -32,7 +31,6 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
     const router = useRouter();
     const queryClient = useQueryClient();
     const searchParams = useSearchParams();
-    const enterRef = usePanelEnter<HTMLDivElement>();
 
     const [view, setView] = useState<"table" | "board">("table");
     const [scope, setScope] = useState<ActivityScope>("upcoming");
@@ -112,7 +110,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
     }
 
     return (
-        <div ref={enterRef} className="flex h-full flex-col">
+        <div className="flex h-full flex-col">
             <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">

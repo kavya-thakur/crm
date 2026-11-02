@@ -33,7 +33,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { Dropdown, MenuItem, SearchableItems } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, SkeletonList, Spinner } from "@/components/Loader";
 import { Select } from "@/components/Select";
@@ -360,15 +360,17 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                                 >
                                                     <IconUserOff size={16} /> Unassigned
                                                 </MenuItem>
-                                                {agents.map((agent) => (
-                                                    <MenuItem
-                                                        key={agent.id}
-                                                        selected={agent.id === deal.assignedTo?.id}
-                                                        onClick={() => { if (agent.id !== deal.assignedTo?.id) assign.mutate(agent.id); close(); }}
-                                                    >
-                                                        <Avatar name={agent.name} /> {agent.name}
-                                                    </MenuItem>
-                                                ))}
+                                                <SearchableItems items={agents} label={(agent) => agent.name}>
+                                                    {(agent) => (
+                                                        <MenuItem
+                                                            key={agent.id}
+                                                            selected={agent.id === deal.assignedTo?.id}
+                                                            onClick={() => { if (agent.id !== deal.assignedTo?.id) assign.mutate(agent.id); close(); }}
+                                                        >
+                                                            <Avatar name={agent.name} /> {agent.name}
+                                                        </MenuItem>
+                                                    )}
+                                                </SearchableItems>
                                             </>
                                         )}
                                     </Dropdown>

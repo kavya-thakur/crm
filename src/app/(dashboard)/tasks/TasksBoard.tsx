@@ -1,17 +1,15 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconCircle, IconCircleCheckFilled } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { Board, BoardCard, BoardColumn, CardControl, CardFields, ColumnTitle } from "@/components/Board";
+import { Board, BoardCard, BoardColumn, CardControl, CardFields, ColumnTitle, useBoardColumn } from "@/components/Board";
 import type { DataColumn } from "@/components/DataTable";
 import { toast } from "@/components/Toast";
 import type { AgentOption } from "../shared/customFields";
 import { taskColumns } from "./TasksTable";
-import { TASK_STATUSES, refreshTasks, type Paginated, type Task, type TaskPriority, type TaskStatus } from "./shared";
-
-const COLUMN_LIMIT = 50;
+import { TASK_STATUSES, refreshTasks, type Task, type TaskPriority, type TaskStatus } from "./shared";
 
 // the table's columns that also show on a card; Status is the column the card sits in
 const CARD_FIELDS = ["dueDate", "priority", "assignedTo", "about"];
@@ -82,26 +80,18 @@ function StatusColumn({
     onOpen: (id: number) => void;
     onAdd?: () => void;
 }) {
-    const tasksQuery = useQuery({
-        queryKey: ["tasks", "board", status.value, filters],
-        queryFn: () =>
-            api
-                .get<Paginated<Task>>("/tasks", { params: { scope: "all", status: status.value, ...filters, limit: COLUMN_LIMIT } })
-                .then((res) => res.data),
-        placeholderData: keepPreviousData,
-    });
-
-    const tasks = tasksQuery.data?.data ?? [];
+    const column = useBoardColumn<Task>(["tasks", "board", status.value, filters], "/tasks", { scope: "all", status: status.value, ...filters });
+    const tasks = column.items;
 
     return (
         <BoardColumn
             id={status.value}
             title={<ColumnTitle color={status.color}>{status.label}</ColumnTitle>}
-            count={tasksQuery.data?.pagination.total}
-            shown={tasks.length}
-            loading={tasksQuery.isPending}
-            error={tasksQuery.error}
-            onRetry={() => tasksQuery.refetch()}
+            count={column.total}
+            more={column.more}
+            loading={column.loading}
+            error={column.error}
+            onRetry={column.retry}
             emptyText={status.value === "COMPLETED" ? "Nothing done yet" : "No tasks"}
             onDropCard={(id) => onChange(id, { status: status.value })}
             onAdd={onAdd}

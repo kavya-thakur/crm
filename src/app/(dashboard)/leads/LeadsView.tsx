@@ -3,17 +3,14 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-    IconArrowDown,
-    IconArrowUp,
-    IconProgress,
-} from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconBuilding, IconProgress, IconTag } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { toast } from "@/components/Toast";
 import {
     AssignMenu,
+    BulkEditButton,
     BulkBar,
     ConfirmDeleteModal,
     FilterBar,
@@ -29,6 +26,9 @@ import {
     OptionsMenuButton,
     createAssignedToField,
     createCreatedRangeField,
+    createModifiedRangeField,
+    createMultiSelectField,
+    createPersonField,
     renderSelectControl,
     useTableColumns,
     type FilterFieldDef,
@@ -48,8 +48,7 @@ import LeadsBoard from "./LeadsBoard";
 import LeadPanel from "./LeadPanel";
 import NewLeadDialog from "./NewLeadDialog";
 import { useListQuery } from "../shared/useListQuery";
-import { createCustomColumn, createCustomFilterField, useCustomFields } from "../shared/customFields";
-import { usePanelEnter } from "../shared/usePanelEnter";
+import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
 
 const PAGE_SIZE = 50;
 
@@ -60,13 +59,13 @@ const SORT_FIELDS: { field: LeadFilters["sortBy"]; label: string }[] = [
 ];
 
 type BulkAction =
+    | { action: "update"; changes: Record<string, unknown> }
     | { action: "stage"; stageId: number }
     | { action: "assign"; assignedToId: number | null }
     | { action: "delete" };
 
 export default function LeadsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
-    const enterRef = usePanelEnter<HTMLDivElement>();
 
     const [view, setView] = useState<"table" | "board">("table");
     const searchParams = useSearchParams();
@@ -125,6 +124,8 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
             toast.success(
                 body.action === "delete"
                     ? `${leadsLabel} deleted`
+                    : body.action === "update"
+                        ? `${leadsLabel} updated`
                     : body.action === "stage"
                         ? `${leadsLabel} moved`
                         : body.assignedToId === null
@@ -165,20 +166,14 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     // The only field here that's genuinely specific to Leads; assignedTo and
     // the created-date range are the exact same for every entity, so they
     // come from shared factories instead of being hand-written three times.
-    const stageField: FilterFieldDef<LeadFilters> = {
+    // tick as many stages as you like: "New or Screening"
+    const stageField = createMultiSelectField<LeadFilters>({
         key: "stage",
         label: "Stage",
-        isActive: (f) => f.stageId !== undefined,
-        clear: () => ({ stageId: undefined }),
-        renderControl: (f, onChange) =>
-            renderSelectControl(
-                f.stageId,
-                (value) => onChange({ stageId: value ? Number(value) : undefined }),
-                stagesQuery.data?.map((stage) => ({ value: stage.id, label: stage.name })) ?? [],
-                "Any stage",
-            ),
-        renderChip: (f) => `Stage: ${stagesQuery.data?.find((stage) => stage.id === f.stageId)?.name ?? "Selected"}`,
-    };
+        get: (f) => f.stageIds,
+        set: (value) => ({ stageIds: value }),
+        options: stagesQuery.data?.map((stage) => ({ value: stage.id, label: stage.name, render: <StageLabel stage={stage} /> })) ?? [],
+    });
 
     const sourceField: FilterFieldDef<LeadFilters> = {
         key: "source",
@@ -203,7 +198,22 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
             set: (value) => ({ assignedTo: value }),
             agents: can.seeAgents ? agents.data : undefined,
         }),
+        createPersonField<LeadFilters>({
+            key: "createdBy",
+            label: "Created by",
+            get: (f) => f.createdBy,
+            set: (value) => ({ createdBy: value }),
+            agents: can.seeAgents ? agents.data : undefined,
+        }),
+        createPersonField<LeadFilters>({
+            key: "updatedBy",
+            label: "Modified by",
+            get: (f) => f.updatedBy,
+            set: (value) => ({ updatedBy: value }),
+            agents: can.seeAgents ? agents.data : undefined,
+        }),
         createCreatedRangeField<LeadFilters>(),
+        createModifiedRangeField<LeadFilters>(),
         ...customFields
             .filter((field) => field.showInFilter)
             .map((field) => createCustomFilterField<LeadFilters>(field, { agents: can.seeAgents ? agents.data : undefined })),
@@ -262,7 +272,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     }
 
     return (
-        <div ref={enterRef} className="flex h-full flex-col">
+        <div className="flex h-full flex-col">
             <ListHeader
                 section="leads"
                 title="Leads"
@@ -382,6 +392,32 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     <AssignMenu
                         agents={agents.data}
                         onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                    />
+                )}
+
+                {can.update && (
+                    <BulkEditButton
+                        count={selected.size}
+                        noun="lead"
+                        pending={bulk.isPending}
+                        onApply={(changes) => bulk.mutate({ action: "update", changes })}
+                        fields={[
+                            ...(sourcesQuery.data
+                                ? [
+                                      {
+                                          key: "source",
+                                          label: "Source",
+                                          icon: IconTag,
+                                          type: "select" as const,
+                                          clearable: true,
+                                          options: sourcesQuery.data.map((source) => ({ value: String(source.id), label: source.name })),
+                                          toChanges: (value: string) => ({ sourceId: value ? Number(value) : null }),
+                                      },
+                                  ]
+                                : []),
+                            { key: "company", label: "Company", icon: IconBuilding, type: "text", clearable: true, toChanges: (value) => ({ companyName: value || null }) },
+                            ...customBulkFields(customFields, can.seeAgents ? agents.data : undefined),
+                        ]}
                     />
                 )}
             </BulkBar>

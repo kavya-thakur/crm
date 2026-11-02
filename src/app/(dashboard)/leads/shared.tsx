@@ -40,6 +40,9 @@ export interface Lead {
     updatedAt: string;
     assignedTo: { id: number; name: string; email: string } | null;
     contact: { id: number; name: string } | null;
+    // who made it / changed it last; null for records from before this was tracked
+    createdBy?: { id: number; name: string } | null;
+    updatedBy?: { id: number; name: string } | null;
     customFields: Record<string, unknown> | null;
 }
 
@@ -72,11 +75,16 @@ export interface Permissions {
 // The filters/sort the API understands (GET /api/leads)
 export interface LeadFilters {
     search?: string;
-    stageId?: number;
+    // several stages at once; the board shows just these columns
+    stageIds?: number[];
     sourceId?: number;
     assignedTo?: string; // "me" | "unassigned" | agent id
     createdFrom?: string; // "YYYY-MM-DD"
     createdTo?: string;
+    createdBy?: string; // "me" | agent id
+    updatedBy?: string;
+    updatedFrom?: string; // "YYYY-MM-DD"
+    updatedTo?: string;
     // values for fields marked "show in filter", keyed by CustomFieldDefinition.key
     customFields?: Record<string, unknown>;
     sortBy: "createdAt" | "updatedAt" | "name" | "source";

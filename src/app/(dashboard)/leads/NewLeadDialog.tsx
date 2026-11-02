@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Controller, useForm, type Control } from "react-hook-form";
+import { Controller, useForm, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
     IconAddressBook,
+    IconAlertTriangle,
+    IconExternalLink,
     IconMail,
     IconPhone,
     IconProgress,
@@ -86,6 +88,8 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
     }, [stagesQuery.data, setValue]);
 
     const [contact, setContact] = useState<ContactOption | null>(null);
+    // for the duplicate warning, which checks as these are typed
+    const [email, phone] = useWatch({ control, name: ["email", "phone"] });
 
     return (
         <RecordFormShell
@@ -152,6 +156,8 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
                 <FormFieldRow icon={IconPhone} label="Phone" required>
                     <input type="tel" placeholder="+91 555 0100" aria-invalid={!!errors.phone} {...register("phone")} className={inputClassName} />
                 </FormFieldRow>
+
+                <DuplicateWarning email={String(email ?? "")} phone={String(phone ?? "")} />
             </FormSection>
 
             {canLinkContact && (
@@ -217,6 +223,74 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
                 </p>
             )}
         </RecordFormShell>
+    );
+}
+
+interface SimilarLead {
+    id: number;
+    name: string;
+    companyName: string | null;
+    stage: { name: string; color: string };
+    open: boolean;
+    owner: string | null;
+    matchedOn: "email" | "phone";
+    canOpen: boolean;
+}
+
+// "This person may already be a lead": checked as the email and phone are typed (once
+// typing pauses), so two people don't end up chasing the same customer. Only a warning:
+// the lead can still be created, e.g. when someone comes back for something new.
+function DuplicateWarning({ email, phone }: { email: string; phone: string }) {
+    const [typed, setTyped] = useState({ email: "", phone: "" });
+
+    useEffect(() => {
+        const timer = setTimeout(() => setTyped({ email: email.trim(), phone: phone.trim() }), 400);
+        return () => clearTimeout(timer);
+    }, [email, phone]);
+
+    const similarQuery = useQuery({
+        queryKey: ["lead-duplicates", typed.email, typed.phone],
+        queryFn: () =>
+            api.get<{ data: SimilarLead[] }>("/leads/duplicates", { params: { email: typed.email || undefined, phone: typed.phone || undefined } }).then((res) => res.data.data),
+        // the API ignores half-typed values anyway; this just skips the request
+        enabled: typed.email.includes("@") || typed.phone.replace(/\D/g, "").length >= 7,
+        staleTime: 30_000,
+    });
+
+    const matches = similarQuery.data ?? [];
+    if (matches.length === 0) return null;
+
+    return (
+        <div role="status" className="mt-2 rounded-lg border border-[#f5d090] bg-[#fff8eb] p-3">
+            <p className="flex items-center gap-1.5 font-medium text-[#8a5a00]">
+                <IconAlertTriangle size={15} className="shrink-0" />
+                {matches.length === 1 ? "This person may already be a lead" : `This person may already be one of ${matches.length} leads`}
+            </p>
+            <ul className="mt-2 flex flex-col gap-1.5">
+                {matches.map((lead) => (
+                    <li key={lead.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-surface px-2.5 py-1.5">
+                        <span className="font-medium text-ink">{lead.name}</span>
+                        {lead.companyName && <span className="text-faint">· {lead.companyName}</span>}
+                        <StageBadge name={lead.stage.name} color={lead.stage.color} />
+                        <span className="text-sm text-faint">
+                            {lead.owner ? `owned by ${lead.owner}` : "unassigned"} · same {lead.matchedOn}
+                        </span>
+                        {lead.canOpen && (
+                            // a new tab, so this half-filled form isn't lost
+                            <a
+                                href={`/leads?open=${lead.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-auto flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+                            >
+                                Open <IconExternalLink size={13} />
+                            </a>
+                        )}
+                    </li>
+                ))}
+            </ul>
+            <p className="mt-2 text-sm text-[#8a5a00]/80">You can still create it, for example if they&apos;re back for something new.</p>
+        </div>
     );
 }
 

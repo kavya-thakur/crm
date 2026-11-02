@@ -1,16 +1,5 @@
 import { z } from "zod";
-import {
-    capitalizeFirst,
-    capitalizeIfPresent,
-    dbIdSchema,
-    hasAnyField,
-    idParamSchema,
-    optionalEmail,
-    requiredPhone,
-    optionalText,
-    paginationSchema,
-    requiredText,
-} from "./common";
+import { capitalizeFirst, capitalizeIfPresent, dbIdSchema, hasAnyField, idParamSchema, optionalEmail, requiredPhone, optionalText, paginationSchema, requiredText, personParamSchema } from "./common";
 
 export const createContactSchema = z.object({
     name: requiredText(200).transform(capitalizeFirst),
@@ -32,9 +21,21 @@ export const updateContactSchema = createContactSchema
     .partial()
     .refine(hasAnyField, "Provide at least one field to update");
 
+// What bulk edit can set on many contacts at once (name, email and phone are each contact's own)
+export const bulkContactChangesSchema = createContactSchema
+    .pick({ jobTitle: true, customFields: true })
+    .partial()
+    .refine(hasAnyField, "Pick a field to change");
+
 export const listContactsQuerySchema = paginationSchema.extend({
     search: z.string().trim().max(100).optional(),
     companyId: idParamSchema.optional(),
+    // who created it / who changed it last: "me" or a user's id
+    createdBy: personParamSchema.optional(),
+    updatedBy: personParamSchema.optional(),
+    // when it was last changed, a day each
+    updatedFrom: z.iso.date().optional(),
+    updatedTo: z.iso.date().optional(),
     assignedTo: z
         .union([z.literal("me"), z.literal("unassigned"), idParamSchema])
         .optional(),

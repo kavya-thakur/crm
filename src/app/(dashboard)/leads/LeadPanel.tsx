@@ -13,6 +13,7 @@ import {
     IconChevronDown,
     IconClock,
     IconFiles,
+    IconForms,
     IconLock,
     IconMail,
     IconMailFast,
@@ -32,7 +33,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { Dropdown, MenuItem } from "@/components/Dropdown";
+import { Dropdown, MenuItem, SearchableItems } from "@/components/Dropdown";
 import { Select } from "@/components/Select";
 import { StageBadge } from "@/components/StageBadge";
 import { ConfirmDeleteModal } from "@/components/ListPage";
@@ -77,6 +78,7 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     CONVERTED: IconArrowRight,
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
+    WEB_FORM: IconForms,
 };
 
 type LeadChanges = Partial<Pick<Lead, "name" | "email" | "phone" | "companyName" | "stageId">> & {
@@ -283,15 +285,17 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                                 >
                                                     <IconUserOff size={16} /> Unassigned
                                                 </MenuItem>
-                                                {agents.map((agent) => (
-                                                    <MenuItem
-                                                        key={agent.id}
-                                                        selected={agent.id === lead.assignedTo?.id}
-                                                        onClick={() => { if (agent.id !== lead.assignedTo?.id) assign.mutate(agent.id); close(); }}
-                                                    >
-                                                        <Avatar name={agent.name} /> {agent.name}
-                                                    </MenuItem>
-                                                ))}
+                                                <SearchableItems items={agents} label={(agent) => agent.name}>
+                                                    {(agent) => (
+                                                        <MenuItem
+                                                            key={agent.id}
+                                                            selected={agent.id === lead.assignedTo?.id}
+                                                            onClick={() => { if (agent.id !== lead.assignedTo?.id) assign.mutate(agent.id); close(); }}
+                                                        >
+                                                            <Avatar name={agent.name} /> {agent.name}
+                                                        </MenuItem>
+                                                    )}
+                                                </SearchableItems>
                                             </>
                                         )}
                                     </Dropdown>
@@ -476,7 +480,8 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
 
                                                 <div className="flex min-w-0 flex-1 items-start justify-between gap-3 pt-1 pb-4">
                                                     <p className="text-muted">
-                                                        <span className="font-medium text-ink">{entry.user.name}</span>
+                                                        {/* a web form's entries are the visitor's doing, not a teammate's */}
+                                                        <span className="font-medium text-ink">{entry.type === "WEB_FORM" ? "Web form" : entry.user.name}</span>
                                                         {" · "}
                                                         {entry.metadata?.taskId ? (
                                                             <Link href={`/tasks?open=${entry.metadata.taskId}`} className="text-accent hover:underline">

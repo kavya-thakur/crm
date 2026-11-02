@@ -99,6 +99,8 @@ export async function POST(
                     leadId: lead.id,
                     assignedToId: lead.assignedToId,
                     organizationId: user.organizationId,
+                    createdById: user.id,
+                    updatedById: user.id,
                     timeline: {
                         create: {
                             userId: user.id,
@@ -118,6 +120,7 @@ export async function POST(
                 where: { id: lead.id },
                 data: {
                     stageId: convertedStage.id,
+                    updatedById: user.id,
                     timeline: {
                         create: {
                             userId: user.id,

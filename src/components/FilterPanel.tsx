@@ -17,7 +17,7 @@ import {
 
 import { api, errorMessage } from "@/lib/api/client";
 import { toast } from "@/components/Toast";
-import { Select } from "@/components/Select";
+import { MultiSelect, Select } from "@/components/Select";
 import { Dropdown, MenuItem } from "./Dropdown";
 import { FilterChip } from "./ListPage";
 
@@ -349,6 +349,86 @@ export function createCreatedRangeField<TFilters extends { createdFrom?: string;
         renderControl: (filters, onChange) =>
             renderCreatedRangeControl(filters.createdFrom, filters.createdTo, (change) => onChange(change as Partial<TFilters>)),
         renderChip: (filters) => `Created: ${filters.createdFrom ?? "…"} – ${filters.createdTo ?? "…"}`,
+    };
+}
+
+// When a record was last changed, from one day to another
+export function createModifiedRangeField<TFilters extends { updatedFrom?: string; updatedTo?: string }>(): FilterFieldDef<TFilters> {
+    return {
+        key: "modifiedRange",
+        label: "Last modified",
+        isActive: (filters) => !!filters.updatedFrom || !!filters.updatedTo,
+        clear: () => ({ updatedFrom: undefined, updatedTo: undefined }) as Partial<TFilters>,
+        // the date control reports whichever end changed, as createdFrom / createdTo
+        renderControl: (filters, onChange) =>
+            renderCreatedRangeControl(filters.updatedFrom, filters.updatedTo, (change) =>
+                onChange({
+                    ...("createdFrom" in change && { updatedFrom: change.createdFrom }),
+                    ...("createdTo" in change && { updatedTo: change.createdTo }),
+                } as Partial<TFilters>),
+            ),
+        renderChip: (filters) => `Modified: ${filters.updatedFrom ?? "…"} – ${filters.updatedTo ?? "…"}`,
+    };
+}
+
+// "Created by" / "Modified by": you, or one teammate
+export function createPersonField<TFilters>(options: {
+    key: string;
+    label: string;
+    get: (filters: TFilters) => string | undefined;
+    set: (value: string | undefined) => Partial<TFilters>;
+    agents?: { id: number; name: string }[];
+}): FilterFieldDef<TFilters> {
+    const { key, label, get, set, agents } = options;
+    const nameOf = (value: string) => (value === "me" ? "Me" : (agents?.find((agent) => String(agent.id) === value)?.name ?? "Someone"));
+
+    return {
+        key,
+        label,
+        isActive: (filters) => get(filters) !== undefined,
+        clear: () => set(undefined),
+        renderControl: (filters, onChange) =>
+            renderSelectControl(
+                get(filters),
+                (value) => onChange(set(value)),
+                [{ value: "me", label: "Me" }, ...(agents?.map((agent) => ({ value: String(agent.id), label: agent.name })) ?? [])],
+                "Anyone",
+            ),
+        renderChip: (filters) => {
+            const value = get(filters);
+            return value === undefined ? null : `${label}: ${nameOf(value)}`;
+        },
+    };
+}
+
+// Several values at once, like "New or Screening": a dropdown you tick as many as you like in
+export function createMultiSelectField<TFilters>(options: {
+    key: string;
+    label: string;
+    get: (filters: TFilters) => number[] | undefined;
+    set: (value: number[] | undefined) => Partial<TFilters>;
+    options: { value: number; label: string; render?: ReactNode }[];
+}): FilterFieldDef<TFilters> {
+    const { key, label, get, set } = options;
+    const choices = options.options;
+
+    return {
+        key,
+        label,
+        isActive: (filters) => (get(filters)?.length ?? 0) > 0,
+        clear: () => set(undefined),
+        renderControl: (filters, onChange) => (
+            <MultiSelect
+                values={(get(filters) ?? []).map(String)}
+                onChange={(values) => onChange(set(values.length > 0 ? values.map(Number) : undefined))}
+                options={choices.map((choice) => ({ value: String(choice.value), label: choice.label, render: choice.render }))}
+                placeholder={`Any ${label.toLowerCase()}`}
+            />
+        ),
+        renderChip: (filters) => {
+            const names = (get(filters) ?? []).map((value) => choices.find((choice) => choice.value === value)?.label ?? "…");
+            return `${label}: ${names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", ")}`;
+        },
     };
 }
 

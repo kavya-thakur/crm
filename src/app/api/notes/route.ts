@@ -42,9 +42,12 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { scope, limit, entity } = query.data;
+        const { scope, limit, entity, page } = query.data;
         // no entity = all three kinds; otherwise just the one asked for
         const wants = (kind: NoteFeedEntity) => entity === undefined || entity === kind;
+        // one kind of note is a single table, so it can be paged; the mixed feed is the latest few
+        const skip = entity ? (page - 1) * limit : 0;
+        let total: number | undefined;
 
         const mentionFilter = (userId: number) =>
             scope === "mine"
@@ -56,8 +59,11 @@ export async function GET(req: NextRequest) {
         const items: NoteFeedItem[] = [];
 
         if (hasPermission(user, "lead:read") && wants("lead")) {
+            const where = { lead: { ...leadScope(user) }, ...mentionFilter(user.id) };
+            if (entity === "lead") total = await prisma.leadNote.count({ where });
             const notes = await prisma.leadNote.findMany({
-                where: { lead: { ...leadScope(user) }, ...mentionFilter(user.id) },
+                where,
+                skip,
                 include: { author: authorSelect, lead: { select: { id: true, name: true } } },
                 orderBy: { createdAt: "desc" },
                 take: limit,
@@ -78,8 +84,11 @@ export async function GET(req: NextRequest) {
         }
 
         if (hasPermission(user, "deal:read") && wants("deal")) {
+            const where = { deal: { ...dealScope(user) }, ...mentionFilter(user.id) };
+            if (entity === "deal") total = await prisma.dealNote.count({ where });
             const notes = await prisma.dealNote.findMany({
-                where: { deal: { ...dealScope(user) }, ...mentionFilter(user.id) },
+                where,
+                skip,
                 include: { author: authorSelect, deal: { select: { id: true, title: true } } },
                 orderBy: { createdAt: "desc" },
                 take: limit,
@@ -100,8 +109,11 @@ export async function GET(req: NextRequest) {
         }
 
         if (hasPermission(user, "contact:read") && wants("contact")) {
+            const where = { contact: { ...contactScope(user) }, ...mentionFilter(user.id) };
+            if (entity === "contact") total = await prisma.contactNote.count({ where });
             const notes = await prisma.contactNote.findMany({
-                where: { contact: { ...contactScope(user) }, ...mentionFilter(user.id) },
+                where,
+                skip,
                 include: { author: authorSelect, contact: { select: { id: true, name: true } } },
                 orderBy: { createdAt: "desc" },
                 take: limit,
@@ -123,7 +135,11 @@ export async function GET(req: NextRequest) {
 
         items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
-        return NextResponse.json({ ok: true, data: items.slice(0, limit) });
+        return NextResponse.json({
+            ok: true,
+            data: items.slice(0, limit),
+            ...(total !== undefined && { pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } }),
+        });
     } catch (error) {
         return handleRouteError(error, "Get notes feed");
     }
