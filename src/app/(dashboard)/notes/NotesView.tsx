@@ -7,7 +7,8 @@ import { IconAddressBook, IconCurrencyRupee, IconTargetArrow } from "@tabler/ico
 
 import { api } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
-import { SectionIcon } from "@/components/SectionIcon";
+import { SectionIcon, headerWash } from "@/components/SectionIcon";
+import { ViewSwitcher } from "@/components/ListPage";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/Loader";
 import { timeAgo } from "@/lib/format";
@@ -15,6 +16,7 @@ import { renderNoteBody } from "../shared/notes";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import type { NoteFeedEntity, NoteFeedItem } from "@/app/api/notes/route";
+import NotesBoard from "./NotesBoard";
 
 const ENTITY_META: Record<NoteFeedEntity, { label: string; icon: typeof IconTargetArrow; href: string }> = {
     lead: { label: "Lead", icon: IconTargetArrow, href: "/leads" },
@@ -36,7 +38,8 @@ const EMPTY_MESSAGE: Record<Scope, string> = {
     mine: "You haven't written any notes yet",
 };
 
-export default function NotesView({ meId }: { meId: number }) {
+export default function NotesView({ meId, entities }: { meId: number; entities: NoteFeedEntity[] }) {
+    const [view, setView] = useState<"table" | "board">("table");
     const [scope, setScope] = useState<Scope>("all");
     const enterRef = usePanelEnter<HTMLDivElement>();
 
@@ -55,13 +58,17 @@ export default function NotesView({ meId }: { meId: number }) {
 
     return (
         <div ref={enterRef} className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("notes")}>
                 <SectionIcon section="notes" size="md" />
-                <h1 className="font-semibold">Notes</h1>
+                <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Notes</h1>
                 {notesQuery.data && <span className="text-faint">{notesQuery.data.length}</span>}
             </header>
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2">
+                <div className="font-medium text-muted">
+                    <ViewSwitcher view={view} onChange={setView} tableLabel="All notes" boardLabel="By record" />
+                </div>
+                <span className="mx-1 h-4 w-px bg-line" />
                 {SCOPES.map((item) => (
                     <button
                         key={item.value}
@@ -74,55 +81,59 @@ export default function NotesView({ meId }: { meId: number }) {
                 ))}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="px-6 py-6">
-                    {notesQuery.isPending && <SkeletonList rows={4} />}
-                    {notesQuery.isError && (
-                        <ErrorState
-                            title="Couldn't load notes"
-                            error={notesQuery.error}
-                            onRetry={() => notesQuery.refetch()}
-                            retrying={notesQuery.isFetching}
-                        />
-                    )}
-                    {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-                        <p className="rounded-lg border border-line px-3 py-10 text-center text-faint">{EMPTY_MESSAGE[scope]}</p>
-                    )}
+            <div className="min-h-0 flex-1 overflow-auto">
+                {view === "board" ? (
+                    <NotesBoard scope={scope} entities={entities} meId={meId} agents={agentsQuery.data ?? []} />
+                ) : (
+                    <div className="px-6 py-6">
+                        {notesQuery.isPending && <SkeletonList rows={4} />}
+                        {notesQuery.isError && (
+                            <ErrorState
+                                title="Couldn't load notes"
+                                error={notesQuery.error}
+                                onRetry={() => notesQuery.refetch()}
+                                retrying={notesQuery.isFetching}
+                            />
+                        )}
+                        {notesQuery.isSuccess && notesQuery.data.length === 0 && (
+                            <p className="rounded-lg border border-line px-3 py-10 text-center text-faint">{EMPTY_MESSAGE[scope]}</p>
+                        )}
 
-                    <ul className="flex flex-col gap-3">
-                        {notesQuery.data?.map((note) => {
-                            const meta = ENTITY_META[note.entity];
-                            const Icon = meta.icon;
-                            const isMine = note.author.id === meId;
+                        <ul className="flex flex-col gap-3">
+                            {notesQuery.data?.map((note) => {
+                                const meta = ENTITY_META[note.entity];
+                                const Icon = meta.icon;
+                                const isMine = note.author.id === meId;
 
-                            return (
-                                <li key={`${note.entity}-${note.id}`}>
-                                    <Link
-                                        href={`${meta.href}?open=${note.recordId}`}
-                                        className="block rounded-lg border border-line px-4 py-3 hover:border-line-strong hover:bg-paper"
-                                    >
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Avatar name={note.author.name} />
-                                            <span className="font-medium text-ink">{isMine ? "You" : note.author.name}</span>
-                                            <span className="text-faint">noted on</span>
-                                            <span className="flex items-center gap-1 font-medium text-ink">
-                                                <Icon size={14} className="text-faint" />
-                                                {note.recordLabel}
-                                            </span>
-                                            <span className="rounded bg-app px-1.5 text-sm text-muted">{meta.label}</span>
-                                            <time dateTime={note.createdAt} className="ml-auto shrink-0 text-faint">
-                                                {timeAgo(note.createdAt)}
-                                            </time>
-                                        </div>
-                                        <p className="mt-2 whitespace-pre-wrap text-muted">
-                                            {renderNoteBody(note.body, note.mentionedUserIds, agentsQuery.data ?? [])}
-                                        </p>
-                                    </Link>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
+                                return (
+                                    <li key={`${note.entity}-${note.id}`}>
+                                        <Link
+                                            href={`${meta.href}?open=${note.recordId}`}
+                                            className="block rounded-lg border border-line px-4 py-3 hover:border-line-strong hover:bg-paper"
+                                        >
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Avatar name={note.author.name} />
+                                                <span className="font-medium text-ink">{isMine ? "You" : note.author.name}</span>
+                                                <span className="text-faint">noted on</span>
+                                                <span className="flex items-center gap-1 font-medium text-ink">
+                                                    <Icon size={14} className="text-faint" />
+                                                    {note.recordLabel}
+                                                </span>
+                                                <span className="rounded bg-app px-1.5 text-sm text-muted">{meta.label}</span>
+                                                <time dateTime={note.createdAt} className="ml-auto shrink-0 text-faint">
+                                                    {timeAgo(note.createdAt)}
+                                                </time>
+                                            </div>
+                                            <p className="mt-2 whitespace-pre-wrap text-muted">
+                                                {renderNoteBody(note.body, note.mentionedUserIds, agentsQuery.data ?? [])}
+                                            </p>
+                                        </Link>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                )}
             </div>
         </div>
     );

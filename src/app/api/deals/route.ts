@@ -5,6 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { createDealSchema, listDealsQuerySchema } from "@/lib/validations/deals";
 import { createdAtRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { validateCustomFieldValues } from "@/lib/customFields";
+import { closedAtFor } from "@/lib/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
                 id: pipelineStageId,
                 organizationId: user.organizationId,
             },
-            select: { id: true },
+            select: { id: true, isWon: true, isLost: true },
         });
 
         if (!stage) {
@@ -215,6 +216,7 @@ export async function POST(req: NextRequest) {
                 leadId: leadId ?? null,
                 assignedToId: assignedToId ?? null,
                 pipelineStageId,
+                closedAt: closedAtFor(stage),
                 expectedCloseDate: expectedCloseDate
                     ? new Date(expectedCloseDate)
                     : null,

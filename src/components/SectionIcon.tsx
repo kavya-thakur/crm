@@ -1,9 +1,10 @@
-import type { ComponentType } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import {
     IconAdjustmentsHorizontal,
     IconBriefcase,
     IconCalendarEvent,
     IconCheckbox,
+    IconLayoutDashboard,
     IconLayoutKanban,
     IconNotes,
     IconShieldLock,
@@ -13,43 +14,56 @@ import {
     IconUsers,
 } from "@tabler/icons-react";
 
-// Soft pastel backgrounds with a deeper, slightly muted ink of the same hue, and a
-// hairline ring of that ink, so the tiles read as calm and premium rather than loud
+// A light tint of each colour with the bright, clear ink of the same hue on top
+// (the Radix scale: step 3 behind, step 9–10 for the ink) and a hairline ring of that ink
 export const TONES = {
-    red: "bg-[#fdebe8] text-[#c4493d] ring-[#c4493d]/15",
-    green: "bg-[#e4f4ea] text-[#2f8656] ring-[#2f8656]/15",
-    blue: "bg-[#e6eefb] text-[#3d68c4] ring-[#3d68c4]/15",
-    violet: "bg-[#efeafc] text-[#7356c4] ring-[#7356c4]/15",
-    amber: "bg-[#fcf0dd] text-[#b9741c] ring-[#b9741c]/15",
-    teal: "bg-[#e0f3f0] text-[#28806f] ring-[#28806f]/15",
-    indigo: "bg-[#e9eafb] text-[#5157bf] ring-[#5157bf]/15",
-    rose: "bg-[#fbe9f1] text-[#b8457a] ring-[#b8457a]/15",
-    sky: "bg-[#e2f2fa] text-[#2c7fa6] ring-[#2c7fa6]/15",
-    orange: "bg-[#fcebe0] text-[#bd5f2a] ring-[#bd5f2a]/15",
-    lime: "bg-[#edf5df] text-[#61852a] ring-[#61852a]/15",
-    slate: "bg-[#eceef2] text-[#5a6272] ring-[#5a6272]/15",
+    red: "bg-[#feebec] text-[#dc3e42] ring-[#dc3e42]/20",
+    green: "bg-[#e6f6eb] text-[#2b9a66] ring-[#2b9a66]/20",
+    blue: "bg-[#e6f4fe] text-[#0588f0] ring-[#0588f0]/20",
+    violet: "bg-[#f4f0fe] text-[#6e56cf] ring-[#6e56cf]/20",
+    amber: "bg-[#fff7c2] text-[#d68b00] ring-[#d68b00]/25",
+    teal: "bg-[#e0f8f3] text-[#0d9b8a] ring-[#0d9b8a]/20",
+    indigo: "bg-[#edf2fe] text-[#3e63dd] ring-[#3e63dd]/20",
+    rose: "bg-[#feeaf5] text-[#cf3897] ring-[#cf3897]/20",
+    sky: "bg-[#e1f6fd] text-[#0894b3] ring-[#0894b3]/20",
+    orange: "bg-[#ffefd6] text-[#ef5f00] ring-[#ef5f00]/20",
+    lime: "bg-[#eef6d6] text-[#5c7c2f] ring-[#5c7c2f]/20",
+    slate: "bg-[#f0f0f3] text-[#60646c] ring-[#60646c]/20",
 } as const;
 
 export type Tone = keyof typeof TONES;
-type Icon = ComponentType<{ size?: number; className?: string; stroke?: number; color?: string }>;
+type Icon = ComponentType<{ size?: number; className?: string; stroke?: number; style?: CSSProperties }>;
 
-// The icon colours twenty.com's own sidebar uses (the Radix colour scale, step 11): a
-// plain coloured line icon, no box behind it
+// The exact icon colours Twenty's sidebar uses: step 10 of its colour scale, written in
+// display-p3 (twenty-ui ThemeLight.ts), which Mac screens show richer than plain hex.
+// Kept as bare channels so the same colour can also be used see-through (tiles, washes).
 const INKS = {
-    red: "#ce2c31",
-    green: "#218358",
-    blue: "#3a5bc7",
-    violet: "#6550b9",
-    teal: "#008573",
-    orange: "#cc4e00",
-    grey: "#666666",
+    red: "0.798 0.294 0.285",
+    green: "0.308 0.595 0.417",
+    blue: "0.234 0.343 0.801",
+    violet: "0.483 0.289 0.7",
+    teal: "0.275 0.599 0.542",
+    orange: "0.87 0.409 0.164",
+    grey: "0.4 0.4 0.4",
 } as const;
+
+// A section's colour, optionally see-through (0 to 1)
+function ink(section: Section, alpha = 1) {
+    return `color(display-p3 ${INKS[SECTIONS[section].ink]} / ${alpha})`;
+}
+
+// The page header's background: a soft wash of the section's colour fading out
+// from the left, over the usual pale header grey
+export function headerWash(section: Section): CSSProperties {
+    return { backgroundImage: `linear-gradient(90deg, ${ink(section, 0.09)}, ${ink(section, 0.03)} 35%, transparent 70%)` };
+}
 
 // Every part of the app, with its icon and colour. The icons are the same Tabler icons
 // twenty.com's sidebar uses wherever there's a match (target, user, checkbox, notes). The sidebar, the page headers and
 // the settings pages all read from here, so a section looks the same everywhere.
 // Settings items are grey, the way twenty.com keeps its settings low-key.
 export const SECTIONS = {
+    dashboard: { icon: IconLayoutDashboard, ink: "orange" },
     leads: { icon: IconTargetArrow, ink: "red" },
     deals: { icon: IconBriefcase, ink: "green" },
     contacts: { icon: IconUser, ink: "blue" },
@@ -65,18 +79,31 @@ export const SECTIONS = {
 
 export type Section = keyof typeof SECTIONS;
 
-// A section's icon in its own colour. "sm" (sidebar) and "md" (page headers) are the bare
-// icon, as on twenty.com; "lg" sits on a quiet grey tile at the top of a settings page.
+// A section's icon in its own colour. "sm" (sidebar) is the bare icon, as on twenty.com;
+// "md" (page headers) sits on a tile tinted with the same colour, like Twenty's object
+// icons; "lg" sits on a quiet grey tile at the top of a settings page.
 export function SectionIcon({ section, size = "sm" }: { section: Section; size?: "sm" | "md" | "lg" }) {
-    const { icon: Icon, ink } = SECTIONS[section];
+    const { icon: Icon } = SECTIONS[section];
 
     if (size === "lg") {
         return (
             <span aria-hidden className="inline-flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-line bg-paper">
-                <Icon size={20} stroke={1.8} color={INKS[ink]} />
+                <Icon size={20} stroke={1.8} style={{ color: ink(section) }} />
             </span>
         );
     }
 
-    return <Icon aria-hidden size={16} stroke={2} color={INKS[ink]} className="shrink-0" />;
+    if (size === "md") {
+        return (
+            <span
+                aria-hidden
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: ink(section, 0.12), boxShadow: `inset 0 0 0 1px ${ink(section, 0.2)}` }}
+            >
+                <Icon size={16} stroke={2} style={{ color: ink(section) }} />
+            </span>
+        );
+    }
+
+    return <Icon aria-hidden size={16} stroke={2} style={{ color: ink(section) }} className="shrink-0" />;
 }

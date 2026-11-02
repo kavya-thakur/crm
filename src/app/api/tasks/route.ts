@@ -1,5 +1,6 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { contactScope, dealScope, leadScope, taskScope } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { addTaskToTimeline, dueDateToDb, startOfToday, taskInclude } from "@/lib/tasks";
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
         // Verify the linked record (if any) belongs to this organization
         if (leadId !== undefined) {
             const lead = await prisma.lead.findFirst({
-                where: { id: leadId, organizationId: user.organizationId },
+                where: { id: leadId, ...leadScope(user) },
                 select: { id: true },
             });
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
         if (dealId !== undefined) {
             const deal = await prisma.deal.findFirst({
-                where: { id: dealId, organizationId: user.organizationId },
+                where: { id: dealId, ...dealScope(user) },
                 select: { id: true },
             });
 
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
 
         if (contactId !== undefined) {
             const contact = await prisma.contact.findFirst({
-                where: { id: contactId, organizationId: user.organizationId },
+                where: { id: contactId, ...contactScope(user) },
                 select: { id: true },
             });
 
@@ -120,20 +121,23 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, scope, assignedTo, priority, leadId, dealId, contactId } = query.data;
+        const { page, limit, scope, status, assignedTo, priority, leadId, dealId, contactId } = query.data;
 
+        // "open" is everything not done yet: to do and in progress
         const scopeFilter: Prisma.TaskWhereInput =
             scope === "open"
-                ? { status: "PENDING" }
+                ? { status: { not: "COMPLETED" } }
                 : scope === "overdue"
-                    ? { status: "PENDING", dueDate: { lt: startOfToday() } }
+                    ? { status: { not: "COMPLETED" }, dueDate: { lt: startOfToday() } }
                     : scope === "completed"
                         ? { status: "COMPLETED" }
                         : {};
 
         const where: Prisma.TaskWhereInput = {
-            organizationId: user.organizationId,
+            // whose tasks this person may see at all; everything below only narrows it
+            AND: [taskScope(user)],
             ...scopeFilter,
+            ...(status && { status }),
             ...(assignedTo !== undefined && {
                 assignedToId: assignedTo === "me" ? user.id : assignedTo,
             }),
@@ -146,7 +150,8 @@ export async function GET(req: NextRequest) {
         // Most urgent first while there's still something to do, most recent first once
         // it's done; among tasks due the same day the higher priority comes first, and
         // id is the last tie-breaker so the order stays stable
-        const sortOrder = scope === "open" || scope === "overdue" ? "asc" : "desc";
+        const stillToDo = scope === "open" || scope === "overdue" || (status !== undefined && status !== "COMPLETED");
+        const sortOrder = stillToDo ? "asc" : "desc";
 
         const [tasks, total] = await Promise.all([
             prisma.task.findMany({

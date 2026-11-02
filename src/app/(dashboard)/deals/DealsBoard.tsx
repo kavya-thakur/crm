@@ -1,44 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconCurrencyRupee, IconTargetArrow, IconUser, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { Board, BoardCard, BoardColumn, CardFields, ColumnTitle } from "@/components/Board";
+import type { DataColumn } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
-import { InlineLoader, PageLoader } from "@/components/Loader";
+import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import {
-    StageLabel,
-    formatDealAmount,
-    refreshDeals,
-    type Deal,
-    type DealFilters,
-    type Paginated,
-    type PipelineStage,
-} from "./shared";
+import { formatMoneyShort } from "@/lib/format";
+import { formatDealAmount, refreshDeals, type Deal, type DealFilters, type Paginated, type PipelineStage } from "./shared";
 
 const COLUMN_LIMIT = 100;
 
 interface DealsBoardProps {
     filters: DealFilters;
+    /** the columns shown in the table view, which the cards show too (and edit in place) */
+    columns: DataColumn<Deal>[];
     canMove: boolean;
     onOpen: (id: number) => void;
-    onError: (message: string) => void;
+    onCreate?: () => void;
 }
 
-interface StagesResponse {
-    ok: boolean;
-    data: PipelineStage[];
-}
-
-type DealsResponse = Paginated<Deal>;
-
-export default function DealsBoard({ filters, canMove, onOpen, onError }: DealsBoardProps) {
+// One column per pipeline stage, each with its deals' total. Dragging a card to another
+// column moves the deal there.
+export default function DealsBoard({ filters, columns, canMove, onOpen, onCreate }: DealsBoardProps) {
     const stagesQuery = useQuery({
         queryKey: ["pipelineStage"],
-        queryFn: () =>
-            api.get<StagesResponse>("/pipeline-stages").then((response) => response.data.data),
+        queryFn: () => api.get<{ data: PipelineStage[] }>("/pipeline-stages").then((response) => response.data.data),
     });
 
     if (stagesQuery.isPending) {
@@ -55,161 +44,89 @@ export default function DealsBoard({ filters, canMove, onOpen, onError }: DealsB
         );
     }
 
-    const stages = filters.pipelineStageId === undefined
-        ? stagesQuery.data
-        : stagesQuery.data.filter((stage) => stage.id === filters.pipelineStageId);
+    const stages =
+        filters.pipelineStageId === undefined ? stagesQuery.data : stagesQuery.data.filter((stage) => stage.id === filters.pipelineStageId);
 
     if (stages.length === 0) {
         return <p className="p-4 text-sm text-faint">No pipeline stages configured yet.</p>;
     }
 
+    // the card shows the amount up top and sits in its stage's column, so neither repeats as a field
+    const fields = columns.filter((column) => column.key !== "pipelineStage" && column.key !== "amount");
+
     return (
-        <div className="flex h-full min-w-max">
-            {stages.map((stage) => (
-                <BoardColumn
+        <Board>
+            {stages.map((stage, index) => (
+                <StageColumn
                     key={stage.id}
                     stage={stage}
                     filters={filters}
+                    fields={fields}
                     canMove={canMove}
                     onOpen={onOpen}
-                    onError={onError}
+                    onAdd={index === 0 ? onCreate : undefined}
                 />
             ))}
-        </div>
+        </Board>
     );
 }
 
-interface BoardColumnProps {
-    stage: PipelineStage;
-    filters: DealFilters;
-    canMove: boolean;
-    onOpen: (id: number) => void;
-    onError: (message: string) => void;
-}
-
-function BoardColumn({ stage, filters, canMove, onOpen, onError }: BoardColumnProps) {
+function StageColumn({
+    stage,
+    filters,
+    fields,
+    canMove,
+    onOpen,
+    onAdd,
+}: Omit<DealsBoardProps, "columns" | "onCreate"> & { stage: PipelineStage; fields: DataColumn<Deal>[]; onAdd?: () => void }) {
     const queryClient = useQueryClient();
-    const [dragOver, setDragOver] = useState(false);
 
     const dealsQuery = useQuery({
         queryKey: ["deals", "board", { ...filters, pipelineStageId: stage.id }],
-        queryFn: async () => {
-            const response = await api.get<DealsResponse>("/deals", {
-                params: {
-                    ...filters,
-                    search: filters.search || undefined,
-                    pipelineStageId: stage.id,
-                    page: 1,
-                    limit: COLUMN_LIMIT,
-                },
-            });
-            return response.data;
-        },
+        queryFn: () =>
+            api
+                .get<Paginated<Deal>>("/deals", {
+                    params: { ...filters, search: filters.search || undefined, pipelineStageId: stage.id, page: 1, limit: COLUMN_LIMIT },
+                })
+                .then((response) => response.data),
         placeholderData: keepPreviousData,
     });
 
     const moveDeal = useMutation({
         mutationFn: (dealId: number) => api.put(`/deals/${dealId}`, { pipelineStageId: stage.id }),
         onSuccess: () => {
-            toast.success("Deal moved");
+            toast.success(`Deal moved to ${stage.name}`);
             void refreshDeals(queryClient);
         },
-        onError: (error) => onError(errorMessage(error)),
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
-    function handleDrop(event: React.DragEvent<HTMLElement>) {
-        setDragOver(false);
-        const dealId = Number(event.dataTransfer.getData("deal-id"));
-        const currentStageId = Number(event.dataTransfer.getData("pipeline-stage-id"));
-        if (!dealId || !Number.isFinite(dealId) || currentStageId === stage.id || moveDeal.isPending) {
-            return;
-        }
-        moveDeal.mutate(dealId);
-    }
-
     const deals = dealsQuery.data?.data ?? [];
+    const total = deals.reduce((sum, deal) => sum + Number(deal.amount), 0);
+    // past the column limit the sum only covers what's loaded, so it's marked as "at least"
+    const partial = (dealsQuery.data?.pagination.total ?? 0) > deals.length;
 
     return (
-        <section
-            onDragOver={(event) => {
-                if (!canMove) return;
-                event.preventDefault();
-                setDragOver(true);
-            }}
-            onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragOver(false);
-            }}
-            onDrop={handleDrop}
-            className={`flex w-64 shrink-0 flex-col border-r border-line-light ${dragOver ? "bg-accent-faint" : ""}`}
+        <BoardColumn
+            id={String(stage.id)}
+            title={<ColumnTitle color={stage.color}>{stage.name}</ColumnTitle>}
+            count={dealsQuery.data?.pagination.total}
+            aside={deals.length > 0 && <span className="ml-auto font-display text-sm font-medium text-muted tabular-nums">{partial ? "≥ " : ""}{formatMoneyShort(total)}</span>}
+            shown={deals.length}
+            loading={dealsQuery.isPending}
+            error={dealsQuery.error}
+            onRetry={() => dealsQuery.refetch()}
+            emptyText="No deals"
+            onDropCard={canMove ? (id) => !moveDeal.isPending && moveDeal.mutate(id) : undefined}
+            onAdd={onAdd}
         >
-            <header className="flex h-10 shrink-0 items-center gap-2 px-2">
-                <StageLabel stage={stage} />
-                <span className="text-faint">{dealsQuery.data?.pagination.total ?? 0}</span>
-            </header>
-
-            <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
-                {dealsQuery.isPending && <InlineLoader label="Loading deals" />}
-                {dealsQuery.isError && (
-                    <ErrorState
-                        variant="inline"
-                        title="Couldn't load deals"
-                        error={dealsQuery.error}
-                        onRetry={() => dealsQuery.refetch()}
-                        retrying={dealsQuery.isFetching}
-                    />
-                )}
-                {dealsQuery.isSuccess && deals.length === 0 && (
-                    <p className="py-3 text-center text-light">No deals</p>
-                )}
-
-                {deals.map((deal) => (
-                    <article
-                        key={deal.id}
-                        draggable={canMove && !moveDeal.isPending}
-                        onDragStart={(event) => {
-                            event.dataTransfer.setData("deal-id", String(deal.id));
-                            event.dataTransfer.setData("pipeline-stage-id", String(deal.pipelineStageId));
-                            event.dataTransfer.effectAllowed = "move";
-                        }}
-                        onClick={() => onOpen(deal.id)}
-                        className="cursor-pointer rounded-lg border border-line bg-surface p-2 hover:border-line-strong hover:shadow-light"
-                    >
-                        <p className="flex items-center gap-1.5 font-medium">
-                            <IconTargetArrow size={14} className="shrink-0 text-accent" />
-                            <span className="truncate">{deal.title}</span>
-                        </p>
-
-                        <div className="mt-2 space-y-1 text-muted">
-                            <CardField icon={IconCurrencyRupee} value={formatDealAmount(deal.amount)} />
-                            <CardField icon={IconUser} value={deal.lead?.name} />
-                            <CardField icon={IconUserCircle} value={deal.assignedTo?.name} />
-                        </div>
-
-                        <p className="mt-2 text-xs text-faint">{deal.probability}% probability</p>
-                    </article>
-                ))}
-
-                {dealsQuery.data && dealsQuery.data.pagination.total > COLUMN_LIMIT && (
-                    <p className="py-1 text-center text-sm text-faint">
-                        Showing {COLUMN_LIMIT} of {dealsQuery.data.pagination.total}
-                    </p>
-                )}
-            </div>
-        </section>
-    );
-}
-
-function CardField({
-    icon: Icon,
-    value,
-}: {
-    icon: typeof IconUser;
-    value?: string | null;
-}) {
-    return (
-        <p className="flex h-5 items-center gap-1.5">
-            <Icon size={14} className="shrink-0 text-faint" />
-            <span className={`truncate ${value ? "" : "text-light"}`}>{value || "Empty"}</span>
-        </p>
+            {deals.map((deal) => (
+                <BoardCard key={deal.id} id={deal.id} columnId={String(stage.id)} draggable={canMove} onOpen={() => onOpen(deal.id)}>
+                    <p className="line-clamp-2 font-medium text-ink">{deal.title}</p>
+                    <p className="mt-1 font-display text-[17px] leading-6 font-semibold tracking-tight text-ink tabular-nums">{formatDealAmount(deal.amount)}</p>
+                    <CardFields record={deal} columns={fields} />
+                </BoardCard>
+            ))}
+        </BoardColumn>
     );
 }

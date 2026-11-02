@@ -147,7 +147,8 @@ export function DataCell<TRecord>({
     );
 }
 
-function renderEditor<TRecord>(edit: EditConfig<TRecord>, record: TRecord, close: () => void) {
+// The in-place editor for one field; also used on board cards
+export function renderEditor<TRecord>(edit: EditConfig<TRecord>, record: TRecord, close: () => void) {
     if (edit.type === "select") {
         return (
             <Select

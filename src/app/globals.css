@@ -5,7 +5,8 @@
    so a colour change happens here only */
 @theme {
   /* backgrounds */
-  --color-app: #f1f1f1; /* behind the sidebar and page card */
+  --color-app: #f1f1f1; /* grey chips and hovers */
+  --color-shell: #f9f9f9; /* behind the sidebar and page card (Twenty's gray3) */
   --color-surface: #ffffff; /* page card, panels, inputs */
   --color-paper: #fcfcfc; /* headers, subtle hover */
   --color-fill: rgb(0 0 0 / 0.04); /* hover on buttons and menu items */
@@ -22,11 +23,11 @@
   --color-line-light: #f1f1f1; /* table grid */
   --color-line-strong: #d6d6d6;
 
-  /* blue accent */
-  --color-accent: #3e63dd;
-  --color-accent-hover: #3358d4;
-  --color-accent-soft: #edf2fe;
-  --color-accent-faint: #f7f9ff; /* selected rows */
+  /* Flash violet, the same accent as the landing page */
+  --color-accent: #4a38f5;
+  --color-accent-hover: #3d2be0;
+  --color-accent-soft: #efedff;
+  --color-accent-faint: #f8f7ff; /* selected rows */
   --color-on-accent: #ffffff;
 
   /* red */

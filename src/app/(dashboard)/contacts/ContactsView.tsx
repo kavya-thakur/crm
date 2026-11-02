@@ -160,7 +160,10 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
         }),
         ...customFields
             .filter((field) => field.showInList)
-            .map((field) => createCustomColumn<Contact>(field, (contact) => contact.customFields, { agents: can.seeAgents ? agents.data : undefined })),
+            .map((field) => createCustomColumn<Contact>(field, (contact) => contact.customFields, {
+                    agents: can.seeAgents ? agents.data : undefined,
+                    onUpdate: can.update ? (contact, changes) => updateContact.mutate({ id: contact.id, changes }) : undefined,
+                })),
     ];
     const { columnPrefs, visibleColumns, getWidth, resize, reorderVisible } = useTableColumns("contacts-columns", contactColumns);
 

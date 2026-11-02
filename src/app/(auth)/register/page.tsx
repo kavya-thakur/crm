@@ -28,7 +28,7 @@ export default function RegisterPage() {
     const registerMutation = useMutation({
         mutationFn: (values: RegisterFormValues) => api.post("/auth/register", values),
         // The API sets the auth cookie, so the user is already signed in here
-        onSuccess: () => router.replace("/leads"),
+        onSuccess: () => router.replace("/dashboard"),
     });
 
     // e.g. "Email is already registered" from the API

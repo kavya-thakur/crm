@@ -102,48 +102,6 @@ export function skyline(towers: Tower[], areaHeight: number): Sampler {
     };
 }
 
-const POLYGONS = {
-    bolt: [[0.62, 0], [0.18, 0.55], [0.42, 0.55], [0.32, 1], [0.82, 0.42], [0.56, 0.42]],
-    shield: [[0.5, 0], [0.92, 0.14], [0.92, 0.5], [0.5, 1], [0.08, 0.5], [0.08, 0.14]],
-    diamond: [[0.25, 0.08], [0.75, 0.08], [1, 0.36], [0.5, 1], [0, 0.36]],
-    arrow: [[0.5, 0], [1, 0.5], [0.68, 0.5], [0.68, 1], [0.32, 1], [0.32, 0.5], [0, 0.5]],
-    hexagon: [[0.25, 0.05], [0.75, 0.05], [1, 0.5], [0.75, 0.95], [0.25, 0.95], [0, 0.5]],
-} as const satisfies Record<string, readonly (readonly [number, number])[]>;
-
-export type ShapeName = keyof typeof POLYGONS | "target";
-
-function inPolygon(x: number, y: number, polygon: readonly (readonly [number, number])[]) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const [xi, yi] = polygon[i];
-        const [xj, yj] = polygon[j];
-        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
-}
-
-function inShape(shape: ShapeName, u: number, v: number) {
-    if (shape === "target") {
-        const distance = Math.hypot(u - 0.5, v - 0.5);
-        return distance < 0.5 && (distance > 0.34 || distance < 0.16);
-    }
-    return inPolygon(u, v, POLYGONS[shape]);
-}
-
-// An icon drawn in bars, shaded like it's lit from the left: solid on the left side,
-// breaking into shorter dashes toward the right, with a lighter band every few rows
-export function iconArt(shape: ShapeName, size: number): Sampler {
-    return (x, y) => {
-        const u = x / size;
-        const v = y / size;
-        if (!inShape(shape, u, v)) return 0;
-
-        const band = Math.floor(y / 6) % 4 === 2 ? 0.35 : 0;
-        const shade = 0.98 - Math.max(0, u - 0.5) * 1.2 - band;
-        return noise(x, y) < 0.05 ? 0.3 : Math.max(0.15, shade);
-    };
-}
-
 // A landscape of soft blobs (like continents), for the big background pieces
 export function blobs(spots: { x: number; y: number; rx: number; ry: number }[]): Sampler {
     return (x, y) => {

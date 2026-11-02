@@ -1,85 +1,85 @@
-import { CutButton } from "./CutButton";
-import { DashArt, skyline } from "./DashArt";
+import type { ReactNode } from "react";
+import { IconArrowRight, IconCircleCheckFilled, IconUserCheck } from "@tabler/icons-react";
+
+import { Button } from "./Button";
+import { HeroCity } from "./HeroCity";
 import { HeroPreview } from "./HeroPreview";
 
-const ART_WIDTH = 420;
-const ART_HEIGHT = 800;
-
-// Two skylines either side of the product window, climbing toward it like a chart.
-// Fixed shapes, so they look the same on every visit.
-const LEFT_TOWERS = [
-    { x: 0, width: 42, height: 0.5 },
-    { x: 48, width: 30, height: 0.44 },
-    { x: 84, width: 54, height: 0.62 },
-    { x: 144, width: 36, height: 0.56 },
-    { x: 186, width: 60, height: 0.74 },
-    { x: 252, width: 42, height: 0.68 },
-    { x: 300, width: 120, height: 0.9 },
-];
-const RIGHT_TOWERS = [
-    { x: 0, width: 120, height: 0.94 },
-    { x: 126, width: 48, height: 0.78 },
-    { x: 180, width: 66, height: 0.86 },
-    { x: 252, width: 36, height: 0.66 },
-    { x: 294, width: 60, height: 0.74 },
-    { x: 360, width: 30, height: 0.56 },
-    { x: 396, width: 24, height: 0.62 },
-];
+// The little cards that slide in beside the window while the hero is pinned,
+// showing the kind of thing that happens in Flash all day
+function UpdateCard({ side, icon, title, detail }: { side: "left" | "right"; icon: ReactNode; title: string; detail: string }) {
+    return (
+        <div
+            data-hero-card
+            className={`absolute z-20 hidden w-64 items-center gap-3 rounded-2xl border border-[#ebebeb] bg-white/90 p-3 font-(family-name:--font-host-grotesk) shadow-[0_12px_40px_rgb(0_0_0/0.14)] backdrop-blur min-[921px]:flex ${side === "left" ? "top-[22%] -left-16" : "top-[52%] -right-16"}`}
+        >
+            {icon}
+            <span className="min-w-0">
+                <span className="block text-[14px] font-medium text-[#1c1c1c]">{title}</span>
+                <span className="block truncate text-[13px] text-[#1c1c1c]/55">{detail}</span>
+            </span>
+        </div>
+    );
+}
 
 export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolean; primaryHref: string; primaryLabel: string }) {
     return (
-        <section className="relative overflow-clip bg-[#f4f4f4]">
-            {/* a soft warm glow behind the headline */}
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 -inset-x-[20%]"
-                style={{ background: "radial-gradient(80% 60% at 50% 40%, #f5f3f099 0%, #0000 70%)" }}
-            />
-            <DashArt
-                width={ART_WIDTH}
-                height={ART_HEIGHT}
-                sample={skyline(LEFT_TOWERS, ART_HEIGHT)}
-                className="pointer-events-none absolute bottom-0 left-0 hidden text-[#4a38f5] min-[921px]:block"
-            />
-            <DashArt
-                width={ART_WIDTH}
-                height={ART_HEIGHT}
-                sample={skyline(RIGHT_TOWERS, ART_HEIGHT)}
-                className="pointer-events-none absolute right-0 bottom-0 hidden text-[#4a38f5] min-[921px]:block"
-            />
+        <section data-hero className="relative overflow-clip bg-[#f4f4f4]">
+            {/* a 3D city drawn in dashes behind everything, lighting up around the pointer */}
+            <HeroCity className="absolute inset-x-0 top-0 h-225" />
 
-            <div className="relative mx-auto flex w-full max-w-378 flex-col px-4 pt-12 pb-10 min-[921px]:px-10">
-                <div className="flex w-full flex-col items-center text-center [&>*+*]:mt-8">
-                    <div className="grid w-full justify-items-center [&>*+*]:mt-3">
-                        <div className="w-full max-w-168">
-                            <h1
-                                data-hero-line
-                                className="font-(family-name:--font-aleo) text-[clamp(2.5rem,1.5819rem+3.7665vw,3.75rem)] leading-[clamp(2.875rem,1.9569rem+3.7665vw,4.125rem)] font-light tracking-[-0.02em] text-balance text-[#1c1c1c]"
-                            >
-                                Run your pipeline,{" "}
-                                {/* the second half of the headline switches to the sans face, as on twenty.com */}
-                                <span className="font-(family-name:--font-host-grotesk) tracking-[-0.04em]">not your inbox</span>
-                            </h1>
-                        </div>
-                        <div className="mx-auto max-w-147.75">
-                            <p data-hero-line className="font-(family-name:--font-host-grotesk) text-[16px] leading-[1.55] font-normal text-[#1c1c1c]/60">
-                                Flash keeps every lead, deal and conversation in one workspace your whole team actually uses, set up in minutes and shaped around how you sell.
-                            </p>
-                        </div>
-                    </div>
+            <div className="relative mx-auto flex w-full max-w-378 flex-col px-4 pt-14 pb-10 min-[921px]:px-10">
+                <div data-hero-copy className="flex w-full flex-col items-center text-center">
+                    <a
+                        data-hero-line
+                        href="#how-it-works"
+                        className="group inline-flex items-center gap-2 rounded-full border border-[#1c1c1c]/10 bg-white py-1 pr-3 pl-1 font-(family-name:--font-host-grotesk) text-[13px] text-[#1c1c1c]/70 transition-colors hover:text-[#1c1c1c]"
+                    >
+                        <span className="rounded-full bg-[#4a38f5] px-2 py-0.5 text-[11px] font-medium text-white">New</span>
+                        Scheduled activities with your whole team
+                        <IconArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                    </a>
 
-                    <div data-hero-line className="flex flex-wrap justify-center gap-3">
-                        <CutButton href={primaryHref}>{primaryLabel}</CutButton>
+                    <h1
+                        data-hero-line
+                        className="mt-7 max-w-200 font-(family-name:--font-aleo) text-[clamp(2.75rem,1.6rem+4.6vw,4.75rem)] leading-[1.04] font-light tracking-[-0.03em] text-balance text-[#1c1c1c]"
+                    >
+                        Every lead, every deal,{" "}
+                        <span className="font-(family-name:--font-host-grotesk) tracking-[-0.05em]">
+                            closed in a <span className="text-[#4a38f5]">flash</span>
+                        </span>
+                    </h1>
+
+                    <p data-hero-line className="mt-6 max-w-140 font-(family-name:--font-host-grotesk) text-[17px] leading-[1.55] text-[#1c1c1c]/60">
+                        Flash is the CRM your whole team actually opens: leads, deals, follow-ups and notes in one fast workspace, set up in minutes and shaped around how you sell.
+                    </p>
+
+                    <div data-hero-line className="mt-9 flex flex-wrap justify-center gap-3">
+                        <Button href={primaryHref}>{primaryLabel}</Button>
                         {!loggedIn && (
-                            <CutButton href="#how-it-works" variant="outlined">
+                            <Button href="#how-it-works" variant="outlined">
                                 See how it works
-                            </CutButton>
+                            </Button>
                         )}
                     </div>
                 </div>
 
-                <div data-hero-mockup className="relative z-10 mt-17 w-full">
-                    <HeroPreview />
+                <div data-hero-mockup className="relative z-10 mt-16 w-full">
+                    <div data-hero-tilt className="relative mx-auto max-w-260">
+                        <HeroPreview />
+                        <UpdateCard
+                            side="left"
+                            icon={<IconUserCheck size={34} className="shrink-0 rounded-xl bg-[#edf2fe] p-2 text-[#3e63dd]" />}
+                            title="Lead assigned"
+                            detail="Acme Industries → Priya"
+                        />
+                        <UpdateCard
+                            side="right"
+                            icon={<IconCircleCheckFilled size={34} className="shrink-0 rounded-xl bg-[#e6f6eb] p-2 text-[#218358]" />}
+                            title="Deal won · ₹4,80,000"
+                            detail="Contoso Ltd moved to Won"
+                        />
+                    </div>
                 </div>
             </div>
         </section>

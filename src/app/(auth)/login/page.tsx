@@ -28,7 +28,7 @@ export default function LoginPage() {
     const loginMutation = useMutation({
         mutationFn: (values: LoginFormValues) => api.post("/auth/login", values),
         // The API sets the auth cookie, so the user is signed in here
-        onSuccess: () => router.replace("/leads"),
+        onSuccess: () => router.replace("/dashboard"),
     });
 
     // e.g. "Invalid email or password" from the API

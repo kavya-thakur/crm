@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { IconSettings } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
-import { Select } from "@/components/Select";
+import { Select, type SelectOption } from "@/components/Select";
+import type { DataColumn, EditConfig } from "@/components/DataTable";
 import { controlClassName, renderSelectControl, type FilterFieldDef } from "@/components/FilterPanel";
 import { formatDate } from "@/lib/format";
 import { FormFieldRow, FormSection } from "./FullPageForm";
@@ -297,16 +298,64 @@ function CustomFieldInput({
     return <input type="text" required={field.required} {...register(name)} className={inputClassName} />;
 }
 
+// A custom field as a table column (and board card field). With `onUpdate` it's editable
+// in place like the built-in columns: the same PUT, sending just this one field.
 export function createCustomColumn<TRecord>(
     def: CustomFieldDef,
     getCustomFields: (record: TRecord) => Record<string, unknown> | null,
-    context?: { agents?: AgentOption[] },
-) {
+    context?: { agents?: AgentOption[]; onUpdate?: (record: TRecord, changes: Record<string, unknown>) => void },
+): DataColumn<TRecord> {
+    const valueOf = (record: TRecord) => {
+        const value = getCustomFields(record)?.[def.key];
+        return value === undefined || value === null || value === "" ? null : value;
+    };
+    const onUpdate = context?.onUpdate;
+    const save = (record: TRecord, value: unknown) => onUpdate?.(record, { customFields: { [def.key]: value } });
+
+    let edit: EditConfig<TRecord> | undefined;
+
+    if (onUpdate && (def.type === "TEXT" || def.type === "NUMBER" || def.type === "DATE")) {
+        edit = {
+            type: def.type === "TEXT" ? "text" : def.type === "NUMBER" ? "number" : "date",
+            // dates are stored as full timestamps; the date input wants just the day
+            getValue: (record: TRecord) => {
+                const value = valueOf(record);
+                return value === null ? null : def.type === "DATE" ? String(value).slice(0, 10) : (value as string | number);
+            },
+            onSave: (record: TRecord, value: string | number | null) => save(record, value),
+        };
+    }
+
+    // the picker types: their options, as strings the way the app's Select takes them
+    const choices: SelectOption[] | null =
+        def.type === "SELECT"
+            ? (def.options ?? []).map((option) => ({ value: option, label: option }))
+            : def.type === "BOOLEAN"
+              ? [{ value: "true", label: "Yes" }, { value: "false", label: "No" }]
+              : def.type === "AGENT" && context?.agents
+                ? context.agents.map((agent) => ({ value: String(agent.id), label: agent.name }))
+                : null;
+
+    if (onUpdate && choices) {
+        edit = {
+            type: "select",
+            // an optional field can be emptied again
+            options: def.required ? choices : [{ value: "", label: "Empty" }, ...choices],
+            getValue: (record) => {
+                const value = valueOf(record);
+                return value === null ? undefined : String(value);
+            },
+            onSave: (record, value) =>
+                save(record, !value ? null : def.type === "BOOLEAN" ? value === "true" : def.type === "AGENT" ? Number(value) : value),
+        };
+    }
+
     return {
         key: `custom_${def.key}`,
         label: def.label,
         icon: IconSettings,
         width: 160,
+        edit,
         cell: (record: TRecord): ReactNode => {
             const value = getCustomFields(record)?.[def.key];
             if (value === undefined || value === null || value === "") return null;

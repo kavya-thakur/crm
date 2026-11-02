@@ -223,7 +223,10 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         }),
         ...customFields
             .filter((field) => field.showInList)
-            .map((field) => createCustomColumn<Lead>(field, (lead) => lead.customFields, { agents: can.seeAgents ? agents.data : undefined })),
+            .map((field) => createCustomColumn<Lead>(field, (lead) => lead.customFields, {
+                    agents: can.seeAgents ? agents.data : undefined,
+                    onUpdate: can.update ? (lead, changes) => updateLead.mutate({ id: lead.id, changes }) : undefined,
+                })),
     ];
     const { columnPrefs, visibleColumns, getWidth, resize, reorderVisible } = useTableColumns("leads-columns", columns);
 
@@ -343,7 +346,13 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
                 ) : (
-                    <LeadsBoard filters={filters} canMove={can.update} onOpen={setOpenLeadId} onError={toast.error} />
+                    <LeadsBoard
+                        filters={filters}
+                        columns={visibleColumns}
+                        canMove={can.update}
+                        onOpen={setOpenLeadId}
+                        onCreate={can.create ? () => setCreating(true) : undefined}
+                    />
                 )}
             </div>
 

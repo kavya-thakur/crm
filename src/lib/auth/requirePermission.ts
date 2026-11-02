@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { getCurrentUser } from "./getCurrentUser";
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
@@ -41,6 +42,40 @@ export function contactScope(user: CurrentUser) {
     return {
         organizationId: user.organizationId,
         ...(!hasPermission(user, "contact:all") && { assignedToId: user.id }),
+    }
+}
+
+// The leads, deals and contacts someone can open, as filters on a task's or activity's
+// linked record
+function openableRecords(user: CurrentUser) {
+    return [
+        ...(hasPermission(user, "lead:read") ? [{ lead: leadScope(user) }] : []),
+        ...(hasPermission(user, "deal:read") ? [{ deal: dealScope(user) }] : []),
+        ...(hasPermission(user, "contact:read") ? [{ contact: contactScope(user) }] : []),
+    ]
+}
+
+// Anyone can create a task, but task:all is needed to see everyone's. Without it you see
+// the tasks assigned to you or made by you, plus every task on a record you can open, so
+// a lead's Tasks tab still shows its whole history to the lead's owner.
+export function taskScope(user: CurrentUser): Prisma.TaskWhereInput {
+    if (hasPermission(user, "task:all")) {
+        return { organizationId: user.organizationId }
+    }
+    return {
+        organizationId: user.organizationId,
+        OR: [{ assignedToId: user.id }, { createdById: user.id }, ...openableRecords(user)],
+    }
+}
+
+// Same for calls and meetings, where being tagged as an attendee also makes it yours
+export function activityScope(user: CurrentUser): Prisma.ScheduledActivityWhereInput {
+    if (hasPermission(user, "activity:all")) {
+        return { organizationId: user.organizationId }
+    }
+    return {
+        organizationId: user.organizationId,
+        OR: [{ assignedToId: user.id }, { createdById: user.id }, { attendees: { some: { id: user.id } } }, ...openableRecords(user)],
     }
 }
 

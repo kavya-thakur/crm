@@ -138,6 +138,8 @@ model Lead {
   @@index([assignedToId])
   @@index([stageId])
   @@index([sourceId])
+  // trigram indexes: make the global search's "contains" matching (ILIKE '%acme%') fast
+  @@index([name(ops: raw("gin_trgm_ops")), email(ops: raw("gin_trgm_ops")), companyName(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([email])
   @@index([contactId])
 }
@@ -292,6 +294,9 @@ model Deal {
   description       String?
   // values for this org's CustomFieldDefinition rows (entity "deal")
   customFields      Json?
+  // when the deal moved into a won or lost stage; null while it's still open.
+  // The dashboard counts "won this month" from it (updatedAt changes on any edit)
+  closedAt          DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -311,6 +316,9 @@ model Deal {
   @@index([assignedToId])
   @@index([leadId])
   @@index([expectedCloseDate])
+  @@index([organizationId, closedAt])
+  // trigram indexes: make the global search's "contains" matching (ILIKE '%acme%') fast
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 // The deal's Timeline tab: an automatic, read-only log. See DealNote for
@@ -388,6 +396,8 @@ model Contact {
   @@index([companyId])
   @@index([assignedToId])
   @@index([organizationId, name])
+  // trigram indexes: make the global search's "contains" matching (ILIKE '%acme%') fast
+  @@index([name(ops: raw("gin_trgm_ops")), email(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 // The contact's Timeline tab: an automatic, read-only log. See ContactNote
@@ -523,10 +533,14 @@ model ScheduledActivity {
   @@index([leadId])
   @@index([dealId])
   @@index([contactId])
+  // trigram indexes: make the global search's "contains" matching (ILIKE '%acme%') fast
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
+// The task board's three columns: To do, In progress, Done
 enum TaskStatus {
   PENDING
+  IN_PROGRESS
   COMPLETED
 }
 
@@ -575,4 +589,6 @@ model Task {
   @@index([leadId])
   @@index([dealId])
   @@index([contactId])
+  // trigram indexes: make the global search's "contains" matching (ILIKE '%acme%') fast
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
 }

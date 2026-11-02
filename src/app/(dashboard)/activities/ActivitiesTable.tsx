@@ -38,7 +38,7 @@ const EMPTY_STATE: Record<ActivityScope, { title: string; hint: string }> = {
 // Title is pinned (it's how an activity is opened); the rest are plain columns, with
 // Type, Duration and Assigned to editable in place via the hover pencil. When,
 // attendees and status are changed in the activity's own panel.
-function buildColumns(context: {
+export function activityColumns(context: {
     agents?: AgentOption[];
     onUpdate: (activity: Activity, changes: Record<string, unknown>) => void;
 }): DataColumn<Activity>[] {
@@ -139,7 +139,7 @@ export default function ActivitiesTable({
         return () => observer.disconnect();
     }, [hasMore, loadingMore, onLoadMore]);
 
-    const columns = buildColumns({ agents, onUpdate });
+    const columns = activityColumns({ agents, onUpdate });
     const colSpan = columns.length + 3;
 
     if (failed) {

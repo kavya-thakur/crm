@@ -178,7 +178,7 @@ function NoteItem({
 
 // Shared by posting a new note and editing an existing one: a textarea where
 // typing "@" opens a picker of agents to mention.
-function NoteComposer({
+export function NoteComposer({
     agents,
     initialBody = "",
     initialMentions = [],

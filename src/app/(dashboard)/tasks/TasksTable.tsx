@@ -10,6 +10,7 @@ import {
     IconFlag,
     IconLink,
     IconPlus,
+    IconProgress,
     IconUserCircle,
 } from "@tabler/icons-react";
 import Link from "next/link";
@@ -23,7 +24,19 @@ import { formatDate, formatDay } from "@/lib/format";
 import type { AgentOption } from "../shared/customFields";
 import { PRIORITY_OPTIONS, PriorityBadge } from "../shared/tasks";
 import { linkedRecord } from "../shared/linkedRecord";
-import { isOverdue, type Task, type TaskScope } from "./shared";
+import { TASK_STATUSES, isOverdue, type Task, type TaskScope, type TaskStatus } from "./shared";
+
+// "● In progress": a status with its board column's colour
+export function TaskStatusLabel({ status }: { status: TaskStatus }) {
+    const { label, color } = TASK_STATUSES.find((item) => item.value === status)!;
+
+    return (
+        <span className="flex items-center gap-1.5">
+            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+            {label}
+        </span>
+    );
+}
 
 const EMPTY_STATE: Record<TaskScope, { title: string; hint: string }> = {
     open: { title: "You're all caught up", hint: "Add a task to keep track of what needs doing." },
@@ -34,7 +47,7 @@ const EMPTY_STATE: Record<TaskScope, { title: string; hint: string }> = {
 
 // Title is pinned (it's how a task is opened); the rest are plain columns,
 // with Due date, Priority and Assigned to editable in place via the hover pencil
-function buildColumns(context: {
+export function taskColumns(context: {
     agents?: AgentOption[];
     onUpdate: (task: Task, changes: Record<string, unknown>) => void;
 }): DataColumn<Task>[] {
@@ -62,7 +75,19 @@ function buildColumns(context: {
         onSave: (task, value) => value && context.onUpdate(task, { assignedToId: Number(value) }),
     };
 
+    const statusEdit: EditConfig<Task> = {
+        type: "select",
+        getValue: (task) => task.status,
+        options: TASK_STATUSES.map((status) => ({ value: status.value, label: status.label, render: <TaskStatusLabel status={status.value} /> })),
+        onSave: (task, value) => value && context.onUpdate(task, { status: value }),
+    };
+
     return [
+        {
+            key: "status", label: "Status", icon: IconProgress, width: 140,
+            edit: statusEdit,
+            cell: (task) => <TaskStatusLabel status={task.status} />,
+        },
         {
             key: "dueDate", label: "Due date", icon: IconCalendarDue, width: 160,
             edit: dueDateEdit,
@@ -134,7 +159,7 @@ export default function TasksTable({
         return () => observer.disconnect();
     }, [hasMore, loadingMore, onLoadMore]);
 
-    const columns = buildColumns({ agents, onUpdate });
+    const columns = taskColumns({ agents, onUpdate });
     const colSpan = columns.length + 3;
 
     if (failed) {

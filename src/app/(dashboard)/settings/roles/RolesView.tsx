@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconChevronRight, IconPlus, IconUsers } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { SectionIcon } from "@/components/SectionIcon";
+import { SectionIcon, headerWash } from "@/components/SectionIcon";
 import { Pill } from "@/components/Pill";
 import { SidePanel } from "@/components/SidePanel";
 import { ErrorState } from "@/components/ErrorState";
@@ -40,8 +40,26 @@ interface Can {
 const AREAS = [
     { key: "lead", label: "Leads" },
     { key: "deal", label: "Deals" },
+    { key: "contact", label: "Contacts" },
     { key: "user", label: "Members" },
     { key: "role", label: "Roles" },
+];
+
+// Whose work a member sees: without these, only their own
+const SEE_EVERYONES = [
+    { name: "lead:all", label: "Every lead", hint: "Otherwise only the leads assigned to them. Needed to assign leads." },
+    { name: "deal:all", label: "Every deal", hint: "Otherwise only their own deals. Also shows the team on the dashboard." },
+    { name: "contact:all", label: "Every contact", hint: "Otherwise only the contacts assigned to them." },
+    { name: "task:all", label: "Every task", hint: "Anyone can add tasks. Otherwise they see their own and those on their records." },
+    { name: "activity:all", label: "Every call & meeting", hint: "Otherwise only theirs and the ones they're tagged on." },
+];
+
+// Changing how the workspace is set up, for everyone in it
+const SETUP = [
+    { name: "pipeline:manage", label: "Pipeline stages", hint: "Add, rename, recolour, reorder and remove the deals board's stages." },
+    { name: "lead-stages:manage", label: "Lead stages", hint: "The same for the leads board's stages." },
+    { name: "lead-sources:manage", label: "Lead sources", hint: "The list of places leads come from." },
+    { name: "custom-fields:manage", label: "Custom fields", hint: "Extra fields on leads, deals and contacts." },
 ];
 
 const ACTIONS = [
@@ -67,9 +85,9 @@ export default function RolesView({ me, can }: { me: Me; can: Can }) {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("roles")}>
                 <SectionIcon section="roles" size="md" />
-                <h1 className="font-semibold">Roles</h1>
+                <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Roles</h1>
                 {roles.data && <span className="text-faint">{roles.data.length}</span>}
 
                 {can.create && (
@@ -316,26 +334,27 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
                         </tbody>
                     </table>
 
-                    <label className="mt-3 flex items-start gap-2 rounded-lg border border-line-light p-3">
-                        <span className="pt-0.5">{permissionCheckbox("lead:all")}</span>
-                        <span>
-                            <span className="font-medium">See every lead</span>
-                            <span className="block text-faint">
-                                Without this, members only see and work on leads assigned to them. Needed to assign leads.
-                            </span>
-                        </span>
-                    </label>
-
-                    <label className="mt-2 flex items-start gap-2 rounded-lg border border-line-light p-3">
-                        <span className="pt-0.5">{permissionCheckbox("pipeline:manage")}</span>
-                        <span>
-                            <span className="font-medium">Manage pipeline</span>
-                            <span className="block text-faint">
-                                Create, rename, reorder and delete the stages of the deals board.
-                            </span>
-                        </span>
-                    </label>
                 </div>
+
+                {[
+                    { title: "See everyone's work", items: SEE_EVERYONES },
+                    { title: "Workspace setup", items: SETUP },
+                ].map((group) => (
+                    <div key={group.title}>
+                        <p className="mb-1 text-sm font-medium text-muted">{group.title}</p>
+                        <div className="divide-y divide-line-light rounded-lg border border-line-light">
+                            {group.items.map((item) => (
+                                <label key={item.name} className="flex items-start gap-2.5 px-3 py-2.5">
+                                    <span className="pt-0.5">{permissionCheckbox(item.name)}</span>
+                                    <span>
+                                        <span className="font-medium">{item.label}</span>
+                                        <span className="block text-sm text-faint">{item.hint}</span>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                ))}
 
                 {(save.isError || remove.isError) && (
                     <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-danger">

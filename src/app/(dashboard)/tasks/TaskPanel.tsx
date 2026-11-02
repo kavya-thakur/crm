@@ -30,7 +30,8 @@ import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { PriorityDropdown } from "../shared/tasks";
 import { linkedRecord } from "../shared/linkedRecord";
-import { isOverdue, refreshTasks, type Task, type TaskPriority } from "./shared";
+import { TASK_STATUSES, isOverdue, refreshTasks, type Task, type TaskPriority } from "./shared";
+import { TaskStatusLabel } from "./TasksTable";
 
 type TaskChanges = Partial<{
     title: string;
@@ -147,7 +148,23 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
                             <SectionLabel>Fields</SectionLabel>
 
                             <FieldRow icon={IconProgress} label="Status">
-                                <StatusBadge task={task} />
+                                <Dropdown buttonClassName="flex h-7 items-center rounded-lg px-1.5 hover:bg-fill" label={<TaskStatusLabel status={task.status} />}>
+                                    {(close) =>
+                                        TASK_STATUSES.map((option) => (
+                                            <MenuItem
+                                                key={option.value}
+                                                selected={option.value === task.status}
+                                                onClick={() => {
+                                                    if (option.value !== task.status) update.mutate({ status: option.value });
+                                                    close();
+                                                }}
+                                            >
+                                                <TaskStatusLabel status={option.value} />
+                                            </MenuItem>
+                                        ))
+                                    }
+                                </Dropdown>
+                                {isOverdue(task) && <span className="ml-1 inline-flex h-5 items-center rounded-full bg-danger-soft px-2 text-sm font-medium text-danger">Overdue</span>}
                             </FieldRow>
 
                             <FieldRow icon={IconCalendarDue} label="Due date">
@@ -274,18 +291,6 @@ function AssigneeLabel({ task }: { task: Task }) {
             <span className="truncate">{task.assignedTo.name}</span>
         </>
     );
-}
-
-// A pending task past its day reads "Overdue" (red); otherwise Pending (blue) or Completed (green)
-function StatusBadge({ task }: { task: Task }) {
-    const [label, colour] =
-        task.status === "COMPLETED"
-            ? ["Completed", "bg-[#e6f6eb] text-[#00824d]"]
-            : isOverdue(task)
-                ? ["Overdue", "bg-danger-soft text-danger"]
-                : ["Pending", "bg-accent-soft text-accent"];
-
-    return <span className={`ml-1 inline-flex h-5 items-center rounded-full px-2 text-sm font-medium ${colour}`}>{label}</span>;
 }
 
 interface EditableTextProps {

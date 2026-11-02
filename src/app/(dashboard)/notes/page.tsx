@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { hasPermission } from "@/lib/auth/requirePermission";
 import NotesView from "./NotesView";
 
 export const metadata: Metadata = {
     title: "Notes",
 };
 
-// No `can` props here — /api/notes itself only returns notes from whichever
-// of lead/deal/contact this user can read, same as every per-record notes route.
+// /api/notes itself only returns notes from whichever of lead/deal/contact this user
+// can read; `entities` just tells the board which columns to draw.
 export default async function NotesPage() {
     const user = await getCurrentUser();
 
@@ -17,5 +18,7 @@ export default async function NotesPage() {
         redirect("/login");
     }
 
-    return <NotesView meId={user.id} />;
+    const entities = (["lead", "deal", "contact"] as const).filter((entity) => hasPermission(user, `${entity}:read`));
+
+    return <NotesView meId={user.id} entities={[...entities]} />;
 }

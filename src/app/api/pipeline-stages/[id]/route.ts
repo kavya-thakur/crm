@@ -1,6 +1,7 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
+import { closedAtFor } from "@/lib/pipelineStages";
 import { idParamSchema } from "@/lib/validations/common";
 import { updatePipelineStageSchema } from "@/lib/validations/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";
@@ -61,6 +62,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             },
             data: body.data,
         });
+
+        // becoming won/lost closes the deals already here; the reverse reopens them
+        if ((existing.isWon || existing.isLost) !== (stage.isWon || stage.isLost)) {
+            await prisma.deal.updateMany({
+                where: { pipelineStageId: stage.id, organizationId: user.organizationId },
+                data: { closedAt: closedAtFor(stage) },
+            });
+        }
 
         return NextResponse.json({ ok: true, data: stage });
     } catch (error) {

@@ -7,12 +7,13 @@ import { IconChevronDown, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
-import { ListHeader } from "@/components/ListPage";
+import { ListHeader, ViewSwitcher } from "@/components/ListPage";
 import { toast } from "@/components/Toast";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { toggledStatus } from "../shared/activities";
 import ActivitiesTable from "./ActivitiesTable";
+import ActivitiesBoard from "./ActivitiesBoard";
 import ActivityPanel from "./ActivityPanel";
 import NewActivityDialog from "./NewActivityDialog";
 import { refreshActivities, type Activity, type ActivityScope, type Paginated } from "./shared";
@@ -33,6 +34,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
     const searchParams = useSearchParams();
     const enterRef = usePanelEnter<HTMLDivElement>();
 
+    const [view, setView] = useState<"table" | "board">("table");
     const [scope, setScope] = useState<ActivityScope>("upcoming");
     // your own schedule (assigned to you or tagged on) is what you usually want; switch it to see the team's
     const [mineOnly, setMineOnly] = useState(true);
@@ -114,7 +116,11 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
             <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
-                {SCOPES.map((item) => (
+                <ViewSwitcher view={view} onChange={setView} tableLabel="All activities" boardLabel="By status" />
+
+                {/* the board's columns already split activities by status, so these are table-only */}
+                {view === "table" && <span className="mx-1 h-4 w-px bg-line" />}
+                {view === "table" && SCOPES.map((item) => (
                     <button
                         key={item.value}
                         type="button"
@@ -152,22 +158,31 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
             </div>
 
             <div className="relative min-h-0 flex-1 overflow-auto">
-                <ActivitiesTable
-                    activities={activities}
-                    scope={scope}
-                    agents={seeAgents ? agents.data : undefined}
-                    loading={activitiesQuery.isPending}
-                    failed={activitiesQuery.isError}
-                    error={activitiesQuery.error}
-                    onRetry={() => activitiesQuery.refetch()}
-                    hasMore={activitiesQuery.hasNextPage}
-                    loadingMore={activitiesQuery.isFetchingNextPage}
-                    onLoadMore={activitiesQuery.fetchNextPage}
-                    onToggle={(activity) => updateActivity.mutate({ id: activity.id, changes: { status: toggledStatus(activity.status) } })}
-                    onUpdate={(activity, changes) => updateActivity.mutate({ id: activity.id, changes })}
-                    onOpen={(id) => router.push(`/activities?open=${id}`)}
-                    onCreate={() => setCreating(true)}
-                />
+                {view === "board" ? (
+                    <ActivitiesBoard
+                        mineOnly={mineOnly}
+                        agents={seeAgents ? agents.data : undefined}
+                        onOpen={(id) => router.push(`/activities?open=${id}`)}
+                        onCreate={() => setCreating(true)}
+                    />
+                ) : (
+                    <ActivitiesTable
+                        activities={activities}
+                        scope={scope}
+                        agents={seeAgents ? agents.data : undefined}
+                        loading={activitiesQuery.isPending}
+                        failed={activitiesQuery.isError}
+                        error={activitiesQuery.error}
+                        onRetry={() => activitiesQuery.refetch()}
+                        hasMore={activitiesQuery.hasNextPage}
+                        loadingMore={activitiesQuery.isFetchingNextPage}
+                        onLoadMore={activitiesQuery.fetchNextPage}
+                        onToggle={(activity) => updateActivity.mutate({ id: activity.id, changes: { status: toggledStatus(activity.status) } })}
+                        onUpdate={(activity, changes) => updateActivity.mutate({ id: activity.id, changes })}
+                        onOpen={(id) => router.push(`/activities?open=${id}`)}
+                        onCreate={() => setCreating(true)}
+                    />
+                )}
             </div>
         </div>
     );

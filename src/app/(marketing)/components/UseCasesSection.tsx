@@ -1,29 +1,27 @@
 import { Accent, CONTAINER, Eyebrow, Heading, PlusMark } from "./Eyebrow";
-import { DashArt, iconArt, type ShapeName } from "./DashArt";
+import { Halftone3D, type ShapeName } from "./Halftone3D";
 import { ArrowTile, FolderCard } from "./FolderCard";
-
-const ICON_SIZE = 180;
 
 // Kinds of teams Flash is made for. Where twenty.com shows customer stories, these are
 // honest examples of use, not invented customers.
 const USE_CASES: { team: string; shape: ShapeName; color: string; body: string; tags: [string, string] }[] = [
     {
         team: "Agencies",
-        shape: "hexagon",
+        shape: "plane",
         color: "#ed87fc",
         body: "Track every enquiry from first call to signed retainer, and see which source actually brings in the work.",
         tags: ["Lead sources", "Deals"],
     },
     {
         team: "B2B sales teams",
-        shape: "arrow",
+        shape: "trophy",
         color: "#89fc9a",
         body: "Give managers the whole pipeline and agents only their own leads, with every hand-off on the timeline.",
         tags: ["Roles", "Pipeline"],
     },
     {
         team: "Founders selling first",
-        shape: "diamond",
+        shape: "hourglass",
         color: "#feffb7",
         body: "Replace the spreadsheet before it breaks: contacts, follow-ups and notes in one place from day one.",
         tags: ["Contacts", "Tasks"],
@@ -56,16 +54,8 @@ export function UseCasesSection() {
                         <FolderCard key={useCase.team} dark className={index === 1 ? "min-[921px]:mt-24" : index === 2 ? "min-[921px]:mt-48" : ""}>
                             <h3 className="border-b border-white/20 pt-1 pb-4 font-(family-name:--font-host-grotesk) text-[16px] font-medium text-white">{useCase.team}</h3>
 
-                            <div className="flex h-64 items-center justify-center">
-                                <DashArt
-                                    width={ICON_SIZE}
-                                    height={ICON_SIZE}
-                                    sample={iconArt(useCase.shape, ICON_SIZE)}
-                                    rowGap={6}
-                                    barHeight={3}
-                                    cell={4}
-                                    style={{ color: useCase.color }}
-                                />
+                            <div className="h-64">
+                                <Halftone3D shape={useCase.shape} color={useCase.color} className="h-full w-full" />
                             </div>
 
                             <p className="font-(family-name:--font-host-grotesk) text-[16px] leading-[1.55] text-white/60">{useCase.body}</p>
