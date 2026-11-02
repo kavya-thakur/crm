@@ -2,7 +2,7 @@
 
 import { IconBriefcase, IconTargetArrow } from "@tabler/icons-react";
 
-import { SectionIcon } from "@/components/SectionIcon";
+import { SectionIcon, headerWash } from "@/components/SectionIcon";
 import { OptionListEditor, type OptionListConfig } from "./OptionListEditor";
 
 const LEAD_STAGES: OptionListConfig = {
@@ -51,9 +51,9 @@ export default function StagesView({ show }: { show: { leadStages: boolean; lead
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("stages")}>
                 <SectionIcon section="stages" size="md" />
-                <h1 className="font-semibold">Stages & sources</h1>
+                <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Stages & sources</h1>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto">

@@ -5,6 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { idParamSchema } from "@/lib/validations/common";
 import { updateDealSchema } from "@/lib/validations/deals";
 import { validateCustomFieldValues } from "@/lib/customFields";
+import { closedAtFor } from "@/lib/pipelineStages";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -91,6 +92,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
         const { pipelineStageId, leadId, customFields: submittedCustomFields, ...fields } = body.data;
 
+        // when the stage changes: the moment the deal closed, or null if it's open again
+        let closedAt: Date | null = null;
+
         // Verify that the pipeline stage belongs to this organization, if changing it.
         if (pipelineStageId !== undefined) {
             const stage = await prisma.pipelineStage.findFirst({
@@ -98,7 +102,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                     id: pipelineStageId,
                     organizationId: user.organizationId,
                 },
-                select: { id: true },
+                select: { id: true, isWon: true, isLost: true },
             });
 
             if (!stage) {
@@ -110,6 +114,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
                     { status: 400 }
                 );
             }
+
+            closedAt = closedAtFor(stage);
         }
 
         // Verify that the lead belongs to this organization, if changing it.
@@ -173,6 +179,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 leadId,
                 ...(customFields && { customFields }),
                 ...(stageChanged && {
+                    closedAt,
                     timeline: {
                         create: {
                             userId: user.id,

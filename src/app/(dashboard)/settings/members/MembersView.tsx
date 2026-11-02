@@ -15,7 +15,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { SectionIcon } from "@/components/SectionIcon";
+import { SectionIcon, headerWash } from "@/components/SectionIcon";
 import { Pill } from "@/components/Pill";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
@@ -113,9 +113,9 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("members")}>
                 <SectionIcon section="members" size="md" />
-                <h1 className="font-semibold">Members</h1>
+                <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Members</h1>
                 {members.data && <span className="text-faint">{members.data.length}</span>}
 
                 {can.create && can.seeRoles && (

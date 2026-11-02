@@ -6,7 +6,7 @@ import { useGSAP } from "@gsap/react";
 import { IconMinus, IconPlus } from "@tabler/icons-react";
 
 import { Accent, CONTAINER, Eyebrow, Heading } from "./Eyebrow";
-import { CutButton } from "./CutButton";
+import { Button } from "./Button";
 import { DashArt, blobs } from "./DashArt";
 
 const FAQS = [
@@ -65,12 +65,12 @@ export function FaqSection({ primaryHref, primaryLabel }: { primaryHref: string;
                     Stop chasing spreadsheets. <Accent>Start selling, with Flash</Accent>
                 </Heading>
                 <div className="mt-8 flex flex-wrap gap-2">
-                    <CutButton href={primaryHref} scheme="dark">
+                    <Button href={primaryHref} scheme="dark">
                         {primaryLabel}
-                    </CutButton>
-                    <CutButton href="/login" variant="outlined" scheme="dark">
+                    </Button>
+                    <Button href="/login" variant="outlined" scheme="dark">
                         Log in
-                    </CutButton>
+                    </Button>
                 </div>
 
                 <ul className="mx-auto mt-20 max-w-224.5">

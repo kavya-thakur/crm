@@ -1,5 +1,6 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { activityScope, contactScope, dealScope, leadScope } from "@/lib/auth/requirePermission";
 import { activityInclude, allAgentsInOrganization } from "@/lib/activities";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
@@ -24,13 +25,13 @@ export async function POST(req: NextRequest) {
         // Verify the linked record (if any) belongs to this organization
         const [lead, deal, contact] = await Promise.all([
             leadId != null
-                ? prisma.lead.findFirst({ where: { id: leadId, organizationId: user.organizationId }, select: { id: true } })
+                ? prisma.lead.findFirst({ where: { id: leadId, ...leadScope(user) }, select: { id: true } })
                 : null,
             dealId != null
-                ? prisma.deal.findFirst({ where: { id: dealId, organizationId: user.organizationId }, select: { id: true } })
+                ? prisma.deal.findFirst({ where: { id: dealId, ...dealScope(user) }, select: { id: true } })
                 : null,
             contactId != null
-                ? prisma.contact.findFirst({ where: { id: contactId, organizationId: user.organizationId }, select: { id: true } })
+                ? prisma.contact.findFirst({ where: { id: contactId, ...contactScope(user) }, select: { id: true } })
                 : null,
         ])
 
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, scope, assignedTo, leadId, dealId, contactId } = query.data;
+        const { page, limit, scope, status, assignedTo, leadId, dealId, contactId } = query.data;
 
         const now = new Date();
 
@@ -114,8 +115,10 @@ export async function GET(req: NextRequest) {
                             : {};
 
         const where: Prisma.ScheduledActivityWhereInput = {
-            organizationId: user.organizationId,
+            // whose activities this person may see at all; everything below only narrows it
+            AND: [activityScope(user)],
             ...scopeFilter,
+            ...(status && { status }),
             // an agent's schedule is what's assigned to them plus what they're tagged on
             ...(assignedTo !== undefined && {
                 OR: [
@@ -130,7 +133,7 @@ export async function GET(req: NextRequest) {
 
         // Soonest due first while still scheduled, most recently resolved first once
         // completed/cancelled — id as tie-breaker so same-minute activities stay stable
-        const sortOrder = scope === "upcoming" || scope === "overdue" ? "asc" : "desc";
+        const sortOrder = scope === "upcoming" || scope === "overdue" || status === "SCHEDULED" ? "asc" : "desc";
 
         const [activities, total] = await Promise.all([
             prisma.scheduledActivity.findMany({

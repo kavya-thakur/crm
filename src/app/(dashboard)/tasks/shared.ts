@@ -12,7 +12,7 @@ export interface Task {
     id: number;
     title: string;
     description: string | null;
-    status: "PENDING" | "COMPLETED";
+    status: TaskStatus;
     priority: TaskPriority;
     // a day, stored as midnight UTC: "2026-11-05T00:00:00.000Z"
     dueDate: string;
@@ -25,6 +25,14 @@ export interface Task {
 }
 
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
+export type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
+
+// In board order, with the colour each column's dot shows in
+export const TASK_STATUSES: { value: TaskStatus; label: string; color: string }[] = [
+    { value: "PENDING", label: "To do", color: "#8d8d8d" },
+    { value: "IN_PROGRESS", label: "In progress", color: "#0d74ce" },
+    { value: "COMPLETED", label: "Done", color: "#218358" },
+];
 
 // Lowest to highest, with the colours each shows in
 export const TASK_PRIORITIES: { value: TaskPriority; label: string; className: string }[] = [
@@ -49,5 +57,5 @@ export interface Paginated<T> {
 
 // Same "today" the API uses, so a task looks overdue exactly when the Overdue tab lists it
 export function isOverdue(task: Task) {
-    return task.status === "PENDING" && task.dueDate.slice(0, 10) < new Date().toISOString().slice(0, 10);
+    return task.status !== "COMPLETED" && task.dueDate.slice(0, 10) < new Date().toISOString().slice(0, 10);
 }

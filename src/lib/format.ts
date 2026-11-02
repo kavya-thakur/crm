@@ -29,3 +29,15 @@ export function timeAgo(date: string) {
     }
     return "just now";
 }
+
+// "₹2,50,000": money on the dashboard, in whole rupees
+export const formatMoney = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format;
+
+// "₹12.5K", "₹2.5L", "₹3.5Cr": for chart axes and other tight spots
+export const formatMoneyShort = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    notation: "compact",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+}).format;

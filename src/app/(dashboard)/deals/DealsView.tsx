@@ -202,7 +202,10 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         }),
         ...customFields
             .filter((field) => field.showInList)
-            .map((field) => createCustomColumn<Deal>(field, (deal) => deal.customFields, { agents: can.seeAgents ? agentsQuery.data : undefined })),
+            .map((field) => createCustomColumn<Deal>(field, (deal) => deal.customFields, {
+                    agents: can.seeAgents ? agentsQuery.data : undefined,
+                    onUpdate: can.update ? (deal, changes) => updateDeal.mutate({ id: deal.id, changes }) : undefined,
+                })),
     ];
     const { columnPrefs, visibleColumns, getWidth, resize, reorderVisible } = useTableColumns("deals-columns", dealColumns);
 
@@ -326,14 +329,13 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
                 ) : (
-                    <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-                        <DealsBoard
-                            filters={filters}
-                            canMove={can.update}
-                            onOpen={setSelectedDealId}
-                            onError={toast.error}
-                        />
-                    </div>
+                    <DealsBoard
+                        filters={filters}
+                        columns={visibleColumns}
+                        canMove={can.update}
+                        onOpen={setSelectedDealId}
+                        onCreate={can.create ? () => setCreating(true) : undefined}
+                    />
                 )}
             </div>
 

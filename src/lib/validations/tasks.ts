@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { dbIdSchema, hasAnyField, hasAtMostOneRecordLink, idParamSchema, optionalText, paginationSchema, requiredText } from "./common";
 
-export const taskStatusSchema = z.enum(["PENDING", "COMPLETED"]);
+export const taskStatusSchema = z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]);
 export const taskPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
 export const createTaskSchema = z
@@ -40,6 +40,8 @@ export const updateTaskSchema = z
 export const listTasksQuerySchema = paginationSchema.extend({
     // "open" = everything not done yet (overdue ones included); "overdue" = open and past its day
     scope: z.enum(["open", "overdue", "completed", "all"]).default("open"),
+    // one exact status, for a column of the task board
+    status: taskStatusSchema.optional(),
     assignedTo: z.union([z.literal("me"), idParamSchema]).optional(),
     priority: taskPrioritySchema.optional(),
     leadId: idParamSchema.optional(),

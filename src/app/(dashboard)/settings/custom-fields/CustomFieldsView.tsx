@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
-import { SectionIcon } from "@/components/SectionIcon";
+import { SectionIcon, headerWash } from "@/components/SectionIcon";
 import { Pill } from "@/components/Pill";
 import { SidePanel } from "@/components/SidePanel";
 import { ConfirmDeleteModal } from "@/components/ListPage";
@@ -50,9 +50,9 @@ export default function CustomFieldsView() {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-paper px-3" style={headerWash("customFields")}>
                 <SectionIcon section="customFields" size="md" />
-                <h1 className="font-semibold">Custom Fields</h1>
+                <h1 className="font-display text-[15px] font-semibold tracking-[-0.01em]">Custom Fields</h1>
                 {fieldsQuery.data && <span className="text-faint">{fieldsQuery.data.length}</span>}
 
                 <button

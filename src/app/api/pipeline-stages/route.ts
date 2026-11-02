@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { placeholderName, planOptionList } from "@/lib/optionLists";
+import { closedAtFor } from "@/lib/pipelineStages";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { createPipelineStageSchema, savePipelineStagesSchema } from "@/lib/validations/pipelineStages";
 
@@ -69,7 +70,7 @@ export async function PUT(req: NextRequest) {
 
         const existing = await prisma.pipelineStage.findMany({
             where: { organizationId: user.organizationId },
-            select: { id: true, name: true },
+            select: { id: true, name: true, isWon: true, isLost: true },
         });
 
         const plan = planOptionList(existing.map((stage) => stage.id), body.data.options);
@@ -112,6 +113,17 @@ export async function PUT(req: NextRequest) {
                     where: { id, organizationId: user.organizationId },
                     data: stage,
                 });
+
+                // A stage that became won/lost closes the deals in it now; one that
+                // stopped being won/lost reopens them
+                const before = existing.find((row) => row.id === id)!;
+                const wasClosed = before.isWon || before.isLost;
+                if (wasClosed !== (stage.isWon || stage.isLost)) {
+                    await tx.deal.updateMany({
+                        where: { pipelineStageId: id, organizationId: user.organizationId },
+                        data: { closedAt: closedAtFor(stage) },
+                    });
+                }
             }
 
             for (const stage of plan.creates) {

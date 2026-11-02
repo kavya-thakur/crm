@@ -14,4 +14,6 @@ export const listNoteFeedQuerySchema = z.object({
     // "mine" = notes I wrote, "mentions" = notes that @-mention me, "all" = either
     scope: z.enum(["all", "mine", "mentions"]).default("all"),
     limit: z.coerce.number().int().min(1).max(100).default(30),
+    // only one kind of record's notes, for a column of the notes board
+    entity: z.enum(["lead", "deal", "contact"]).optional(),
 });

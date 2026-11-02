@@ -1,19 +1,17 @@
 import { Accent, CONTAINER, Eyebrow, Heading, Lead } from "./Eyebrow";
-import { DashArt, iconArt, type ShapeName } from "./DashArt";
+import { Halftone3D, type ShapeName } from "./Halftone3D";
 import { ArrowTile, FolderCard } from "./FolderCard";
-
-const ICON_SIZE = 190;
 
 const PILLARS: { title: string; shape: ShapeName; body: string; tags: [string, string] }[] = [
     {
         title: "Capture every lead",
-        shape: "target",
+        shape: "funnel",
         body: "Leads from your website, referrals and events land with the right person straight away, instead of sitting in a shared inbox.",
         tags: ["Leads", "Lead sources"],
     },
     {
         title: "Close deals faster",
-        shape: "bolt",
+        shape: "coins",
         body: "Move deals across a board that matches your pipeline. Every stage change, note and hand-off is logged, so anyone can pick it up.",
         tags: ["Deals", "Pipeline"],
     },
@@ -42,16 +40,8 @@ export function PillarsSection() {
                                 {pillar.title}
                             </h3>
 
-                            <div className="flex h-68 items-center justify-center border-b border-dotted border-[#1c1c1c]/30">
-                                <DashArt
-                                    width={ICON_SIZE}
-                                    height={ICON_SIZE}
-                                    sample={iconArt(pillar.shape, ICON_SIZE)}
-                                    rowGap={6}
-                                    barHeight={3}
-                                    cell={4}
-                                    className="text-[#4a38f5]"
-                                />
+                            <div className="h-68 border-b border-dotted border-[#1c1c1c]/30">
+                                <Halftone3D shape={pillar.shape} className="h-full w-full" />
                             </div>
 
                             <p className="mt-6 flex-1 font-(family-name:--font-host-grotesk) text-[16px] leading-[1.55] text-[#1c1c1c]">{pillar.body}</p>

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { closedAtFor } from "@/lib/pipelineStages";
 
 const dealIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -166,7 +167,7 @@ export async function PATCH(req: NextRequest) {
                     id: data.pipelineStageId,
                     organizationId: user.organizationId,
                 },
-                select: { id: true },
+                select: { id: true, isWon: true, isLost: true },
             });
 
             if (!stage) {
@@ -194,6 +195,7 @@ export async function PATCH(req: NextRequest) {
                         },
                         data: {
                             pipelineStageId: data.pipelineStageId,
+                            closedAt: closedAtFor(stage),
                         },
                     });
 

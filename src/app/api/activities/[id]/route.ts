@@ -1,5 +1,6 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { activityScope } from "@/lib/auth/requirePermission";
 import { activityInclude, allAgentsInOrganization } from "@/lib/activities";
 import { prisma } from "@/lib/db/prisma";
 import { updateScheduledActivitySchema } from "@/lib/validations/scheduledActivities";
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         const activity = await prisma.scheduledActivity.findFirst({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                ...activityScope(user),
             },
             include: activityInclude,
         });
@@ -76,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         const existingActivity = await prisma.scheduledActivity.findFirst({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                ...activityScope(user),
             },
             select: { id: true },
         });
@@ -96,12 +97,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
             return NextResponse.json({ ok: false, message: "Invalid attendee" }, { status: 400 });
         }
 
-        // organizationId in the where too, so the write itself is checked; if the activity
+        // the scope in the where too, so the write itself is checked; if the activity
         // is deleted in between, Prisma throws P2025 -> 404
         const updatedActivity = await prisma.scheduledActivity.update({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                AND: [activityScope(user)],
             },
             data: {
                 ...fields,
@@ -135,11 +136,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             return validationError(id.error);
         }
 
-        // One query that checks the organization and deletes, so there's no gap for a race
+        // One query that checks the activity is theirs to touch and deletes, so there's no gap for a race
         const { count } = await prisma.scheduledActivity.deleteMany({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                ...activityScope(user),
             },
         });
 

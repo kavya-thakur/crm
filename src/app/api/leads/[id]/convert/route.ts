@@ -4,6 +4,7 @@ import { hasPermission, leadScope, requirePermission } from "@/lib/auth/requireP
 import { createDealSchema } from "@/lib/validations/deals";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { closedAtFor } from "@/lib/pipelineStages";
 
 // Only what a deal needs beyond the lead itself: the lead and its current
 // assignee carry over as-is, so neither is asked for here. Deal custom fields
@@ -78,7 +79,7 @@ export async function POST(
                 id: pipelineStageId,
                 organizationId: user.organizationId,
             },
-            select: { id: true },
+            select: { id: true, isWon: true, isLost: true },
         });
 
         if (!stage) {
@@ -94,6 +95,7 @@ export async function POST(
             prisma.deal.create({
                 data: {
                     ...body.data,
+                    closedAt: closedAtFor(stage),
                     leadId: lead.id,
                     assignedToId: lead.assignedToId,
                     organizationId: user.organizationId,

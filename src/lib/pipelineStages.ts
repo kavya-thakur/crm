@@ -9,3 +9,9 @@ export const DEFAULT_PIPELINE_STAGES = [
     { name: "Won", order: 4, color: STAGE_COLORS.green, isWon: true },
     { name: "Lost", order: 5, color: STAGE_COLORS.red, isLost: true },
 ];
+
+// A deal entering a won or lost stage closes now; entering any other stage reopens it.
+// Every route that puts a deal in a stage sets Deal.closedAt from this.
+export function closedAtFor(stage: { isWon: boolean; isLost: boolean }) {
+    return stage.isWon || stage.isLost ? new Date() : null;
+}

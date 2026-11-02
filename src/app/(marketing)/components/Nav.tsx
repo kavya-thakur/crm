@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { IconBolt } from "@tabler/icons-react";
 
-import { CutButton } from "./CutButton";
+import { Button } from "./Button";
 
 const LINKS = [
     { href: "#product", label: "Product" },
@@ -71,14 +71,14 @@ export function Nav({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolean
                 <div className="flex items-center gap-2">
                     {!loggedIn && (
                         <span className="hidden min-[921px]:inline-flex">
-                            <CutButton href="/login" variant="outlined" size="small" scheme={dark ? "dark" : "light"}>
+                            <Button href="/login" variant="outlined" size="small" scheme={dark ? "dark" : "light"}>
                                 Log in
-                            </CutButton>
+                            </Button>
                         </span>
                     )}
-                    <CutButton href={primaryHref} size="small" scheme={dark ? "dark" : "light"}>
+                    <Button href={primaryHref} size="small" scheme={dark ? "dark" : "light"}>
                         {primaryLabel}
-                    </CutButton>
+                    </Button>
                 </div>
             </div>
         </header>

@@ -44,6 +44,8 @@ export const listScheduledActivitiesQuerySchema = paginationSchema.extend({
     // "upcoming" = SCHEDULED and not yet due; "overdue" = SCHEDULED and past due;
     // "all" ignores status/time entirely
     scope: z.enum(["upcoming", "overdue", "completed", "cancelled", "all"]).default("upcoming"),
+    // one exact status, for a column of the activity board
+    status: scheduledActivityStatusSchema.optional(),
     // an agent's schedule: what's assigned to them plus what they're tagged on
     assignedTo: z.union([z.literal("me"), idParamSchema]).optional(),
     leadId: idParamSchema.optional(),

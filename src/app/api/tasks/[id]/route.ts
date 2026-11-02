@@ -1,5 +1,6 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { taskScope } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
 import { addTaskToTimeline, dueDateToDb, taskInclude } from "@/lib/tasks";
 import { updateTaskSchema } from "@/lib/validations/tasks";
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         const task = await prisma.task.findFirst({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                ...taskScope(user),
             },
             include: taskInclude,
         });
@@ -76,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         const existingTask = await prisma.task.findFirst({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                ...taskScope(user),
             },
             select: { status: true },
         });
@@ -99,13 +100,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
             }
         }
 
-        // organizationId in the where too, so the write itself is checked; if the task
+        // the scope in the where too, so the write itself is checked; if the task
         // is deleted in between, Prisma throws P2025 -> 404
         const updatedTask = await prisma.$transaction(async (tx) => {
             const updated = await tx.task.update({
                 where: {
                     id: id.data,
-                    organizationId: user.organizationId,
+                    AND: [taskScope(user)],
                 },
                 data: {
                     ...fields,
@@ -146,11 +147,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             return validationError(id.error);
         }
 
-        // One query that checks the organization and deletes, so there's no gap for a race
+        // One query that checks the task is theirs to touch and deletes, so there's no gap for a race
         const { count } = await prisma.task.deleteMany({
             where: {
                 id: id.data,
-                organizationId: user.organizationId,
+                ...taskScope(user),
             },
         });
 
