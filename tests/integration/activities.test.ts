@@ -89,6 +89,22 @@ describe("scheduled activities", () => {
         expect(json.data.map((activity: { title: string }) => activity.title)).toEqual(["Team sync"]);
     });
 
+    it("lists the scheduled ones from a moment on, soonest first, for the start-time popup", async () => {
+        const { user } = await setUpOrg();
+        (getCurrentUser as Mock).mockResolvedValue(user);
+        const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+
+        await createActivity(jsonRequest("POST", { type: "CALL", title: "Long gone", scheduledAt: minutesAgo(60) }));
+        await createActivity(jsonRequest("POST", { type: "CALL", title: "Just started", scheduledAt: minutesAgo(2) }));
+        await createActivity(jsonRequest("POST", { type: "MEETING", title: "Tomorrow", scheduledAt: inDays(1) }));
+
+        const from = encodeURIComponent(minutesAgo(15));
+        const res = await listActivities(new NextRequest(`http://localhost/api/activities?scope=all&status=SCHEDULED&assignedTo=me&from=${from}`));
+        const json = await res.json();
+
+        expect(json.data.map((activity: { title: string }) => activity.title)).toEqual(["Just started", "Tomorrow"]);
+    });
+
     it("reschedules, changes who is tagged, and completes an activity", async () => {
         const { user, colleague } = await setUpOrg();
         (getCurrentUser as Mock).mockResolvedValue(user);
