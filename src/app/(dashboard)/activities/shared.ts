@@ -95,3 +95,27 @@ export function nextFullHour() {
     date.setHours(date.getHours() + 1, 0, 0, 0);
     return date.toISOString();
 }
+
+// Quick ways to move an activity, as ISO datetimes: from now, or tomorrow at the same time of day
+export const RESCHEDULE_OPTIONS: { label: string; at: (scheduledAt: string) => string }[] = [
+    { label: "In 10 minutes", at: () => minutesFromNow(10) },
+    { label: "In 30 minutes", at: () => minutesFromNow(30) },
+    { label: "In 1 hour", at: () => minutesFromNow(60) },
+    {
+        label: "Tomorrow, same time",
+        at: (scheduledAt) => {
+            const was = new Date(scheduledAt);
+            const date = new Date();
+            date.setDate(date.getDate() + 1);
+            date.setHours(was.getHours(), was.getMinutes(), 0, 0);
+            return date.toISOString();
+        },
+    },
+];
+
+// to the whole minute, like the time pickers
+function minutesFromNow(minutes: number) {
+    const date = new Date(Date.now() + minutes * 60_000);
+    date.setSeconds(0, 0);
+    return date.toISOString();
+}

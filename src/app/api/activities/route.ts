@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, scope, status, assignedTo, leadId, dealId, contactId } = query.data;
+        const { page, limit, scope, status, assignedTo, leadId, dealId, contactId, from } = query.data;
 
         const now = new Date();
 
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
 
         const where: Prisma.ScheduledActivityWhereInput = {
             // whose activities this person may see at all; everything below only narrows it
-            AND: [activityScope(user)],
+            AND: [activityScope(user), ...(from ? [{ scheduledAt: { gte: from } }] : [])],
             ...scopeFilter,
             ...(status && { status }),
             // an agent's schedule is what's assigned to them plus what they're tagged on

@@ -7,7 +7,7 @@ import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkLeadChangesSchema } from "@/lib/validations/leads";
-import { stageMessage } from "@/lib/leads/stages";
+import { assignLeads, moveLeads } from "@/lib/jobs/bulkActions";
 import { firstName, notify } from "@/lib/realtime/notify";
 
 const leadIdsSchema = z.array(dbIdSchema).min(1).max(500);
@@ -125,44 +125,10 @@ export async function PATCH(req: NextRequest) {
                 agentName = agent.name;
             }
 
-            // Leads already assigned this way are skipped, so no duplicate timeline entries
-            const changed = leads.filter((lead) => lead.assignedToId !== assignedToId);
+            // leads already assigned this way are skipped, so no duplicate timeline entries
+            const changed = await prisma.$transaction((tx) => assignLeads(tx, user, leads, assignedToId === null ? null : { id: assignedToId, name: agentName! }));
 
             if (changed.length > 0) {
-                await prisma.$transaction(async (tx) => {
-                    await tx.lead.updateMany({
-                        where: {
-                            id: {
-                                in: changed.map((lead) => lead.id),
-                            },
-                            organizationId: user.organizationId,
-                        },
-                        data: {
-                            assignedToId,
-                            updatedById: user.id,
-                        },
-                    });
-
-                    await tx.leadTimeline.createMany({
-                        data: changed.map((lead) => ({
-                            leadId: lead.id,
-                            userId: user.id,
-                            type:
-                                assignedToId === null
-                                    ? "UNASSIGNED"
-                                    : lead.assignedToId === null
-                                        ? "ASSIGNED"
-                                        : "REASSIGNED",
-                            message:
-                                assignedToId === null
-                                    ? "Lead unassigned"
-                                    : lead.assignedToId === null
-                                        ? `Lead assigned to ${agentName}`
-                                        : `Lead reassigned to ${agentName}`,
-                        })),
-                    });
-                });
-
                 const [only] = changed;
                 await notify([assignedToId], {
                     organizationId: user.organizationId,
@@ -197,43 +163,7 @@ export async function PATCH(req: NextRequest) {
                 );
             }
 
-            const stageNames = new Map(
-                (
-                    await prisma.leadStage.findMany({
-                        where: { organizationId: user.organizationId },
-                        select: { id: true, name: true },
-                    })
-                ).map((s) => [s.id, s.name])
-            );
-
-            const changed = leads.filter((lead) => lead.stageId !== stage.id);
-
-            if (changed.length > 0) {
-                await prisma.$transaction(async (tx) => {
-                    await tx.lead.updateMany({
-                        where: {
-                            id: {
-                                in: changed.map((lead) => lead.id),
-                            },
-                            ...leadScope(user),
-                        },
-                        data: {
-                            stageId: stage.id,
-                            lostReason: stage.isLost ? (data.lostReason ?? null) : null,
-                            updatedById: user.id,
-                        },
-                    });
-
-                    await tx.leadTimeline.createMany({
-                        data: changed.map((lead) => ({
-                            leadId: lead.id,
-                            userId: user.id,
-                            type: "STATUS_CHANGED",
-                            message: stageMessage(stageNames.get(lead.stageId), stage, data.lostReason),
-                        })),
-                    });
-                });
-            }
+            const changed = await prisma.$transaction((tx) => moveLeads(tx, user, leads, stage, data.lostReason));
 
             return NextResponse.json({
                 ok: true,

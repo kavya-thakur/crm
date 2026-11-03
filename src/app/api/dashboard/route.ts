@@ -93,8 +93,8 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
     const [won, previousWon, lost, previousLost, lostByReason, openStages, byStage, byProbability, closing, closingItems, pastDue] = await Promise.all([
         prisma.deal.findMany({
             where: { ...where, pipelineStage: { isWon: true }, closedAt: { gte: start, lt: end } },
-            // the source of the lead it came from, for revenue per source
-            select: { amount: true, closedAt: true, createdAt: true, lead: { select: { sourceId: true } } },
+            // the source and ad campaign of the lead it came from, for revenue per source and per campaign
+            select: { amount: true, closedAt: true, createdAt: true, lead: { select: { sourceId: true, utmCampaign: true } } },
         }),
         prisma.deal.findMany({
             where: { ...where, pipelineStage: { isWon: true }, closedAt: { gte: previousStart, lt: start } },
@@ -136,6 +136,15 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
         wonBySource.set(sourceId, { value: row.value + Number(deal.amount), count: row.count + 1 });
     }
 
+    // the same per ad campaign; deals from leads without one aren't counted here
+    const wonByCampaign = new Map<string, { value: number; count: number }>();
+    for (const deal of won) {
+        const campaign = deal.lead?.utmCampaign;
+        if (!campaign) continue;
+        const row = wonByCampaign.get(campaign) ?? { value: 0, count: 0 };
+        wonByCampaign.set(campaign, { value: row.value + Number(deal.amount), count: row.count + 1 });
+    }
+
     // every open stage in board order, including the empty ones
     const stages = openStages.map((stage) => {
         const row = byStage.find((group) => group.pipelineStageId === stage.id);
@@ -153,6 +162,7 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
             trend: buckets.map((bucket, index) => ({ start: bucket.toISOString(), value: trend[index] })),
             previousTrend,
             bySource: [...wonBySource].map(([sourceId, row]) => ({ sourceId, ...row })),
+            byCampaign: [...wonByCampaign].map(([campaign, row]) => ({ campaign, ...row })),
         },
         lost: { count: lost, previousCount: previousLost, reasons: reasonRows(lostByReason) },
         open: {
@@ -183,11 +193,13 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
     const lastPeriod = { ...where, createdAt: { gte: previousStart, lt: start } };
 
     // counted by Postgres; only each lead's creation time comes back, for the chart
-    const [createdAt, byStage, bySource, convertedBySource, lostByReason, converted, previousCreated, previousConverted, stages, sources] = await Promise.all([
+    const [createdAt, byStage, bySource, convertedBySource, byCampaign, convertedByCampaign, lostByReason, converted, previousCreated, previousConverted, stages, sources] = await Promise.all([
         prisma.lead.findMany({ where: thisPeriod, select: { createdAt: true } }),
         prisma.lead.groupBy({ by: ["stageId"], where: thisPeriod, _count: { _all: true } }),
         prisma.lead.groupBy({ by: ["sourceId"], where: thisPeriod, _count: { _all: true } }),
         prisma.lead.groupBy({ by: ["sourceId"], where: { ...thisPeriod, stage: { isConverted: true } }, _count: { _all: true } }),
+        prisma.lead.groupBy({ by: ["utmCampaign"], where: { ...thisPeriod, utmCampaign: { not: null } }, _count: { _all: true } }),
+        prisma.lead.groupBy({ by: ["utmCampaign"], where: { ...thisPeriod, utmCampaign: { not: null }, stage: { isConverted: true } }, _count: { _all: true } }),
         prisma.lead.groupBy({ by: ["lostReason"], where: { ...thisPeriod, stage: { isLost: true } }, _count: { _all: true } }),
         prisma.lead.count({ where: { ...thisPeriod, stage: { isConverted: true } } }),
         prisma.lead.count({ where: lastPeriod }),
@@ -215,6 +227,15 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
         }))
         .sort((a, b) => b.count - a.count);
 
+    // the ad campaigns this period's leads came in from (utm_campaign on a web form), biggest first
+    const campaignRows = byCampaign
+        .map((group) => ({
+            campaign: group.utmCampaign!,
+            count: group._count._all,
+            converted: convertedByCampaign.find((row) => row.utmCampaign === group.utmCampaign)?._count._all ?? 0,
+        }))
+        .sort((a, b) => b.count - a.count);
+
     return {
         created: createdAt.length,
         previousCreated,
@@ -224,6 +245,7 @@ async function leadNumbers(where: Prisma.LeadWhereInput, user: CurrentUser, { st
         // where this period's leads are now, stage by stage in board order
         stages: stages.map((stage) => ({ ...stage, count: byStage.find((group) => group.stageId === stage.id)?._count._all ?? 0 })),
         sources: sourceRows,
+        campaigns: campaignRows,
         lostReasons: reasonRows(lostByReason),
     };
 }

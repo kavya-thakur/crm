@@ -86,9 +86,10 @@ cache, so the bar moves without refetching. Everyone's lead lists refresh as row
 
 ---
 
-## 4. Big bulk actions (deleting thousands)
+## 4. Big bulk actions (deleting, moving, assigning thousands)
 
-The same idea as imports, for "delete all 4,230 leads that match my filters":
+The same idea as imports, for "delete / move to Lost / assign to Priya all 4,230 leads that match
+my filters". It works on leads, deals and contacts (contacts have no stages):
 
 1. **Select all matching.** Ticking the header checkbox selects the rows loaded so far; a bar
    then offers *"Select all 4,230 matching leads"*. The page asks the list endpoint for every
@@ -96,11 +97,15 @@ The same idea as imports, for "delete all 4,230 leads that match my filters":
 2. **Small or big?** Up to `INSTANT_BULK_LIMIT` (200) records are deleted in the request as
    before. More become a **BulkJob** row holding the ids, a *snapshot* of what was selected, so
    leads added a second later aren't swept up. Its id goes on the `bulk` queue.
-3. **The worker** (`runBulkJob`, `src/lib/jobs/bulkActions.ts`) deletes 500 at a time. Each batch
+3. **The worker** (`runBulkJob`, `src/lib/jobs/bulkActions.ts`) works 500 at a time. The functions
+   that change a batch (`moveLeads`, `assignLeads`, `moveDeals`, `assignDeals`, `assignContacts`)
+   are the *same ones* the bulk routes use for a small selection, so timeline entries, lost reasons
+   and won/lost dates come out identical either way; an assignment sends one notification for the
+   whole job. Each batch
    and the job's counters (`processed`, `affected`) are one transaction, so a retry resumes. It
-   re-checks the person's permission first, and deletes only within their scope, so records
-   that became out of reach (or were already deleted) are skipped, and `affected` says how many
-   really went.
+   re-checks the person's permission (and that the stage or teammate still exists) first, and acts
+   only within their scope, so records that became out of reach, were already deleted or were
+   already that way are skipped, and `affected` says how many really changed.
 4. **Progress anywhere.** Each batch emits `bulk-progress` to the person's room; a small card in
    the corner of every page (`BackgroundJobs.tsx`) shows *"Deleting 4,230 leads… 2,000 of 4,230"*.
    When it finishes there's a toast, and everyone's lists have been shrinking as it went.
@@ -185,7 +190,15 @@ redis-cli TTL ratelimit:login:unknown:demo@flash-demo.dev   # seconds until that
 3. Start a `Worker` for it in `startWorkers()`.
 4. Add jobs from the routes with only ids in the data.
 
-Good next candidates: the **nightly demo reset** (a repeatable job), **speed-to-lead alerts**
+The **nightly demo reset** is one: a job *scheduler* (`upsertJobScheduler` in `startWorkers`,
+cron `0 3 * * *` in Asia/Kolkata) adds a job to the `demo` queue every night, and its worker runs
+`buildDemoWorkspace()`. Look at it with `redis-cli --scan --pattern 'bull:demo:*'`.
+
+**Emails** are another: `POST /api/emails` saves the email and adds `{ emailId }` to the `emails`
+queue; the worker's `sendEmail()` sends it over SMTP, and after 4 failed tries `failEmail()`
+marks it failed and tells the sender. See [EMAIL.md](EMAIL.md).
+
+Good next candidates: **speed-to-lead alerts**
 (a delayed job: "in 2 hours, check whether this lead was contacted"), and moving meeting
 **reminders** from the 30-second loop to delayed jobs at the exact minute.
 

@@ -9,22 +9,22 @@ const USE_CASES: { team: string; shape: ShapeName; color: string; body: string; 
         team: "Agencies",
         shape: "plane",
         color: "#ed87fc",
-        body: "Track every enquiry from first call to signed retainer, and see which source actually brings in the work.",
-        tags: ["Lead sources", "Deals"],
+        body: "Put a Flash form on your website, tag every enquiry with its source, and follow it from first call to signed retainer.",
+        tags: ["Web forms", "Lead sources"],
     },
     {
         team: "B2B sales teams",
         shape: "trophy",
         color: "#89fc9a",
-        body: "Give managers the whole pipeline and agents only their own leads, with every hand-off on the timeline.",
-        tags: ["Roles", "Pipeline"],
+        body: "Managers get the whole pipeline with win rate and forecast on the dashboard; agents see only their own leads and deals.",
+        tags: ["Roles", "Dashboard"],
     },
     {
         team: "Founders selling first",
         shape: "hourglass",
         color: "#feffb7",
-        body: "Replace the spreadsheet before it breaks: contacts, follow-ups and notes in one place from day one.",
-        tags: ["Contacts", "Tasks"],
+        body: "Import the spreadsheet before it breaks, then keep contacts, follow-ups and notes in one place from day one.",
+        tags: ["CSV import", "Tasks"],
     },
 ];
 

@@ -57,6 +57,14 @@ export function handleRouteError(error: unknown, context: string) {
                 { status: 403 }
             );
         }
+
+        // thrown by assertNotDemo
+        if (error.message === "DEMO") {
+            return NextResponse.json(
+                { ok: false, message: "That's switched off in the demo workspace, so it stays the same for everyone exploring it." },
+                { status: 403 }
+            );
+        }
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

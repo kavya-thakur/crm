@@ -82,7 +82,7 @@ async function customColumns(organizationId: number, entity: "lead" | "deal" | "
 export async function exportLeads(organizationId: number, where: Prisma.LeadWhereInput) {
     const custom = await customColumns(organizationId, "lead");
     // the same column names the importer recognises, so an exported file can be imported again
-    const header = ["Name", "Email", "Phone", "Company", "Stage", "Source", "Assigned to", "Lost reason", "Created", "Last updated", ...custom.header];
+    const header = ["Name", "Email", "Phone", "Company", "Stage", "Source", "Campaign", "Assigned to", "Lost reason", "Created", "Last updated", ...custom.header];
 
     return csvResponse(
         "leads",
@@ -96,6 +96,7 @@ export async function exportLeads(organizationId: number, where: Prisma.LeadWher
                 lead.companyName ?? "",
                 lead.stage.name,
                 lead.source?.name ?? "",
+                lead.utmCampaign ?? "",
                 lead.assignedTo?.name ?? "",
                 lead.lostReason ?? "",
                 day(lead.createdAt),

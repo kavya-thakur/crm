@@ -189,6 +189,7 @@ export async function runImport(importJobId: number) {
                             email: email ?? null,
                             phone,
                             companyName: companyName ?? null,
+                            utmCampaign: cell(row, "campaign").slice(0, 150) || null,
                             stageId: stage.id,
                             sourceId,
                             assignedToId: ownerId,

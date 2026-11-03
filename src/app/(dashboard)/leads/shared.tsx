@@ -50,6 +50,10 @@ export interface Lead {
     stage: LeadStage;
     // why it was lost, while it's in a lost stage
     lostReason: string | null;
+    // the ad campaign it came in from (utm_ tags on a web form's link); not editable
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
     // in lists: another open lead for the same person (same phone or email), if there is one
     duplicates?: { count: number; name: string } | null;
     createdAt: string;

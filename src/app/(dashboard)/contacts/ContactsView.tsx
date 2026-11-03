@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconArrowDown, IconArrowUp, IconBriefcase } from "@tabler/icons-react";
 
@@ -18,6 +17,7 @@ import {
     ExportButton,
     SearchBox,
     SortMenu,
+    Pagination,
 } from "@/components/ListPage";
 import {
     ActiveFilterChips,
@@ -39,10 +39,13 @@ import {
 import ContactsTable, { CONTACT_COLUMNS, withContactEdits } from "./ContactsTable";
 import ContactPanel from "./ContactPanel";
 import NewContactDialog from "./NewContactDialog";
+import { startBulkJob } from "../BackgroundJobs";
+import { SelectAllBar, useSelectAll } from "../shared/useSelectAll";
+import { PAGE_SIZES } from "../shared/useUrlState";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
+import { useUrlState } from "../shared/useUrlState";
 
-const PAGE_SIZE = 50;
 
 const SORT_FIELDS: { field: ContactFilters["sortBy"]; label: string }[] = [
     { field: "name", label: "Name" },
@@ -59,21 +62,17 @@ type BulkAction =
 export default function ContactsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
 
-    const searchParams = useSearchParams();
-    // Lets a link elsewhere (the Notes feed, a notification) land straight on a contact's panel,
-    // including one followed while this page is already open
-    const openParam = searchParams.get("open");
-    const [openContactId, setOpenContactId] = useState<number | null>(openParam ? Number(openParam) : null);
-    const [followedParam, setFollowedParam] = useState(openParam);
-    if (openParam !== followedParam) {
-        setFollowedParam(openParam);
-        if (openParam) setOpenContactId(Number(openParam));
-    }
+    // The open contact lives in the URL (?open=12): a refresh reopens it, Back closes it, and a
+    // link from elsewhere (the Notes feed, a notification) lands straight on it
+    const page = useUrlState();
+    const openContactId = Number(page.get("open")) || null;
+    const setOpenContactId = (id: number | null) => page.set({ open: id ? String(id) : null }, "push");
     const [creating, setCreating] = useState(false);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
 
     const {
         query: contactsQuery,
+        paging,
         items: contacts,
         total,
         filters,
@@ -86,7 +85,7 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
         "contacts",
         "/contacts",
         { sortBy: "createdAt", sortOrder: "desc" },
-        { pageSize: PAGE_SIZE, onSearch: (trimmed) => ({ search: trimmed || undefined }) },
+        { onSearch: (trimmed) => ({ search: trimmed || undefined }) },
     );
 
     // For the assignee filter and the assign menus
@@ -98,6 +97,20 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
 
     const customFieldsQuery = useCustomFields("contact");
     const customFields = customFieldsQuery.data ?? [];
+
+    // "Select all 4,230 matching contacts", and whether the selection is big enough for a background job
+    const selection = useSelectAll({ endpoint: "/contacts", filters, total, items: contacts, selected, setSelected });
+
+    // More than a couple of hundred, or every match: a background job with a progress card in the
+    // corner (docs/QUEUES.md)
+    const bulkJob = useMutation({
+        mutationFn: async (action: BulkAction) => startBulkJob(queryClient, { entity: "contact", ...action, ids: await selection.ids() }),
+        onSuccess: () => {
+            selection.clear();
+            setConfirmingDelete(false);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+    });
 
     const bulk = useMutation({
         mutationFn: (body: BulkAction) => api.patch("/contacts/bulkUpdate", { ...body, contactIds: [...selected] }),
@@ -119,6 +132,9 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
         },
         onError: (error) => toast.error(errorMessage(error)),
     });
+
+    // a bulk action: done in the request for a small selection, as a background job for a big one
+    const runBulk = (action: BulkAction) => (selection.big ? bulkJob.mutate(action) : bulk.mutate(action));
 
     // Inline edits from the table — a single-row PUT, same endpoint the
     // contact panel itself uses. Assignment goes through its own endpoint so
@@ -232,7 +248,7 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
             />
 
             {/* Search / filter / sort */}
-            <div className="flex h-10 shrink-0 items-center justify-end gap-1 border-b border-line-light px-2 font-medium text-muted">
+            <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0 [&>*:first-child]:ml-auto">
                 <SearchBox value={searchInput} ariaLabel="Search contacts" onChange={setSearchInput} />
 
                 <FilterPanelButton
@@ -267,6 +283,8 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                 <ActiveFilterChips fields={FILTER_FIELDS} filters={filters} onChange={updateFilters} />
             </FilterBar>
 
+            {(can.update || can.delete) && <SelectAllBar selection={selection} noun="contact" />}
+
             <div className="relative min-h-0 flex-1 overflow-auto">
                 <ContactsTable
                     contacts={contacts}
@@ -277,31 +295,32 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                     error={contactsQuery.error}
                     onRetry={() => contactsQuery.refetch()}
                     filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
-                    hasMore={contactsQuery.hasNextPage}
-                    loadingMore={contactsQuery.isFetchingNextPage}
-                    onLoadMore={contactsQuery.fetchNextPage}
                     selectable={can.update || can.delete}
                     selected={selected}
-                    onSelect={setSelected}
+                    onSelect={selection.onSelect}
                     onOpen={setOpenContactId}
                     onCreate={can.create ? () => setCreating(true) : undefined}
                 />
             </div>
 
+            {/* which page of the list, and how many rows a page */}
+            <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />
+
             {/* Bulk actions, Twenty's floating bar */}
             <BulkBar
-                count={selected.size}
-                onClear={() => setSelected(new Set())}
+                count={selection.count}
+                onClear={selection.clear}
                 onDelete={can.delete ? () => setConfirmingDelete(true) : undefined}
             >
                 {can.assign && agents.data && (
                     <AssignMenu
                         agents={agents.data}
-                        onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                        onAssign={(assignedToId) => runBulk({ action: "assign", assignedToId })}
                     />
                 )}
 
-                {can.update && (
+                {/* editing a field runs in the request, so only for a selection that fits in one */}
+                {!selection.big && can.update && (
                     <BulkEditButton
                         count={selected.size}
                         noun="contact"
@@ -317,11 +336,12 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
 
             <ConfirmDeleteModal
                 open={confirmingDelete}
-                count={selected.size}
+                count={selection.count}
                 noun="contact"
-                pending={bulk.isPending}
+                description={selection.big ? "It runs in the background, so you can keep working. This can't be undone." : undefined}
+                pending={bulk.isPending || bulkJob.isPending}
                 onCancel={() => setConfirmingDelete(false)}
-                onConfirm={() => bulk.mutate({ action: "delete" })}
+                onConfirm={() => runBulk({ action: "delete" })}
             />
         </div>
     );

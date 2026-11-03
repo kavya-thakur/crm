@@ -7,7 +7,10 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasPermission } from "@/lib/auth/requirePermission";
 import { Avatar } from "@/components/Avatar";
 import { LostReasonPrompt } from "@/components/LostReasonPrompt";
+import { DEMO_PEOPLE, isDemoWorkspace } from "@/lib/demo/workspace";
 import { LiveUpdates } from "./LiveUpdates";
+import { ActivityAlert } from "./ActivityAlert";
+import { SidebarShell } from "./SidebarShell";
 import { BackgroundJobs } from "./BackgroundJobs";
 import { NotificationBell } from "./NotificationBell";
 import CommandMenu, { SearchButton, type MenuPage, type SearchKind } from "./CommandMenu";
@@ -28,6 +31,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     const canSeeLeadSources = hasPermission(user, "lead-sources:manage");
     const canSeeCustomFields = hasPermission(user, "custom-fields:manage");
     const canSeeLeadForms = hasPermission(user, "lead-forms:manage");
+    const canSeeEmailTemplates = hasPermission(user, "email-templates:manage");
     const canSeeNotes = hasPermission(user, "lead:read") || hasPermission(user, "deal:read") || hasPermission(user, "contact:read");
 
     // What this person can open: the workspace pages, and the settings pages grouped the
@@ -52,6 +56,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
             : []),
         ...(canSeeCustomFields ? [{ href: "/settings/custom-fields", label: "Custom fields", section: "customFields" as const }] : []),
         ...(canSeeLeadForms ? [{ href: "/settings/lead-forms", label: "Web forms", section: "leadForms" as const }] : []),
+        ...(canSeeEmailTemplates ? [{ href: "/settings/email-templates", label: "Email templates", section: "emailTemplates" as const }] : []),
     ];
     const settings: NavGroup[] = [
         // everyone has their own profile, so Settings always has somewhere to land
@@ -77,9 +82,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     }
 
     return (
-        <div className="flex h-screen bg-shell">
+        // a column on phones (the menu bar on top), a row from tablets up (the sidebar on the left)
+        <div className="flex h-dvh flex-col bg-shell md:flex-row">
             {/* Sidebar sits on the grey app background, like Twenty's */}
-            <aside className="flex w-55 shrink-0 flex-col gap-4 px-2 py-3">
+            <SidebarShell title={user.organization.name}>
                 <div className="flex h-7 items-center gap-2 px-1 font-medium">
                     <span className="flex size-4 items-center justify-center rounded bg-ink text-[10px] font-semibold text-white">
                         {user.organization.name[0].toUpperCase()}
@@ -92,7 +98,27 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
 
                 <SidebarNav workspace={workspace} settings={settings} />
 
-                <div className="mt-auto flex items-center gap-1 px-1">
+                {/* In the demo workspace: who you're exploring as, and that it all resets */}
+                {isDemoWorkspace(user) && (
+                    <div className="mt-auto rounded-lg border border-accent/20 bg-accent-faint p-2.5 text-sm">
+                        <p className="font-medium text-ink">Demo workspace</p>
+                        <p className="mt-0.5 text-muted">
+                            You&apos;re exploring as a {user.email === DEMO_PEOPLE.manager.email ? "manager" : "sales agent"}. Anything you change resets every night.
+                        </p>
+                        {/* an API route that signs in again, so a plain link */}
+                        <a
+                            href={`/api/auth/demo?as=${user.email === DEMO_PEOPLE.manager.email ? "agent" : "manager"}`}
+                            className="mt-2 block font-medium text-accent hover:underline"
+                        >
+                            Switch to the {user.email === DEMO_PEOPLE.manager.email ? "sales agent" : "manager"} view
+                        </a>
+                        <Link href="/register" className="mt-1 block font-medium text-accent hover:underline">
+                            Create your own workspace →
+                        </Link>
+                    </div>
+                )}
+
+                <div className={`${isDemoWorkspace(user) ? "" : "mt-auto "}flex items-center gap-1 px-1`}>
                     <Link href="/settings/profile" className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 hover:bg-fill">
                         <Avatar name={user.name} size="md" />
                         <div className="min-w-0 flex-1">
@@ -110,10 +136,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
                         </button>
                     </form>
                 </div>
-            </aside>
+            </SidebarShell>
 
             {/* The white page card, lifted off the grey background by a soft shadow */}
-            <main className="my-2 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-black/5 bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_28px_-10px_rgb(0_0_0/0.14)]">
+            <main className="mx-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:my-2 md:ml-0 rounded-xl border border-black/5 bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_28px_-10px_rgb(0_0_0/0.14)]">
                 {children}
             </main>
 
@@ -122,6 +148,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
             {/* the live connection: other people's changes and notifications arrive here */}
             <LiveUpdates />
             <BackgroundJobs />
+            {/* the popup when one of your calls or meetings starts, on any page */}
+            <ActivityAlert />
         </div>
     );
 }

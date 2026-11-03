@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
     IconAddressBook,
     IconBriefcase,
@@ -92,9 +91,6 @@ interface ContactsTableProps {
     error: unknown;
     onRetry: () => void;
     filtered: boolean;
-    hasMore: boolean;
-    loadingMore: boolean;
-    onLoadMore: () => void;
     selectable: boolean;
     selected: Set<number>;
     onSelect: (selected: Set<number>) => void;
@@ -103,20 +99,9 @@ interface ContactsTableProps {
 }
 
 export default function ContactsTable({
-    contacts, columns, tableColumns, loading, failed, error, onRetry, filtered, hasMore, loadingMore, onLoadMore,
+    contacts, columns, tableColumns, loading, failed, error, onRetry, filtered,
     selectable, selected, onSelect, onOpen, onCreate,
 }: ContactsTableProps) {
-    // Infinite scroll: when this invisible div at the bottom comes into view, load the next page
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const bottom = bottomRef.current;
-        if (!bottom || !hasMore || loadingMore) return;
-
-        const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && onLoadMore());
-        observer.observe(bottom);
-        return () => observer.disconnect();
-    }, [hasMore, loadingMore, onLoadMore]);
 
     const allSelected = contacts.length > 0 && contacts.every((contact) => selected.has(contact.id));
     const colSpan = columns.length + 3;
@@ -207,7 +192,7 @@ export default function ContactsTable({
                     })}
 
                     {/* Loading placeholders, the same height as real rows so nothing jumps */}
-                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
+                    {loading && <SkeletonRows colSpan={colSpan} />}
 
                     {onCreate && !loading && (
                         <tr>
@@ -239,7 +224,6 @@ export default function ContactsTable({
                 </div>
             )}
 
-            <div ref={bottomRef} className="h-px" />
         </>
     );
 }

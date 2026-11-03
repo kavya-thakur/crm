@@ -73,7 +73,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 ### Selling better
 - [x] **Dashboard**: revenue won and trend, win rate, weighted pipeline, closing soon, lead
       funnel, **team performance table** (who's doing well), **source performance**
-      (leads → conversion → revenue), **lost reasons**, my tasks and upcoming calls, filters by
+      (leads → conversion → revenue), **campaign performance** (the same per ad campaign), **lost reasons**, my tasks and upcoming calls, filters by
       period and agent
 - [x] **Web forms**: embed on any site; leads arrive with source, owner and a reply task;
       spam trap and rate limit; **round-robin** assignment; Book a demo page on the marketing site
@@ -81,6 +81,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       redirect, which built-in fields are required/optional/off, and which **lead custom fields**
       to ask; each form has its own shareable page (`/f/<key>`) for social bios, WhatsApp and QR
       codes; answers are saved into the lead's real custom fields
+- [x] **Campaign tracking (UTM tags)**: `?utm_campaign=…` on the link to a form's page (or the
+      site page an embedded form sits on) is saved on the lead; shown on the lead, as a list
+      column and in exports; the dashboard shows each campaign's leads, conversions and revenue won
 - [x] **Lost reasons** asked when anything moves to a lost stage
 - [x] **Duplicates**: one open lead per person (enforced), warning while typing, "possible
       duplicates" filter, **merge** for leads and deals
@@ -93,37 +96,55 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       that resume where they stopped, duplicate checks, and a downloadable file of rows not added
 - [x] **CSV export** of leads, deals and contacts: streamed, follows the filters on screen,
       safe against spreadsheet formula injection, re-importable
-- [x] **Bulk delete of thousands**: "select all N matching" the filters, deleted as a background
-      job in batches with a progress card on every page (small selections stay instant)
+- [x] **Bulk actions on thousands** (leads, deals, contacts): "select all N matching" the filters,
+      then delete, move to a stage or assign as a background job in batches, with a progress card
+      on every page (up to 200 stay instant; both paths run the same code)
 - [x] **Rate limits** on Redis: web forms, sign-in attempts, imports, big bulk actions
 
 ### Real time
 - [x] Socket.IO: other people's changes appear live on every list, board, panel and dashboard
 - [x] **Notifications** with a bell: assigned a lead/deal/task, added to a meeting, @mentioned,
       new web form lead
-- [x] **Reminders** 10 minutes before calls and meetings
+- [x] **Reminders** 10 minutes before calls and meetings, and a **popup in the middle of the
+      screen at the start time** on any page (chime; mark done, reschedule, open)
+- [x] **Reschedule** an activity: the When pencil in the list and on board cards, or one click in its panel and the start-time popup (in 10/30/60 minutes, tomorrow same time, or any time)
+
+### Email
+- [x] **Email from a lead or deal** (its Emails tab): sent through a queue over free SMTP (Gmail),
+      replies go to the sender's own inbox, status live (Sending → Sent / Not sent → Opened),
+      logged on the timeline. See [EMAIL.md](EMAIL.md)
+- [x] **Email templates** with placeholders (`{{lead.firstName}}`, `{{me.name}}`...), filled in as
+      you pick one; three starters for a new workspace
+- [x] **Open tracking**: "Rahul opened your email" in the bell, live
+- [x] Demo workspace never really sends (marked "Demo, not delivered"); 100 emails per person a day
+
+### Live demo
+- [x] **One-click demo**: "Explore as a manager / as a sales agent" on the login page (and a link
+      under the landing page's hero): `/api/auth/demo?as=manager|agent`, no sign-up
+- [x] A card in the demo's sidebar: who you're exploring as, "resets every night", switch view,
+      create your own workspace
+- [x] Locked in the demo: password, profile, members and roles (everything else is open to try)
+- [x] **Nightly reset**: a BullMQ job scheduler rebuilds the demo workspace at 3:00 AM IST
 
 ### Site
-- [x] Marketing landing page (Flash), pricing, /demo
+- [x] Marketing landing page (Flash), product tour (/product), pricing, /demo, privacy policy and terms (/privacy, /terms)
+- [x] 404 page in the landing look; link-preview image (`src/app/opengraph-image.tsx`, fonts in `assets/fonts`, site address from `APP_URL`)
 - [x] Onboarding intro
 
 ### Engineering
-- [x] 120 integration tests across 24 files; CI with Postgres
+- [x] 126 integration tests across 25 files; CI with Postgres
 - [x] Large-data checked: 10k+ leads, lists and boards in tens of milliseconds (indexes, paging)
 
 ---
 
 ## 4. What's next (candidates, roughly in order)
 
-1. **Campaign tracking (UTM tags)** on web forms, captured into the lead automatically
-2. **Demo mode** for the live site: one-click Manager/Agent login, nightly reset (a repeatable job)
-3. **Speed-to-lead rule**: alert the owner (then their manager) if a new lead isn't contacted in X hours (a delayed job)
-4. **Booking link**: a public page where a visitor picks a free slot → lead + meeting
-5. Email from the CRM (templates, logged on the timeline)
-6. Webhooks / API keys for integrations
-7. Products & quotes on deals
-8. README for the repo, and deployment (Railway/Render, since the custom server needs a long-running Node process)
-9. Presence ("Priya is viewing this lead"), email for missed notifications
+1. **Speed-to-lead rule**: alert the owner (then their manager) if a new lead isn't contacted in X hours (a delayed job)
+2. **Booking link**: a public page where a visitor picks a free slot → lead + meeting
+3. Webhooks / API keys for integrations
+4. Products & quotes on deals
+5. README for the repo, and deployment (Railway/Render, since the custom server needs a long-running Node process)
+6. Presence ("Priya is viewing this lead"), email for missed notifications
 
 Known gaps: moving lost leads back to open **in bulk** doesn't check for duplicates yet;
 11 old lint errors remain (none in new code).
@@ -136,6 +157,13 @@ Newest first. The reason matters more than the choice.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-03 | **Lenis** smooth scrolling on the marketing pages (not GSAP's ScrollSmoother) | a mouse wheel jumps ~100px a notch, so scroll-linked text animations stepped; Lenis keeps native scrolling, so `position: sticky` (nav, quote, steps) still works, which ScrollSmoother breaks |
+| 2026-11-03 | Email over **SMTP via Nodemailer**, from **one Gmail account** with Reply-To = the sender | free with no domain, lands in inboxes; switching to Resend/Brevo is only .env; per-user Gmail sign-in (OAuth) needs Google's app review |
+| 2026-11-03 | Emails are **queued** (BullMQ), placeholders filled **in the browser** | sending never makes anyone wait and retries itself; the sender sees and can edit the exact text before it goes |
+| 2026-11-03 | **View, filters and the open record live in the URL**, not page memory or browser storage | they survive a refresh, Back works, links can be shared, and the server sees them too (no flash of the wrong view) |
+| 2026-11-03 | Demo login is a **plain link** (`GET /api/auth/demo`), into the demo workspace only | works from the landing page, the login page and a README; it can only ever sign in as the demo's two fixed people |
+| 2026-11-03 | The demo is **rebuilt from scratch nightly** by a BullMQ job scheduler, rather than undoing changes | always the same clean demo whatever visitors did; the schedule lives in Redis, so it runs once even with several servers |
+| 2026-11-03 | In the demo, only **password, profile, members and roles** are locked | visitors should be able to try everything; only changes that would break it for the next visitor are blocked |
 | 2026-11-02 | `src/lib` **grouped into folders by purpose** (auth, db, api, realtime, jobs, leads, deals, work, settings, dashboard, utils, validations) | 30 loose files were hard to find your way around; a folder's name now says what's inside |
 | 2026-11-02 | **Redis + BullMQ** for background jobs (over a Postgres-backed queue) | the standard Node stack; also gives delayed/repeatable jobs and shared rate limits; worth learning |
 | 2026-11-02 | Jobs carry **only ids**; imports save each batch **with its counters in one transaction** | Redis is never the source of truth; a retried job resumes exactly where it stopped, importing nothing twice |
@@ -150,11 +178,13 @@ Newest first. The reason matters more than the choice.
 | 2026-11-02 | **Socket.IO in the same process as Next.js** (`server.ts`), not a separate service | routes can `notify()` directly; one thing to run. Separate service + Redis adapter later if it ever needs more than one server |
 | 2026-11-02 | Live updates send **only the topic** ("leads"), never data; clients refetch | permissions stay in one place (the API); nothing can leak over the socket; no per-route code (one hook in `server.ts`) |
 | 2026-11-02 | Notifications are **saved, then pushed** | the bell survives reloads and works for people who were offline |
+| 2026-11-03 | The start-time popup is **timed in the browser**, not pushed by the server | a 1-second clock check is exact to the second; a server push would need a job per activity or a tighter loop; the server reminder (toast + bell) still covers people not in the app |
 | 2026-11-02 | Reminders by a 30-second loop with an **atomic claim** (`reminderSentAt`) | no extra job system; never double-sends |
 | 2026-11-02 | **One open lead per person** (by phone or email); returning after lost/converted is allowed | two reps shouldn't chase one customer; a returning customer is a new opportunity |
 | 2026-11-02 | Phone/email match keys kept by a **database trigger** | every write path (API, web forms, imports, scripts) stays correct without remembering to |
 | 2026-11-02 | **Merge** kept as a cleanup tool (one-line suggestion, filter, select two) | blocking stops new duplicates; old and imported ones still need fixing |
 | 2026-11-02 | Lost reasons from a **fixed list + "Other"** | comparable numbers on the dashboard; free text for the rest |
+| 2026-11-03 | UTM tags saved as **three plain columns on Lead**, not a Campaign table; **first touch wins** | campaigns are named by whoever writes the ad link, so there's nothing to set up; the campaign that first brought someone in keeps the credit for their revenue |
 | 2026-11-02 | Web form round-robin with a **database counter** (`increment`) | two leads arriving together never get the same person |
 | 2026-11-01 | Dropdowns float in a portal; **inside dialogs, lists of buttons** | native dialogs clip floating menus |
 | 2026-11-01 | Bulk edit is a **side panel**, like record panels | consistency, and no clipped menus |

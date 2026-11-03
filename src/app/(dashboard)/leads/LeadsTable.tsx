@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
     IconBuilding,
+    IconSpeakerphone,
     IconCalendar,
     IconMail,
     IconPhone,
@@ -49,6 +49,7 @@ export const LEAD_COLUMNS: LeadColumn[] = [
         cell: (lead) => lead.phone && <a href={`tel:${lead.phone}`} className="hover:underline">{lead.phone}</a>,
     },
     { key: "source", label: "Source", icon: IconTag, width: 150, cell: (lead) => lead.source && <StageBadge name={lead.source.name} color={lead.source.color} /> },
+    { key: "campaign", label: "Campaign", icon: IconSpeakerphone, width: 170, cell: (lead) => lead.utmCampaign },
     {
         key: "assignedTo", label: "Assigned to", icon: IconUserCircle, width: 180,
         cell: (lead) => lead.assignedTo && (
@@ -136,9 +137,6 @@ interface LeadsTableProps {
     error: unknown;
     onRetry: () => void;
     filtered: boolean;
-    hasMore: boolean;
-    loadingMore: boolean;
-    onLoadMore: () => void;
     selectable: boolean;
     selected: Set<number>;
     onSelect: (selected: Set<number>) => void;
@@ -147,20 +145,9 @@ interface LeadsTableProps {
 }
 
 export default function LeadsTable({
-    leads, columns, tableColumns, loading, failed, error, onRetry, filtered, hasMore, loadingMore, onLoadMore,
+    leads, columns, tableColumns, loading, failed, error, onRetry, filtered,
     selectable, selected, onSelect, onOpen, onCreate,
 }: LeadsTableProps) {
-    // Infinite scroll: when this invisible div at the bottom comes into view, load the next page
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const bottom = bottomRef.current;
-        if (!bottom || !hasMore || loadingMore) return;
-
-        const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && onLoadMore());
-        observer.observe(bottom);
-        return () => observer.disconnect();
-    }, [hasMore, loadingMore, onLoadMore]);
 
     const allSelected = leads.length > 0 && leads.every((lead) => selected.has(lead.id));
     // checkbox + name (pinned) + the chosen columns + the trailing filler column
@@ -252,7 +239,7 @@ export default function LeadsTable({
                     })}
 
                     {/* Loading placeholders, the same height as real rows so nothing jumps */}
-                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
+                    {loading && <SkeletonRows colSpan={colSpan} />}
 
                     {onCreate && !loading && (
                         <tr>
@@ -284,7 +271,6 @@ export default function LeadsTable({
                 </div>
             )}
 
-            <div ref={bottomRef} className="h-px" />
         </>
     );
 }

@@ -51,4 +51,6 @@ export const listScheduledActivitiesQuerySchema = paginationSchema.extend({
     leadId: idParamSchema.optional(),
     dealId: idParamSchema.optional(),
     contactId: idParamSchema.optional(),
+    // only ones at or after this moment (the start-time alert asks for the last few minutes onwards)
+    from: z.coerce.date().optional(),
 });

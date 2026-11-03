@@ -7,6 +7,7 @@ import { dbIdSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkContactChangesSchema } from "@/lib/validations/contact";
+import { assignContacts } from "@/lib/jobs/bulkActions";
 
 const contactIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -107,23 +108,8 @@ export async function PATCH(req: NextRequest) {
                 }
             }
 
-            // Contacts already assigned this way are skipped
-            const changed = contacts.filter((contact) => contact.assignedToId !== assignedToId);
-
-            if (changed.length > 0) {
-                await prisma.contact.updateMany({
-                    where: {
-                        id: {
-                            in: changed.map((contact) => contact.id),
-                        },
-                        organizationId: user.organizationId,
-                    },
-                    data: {
-                        assignedToId,
-                        updatedById: user.id,
-                    },
-                });
-            }
+            // contacts already assigned this way are skipped
+            const changed = await prisma.$transaction((tx) => assignContacts(tx, user, contacts, assignedToId === null ? null : { id: assignedToId, name: "" }));
 
             return NextResponse.json({
                 ok: true,

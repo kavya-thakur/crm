@@ -5,6 +5,7 @@ import { findManageableRole, requirePermission } from "@/lib/auth/requirePermiss
 import { hashPassword } from "@/lib/auth/password";
 import { createAgentSchema } from "@/lib/validations/agents";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { assertNotDemo } from "@/lib/demo/workspace";
 
 // Never select passwordHash into a response
 const agentSelect = {
@@ -19,6 +20,8 @@ const agentSelect = {
 export async function POST(req: NextRequest) {
     try {
         const user = await requirePermission("user:create");
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const body = await parseBody(req, createAgentSchema);
 

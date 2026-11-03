@@ -213,6 +213,22 @@ and the tests still pass.
 When an activity is moved to another time, its `reminderSentAt` is cleared
 (`api/activities/[id]` PUT), so the reminder goes out again for the new time.
 
+### At the start time: the popup (browser side)
+
+The 10-minute reminder is a toast, and the 30-second loop can't hit an exact moment. So the
+start itself is handled in the browser by `ActivityAlert.tsx` (mounted once in the dashboard
+layout, so it works on every page):
+
+1. It loads your next scheduled calls/meetings (`GET /api/activities?status=SCHEDULED&assignedTo=me&from=<15 min ago>`).
+   The query key starts with `"activities"`, so any change to activities (yours or, over the
+   socket, anyone's) refetches it.
+2. Every second it checks the clock; when one's time arrives it opens a **centered modal**
+   with a short chime: Mark as done, Reschedule (quick picks or any time), Open, Dismiss.
+   One that started up to 15 minutes before you opened the app still pops up ("started 4 min ago").
+3. Whatever you do, `<id>@<scheduledAt>` is saved in localStorage, so it doesn't pop again on
+   refresh, and other tabs close theirs (the `storage` event). A rescheduled activity has a
+   new `scheduledAt`, so it pops up again at its new time.
+
 ---
 
 ## 8. The bell

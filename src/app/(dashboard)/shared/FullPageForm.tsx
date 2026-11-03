@@ -83,12 +83,17 @@ export function RecordFormShell({
                     id={formId}
                     noValidate
                     onSubmit={onSubmit}
-                    className={`flex w-full max-w-lg shrink-0 flex-col overflow-y-auto ${hideTabs ? "mx-auto" : "border-r border-line-light"}`}
+                    className={`flex w-full max-w-lg shrink-0 flex-col overflow-y-auto ${hideTabs ? "mx-auto" : "border-line-light md:border-r"}`}
                 >
                     <div className="space-y-1 px-6 py-6">{children}</div>
                 </form>
 
-                {!hideTabs && <LockedRecordTabs noun={noun} />}
+                {/* the tabs a saved record will have: from tablets up, there's no room for them on a phone */}
+                {!hideTabs && (
+                    <div className="hidden md:contents">
+                        <LockedRecordTabs noun={noun} />
+                    </div>
+                )}
             </div>
         </div>
     );

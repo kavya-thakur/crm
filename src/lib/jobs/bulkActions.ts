@@ -1,14 +1,21 @@
 import { prisma } from "@/lib/db/prisma";
 import { contactScope, dealScope, hasPermission, leadScope, userForJob, type CurrentUser } from "@/lib/auth/requirePermission";
-import { broadcastChange, getSocketServer, userRoom } from "@/lib/realtime/notify";
+import { broadcastChange, firstName, getSocketServer, notify, userRoom } from "@/lib/realtime/notify";
+import { stageMessage } from "@/lib/leads/stages";
+import { closedAtFor } from "@/lib/deals/stages";
 import type { Prisma } from "@/generated/prisma/client";
 
 /*
- * Bulk actions too big for one request, e.g. deleting every one of 4,000 filtered leads. The
- * request saves a BulkJob (the ids picked, as a snapshot) and queues it; the BullMQ worker
- * runs it here, BATCH records at a time. Like imports (src/lib/jobs/leadImport.ts), each batch and the
- * job's counters are saved in one transaction, so a retried job carries on where it stopped.
- * See docs/QUEUES.md.
+ * Bulk actions on leads, deals and contacts: delete, move to a stage, assign.
+ *
+ * The functions that change one batch (moveLeads, assignDeals...) are used two ways: by the
+ * bulk routes for a small selection, in the request itself, and by runBulkJob for thousands,
+ * BATCH at a time, in the background (a BullMQ job, see docs/QUEUES.md). Same code, so the
+ * same rules and the same timeline entries either way.
+ *
+ * A job saves a BulkJob (the ids picked, a snapshot) and is queued. Like imports, each batch
+ * and the job's counters are saved in one transaction, so a retried job carries on where it
+ * stopped.
  */
 
 export { MAX_BULK } from "@/lib/validations/common";
@@ -17,14 +24,136 @@ export { MAX_BULK } from "@/lib/validations/common";
 const BATCH = 500;
 
 export type BulkEntity = "lead" | "deal" | "contact";
+export type BulkAction = "delete" | "stage" | "assign";
+export interface BulkParams {
+    stageId?: number;
+    lostReason?: string | null;
+    assignedToId?: number | null;
+}
 
-// Deletes one batch, only among the records this person may still touch (the same scope as the
-// list and the single delete); anything already gone or now out of reach is simply skipped
-function deleteBatch(tx: Prisma.TransactionClient, entity: BulkEntity, ids: number[], user: CurrentUser) {
+type Tx = Prisma.TransactionClient;
+type Agent = { id: number; name: string } | null;
+
+// "Lead assigned to Priya", "Deal reassigned to Priya", "Lead unassigned"
+function assignmentEntry(noun: "Lead" | "Deal", before: number | null, agent: Agent) {
+    if (!agent) return { type: "UNASSIGNED", message: `${noun} unassigned` };
+    return before === null ? { type: "ASSIGNED", message: `${noun} assigned to ${agent.name}` } : { type: "REASSIGNED", message: `${noun} reassigned to ${agent.name}` };
+}
+
+// --- One batch of each action. Each takes rows already loaded within the person's scope,
+// --- skips the ones already that way, and returns the ones it changed.
+
+export async function moveLeads(tx: Tx, user: CurrentUser, leads: { id: number; stageId: number }[], stage: { id: number; name: string; isLost: boolean }, lostReason?: string | null) {
+    const changed = leads.filter((lead) => lead.stageId !== stage.id);
+    if (changed.length === 0) return changed;
+
+    const names = new Map((await tx.leadStage.findMany({ where: { organizationId: user.organizationId }, select: { id: true, name: true } })).map((item) => [item.id, item.name]));
+    await tx.lead.updateMany({
+        where: { id: { in: changed.map((lead) => lead.id) }, ...leadScope(user) },
+        data: { stageId: stage.id, lostReason: stage.isLost ? (lostReason ?? null) : null, updatedById: user.id },
+    });
+    await tx.leadTimeline.createMany({
+        data: changed.map((lead) => ({ leadId: lead.id, userId: user.id, type: "STATUS_CHANGED", message: stageMessage(names.get(lead.stageId), stage, lostReason) })),
+    });
+    return changed;
+}
+
+export async function assignLeads<T extends { id: number; assignedToId: number | null }>(tx: Tx, user: CurrentUser, leads: T[], agent: Agent) {
+    const changed = leads.filter((lead) => lead.assignedToId !== (agent?.id ?? null));
+    if (changed.length === 0) return changed;
+
+    await tx.lead.updateMany({ where: { id: { in: changed.map((lead) => lead.id) }, organizationId: user.organizationId }, data: { assignedToId: agent?.id ?? null, updatedById: user.id } });
+    await tx.leadTimeline.createMany({ data: changed.map((lead) => ({ leadId: lead.id, userId: user.id, ...assignmentEntry("Lead", lead.assignedToId, agent) })) });
+    return changed;
+}
+
+export async function moveDeals(tx: Tx, user: CurrentUser, deals: { id: number; pipelineStageId: number }[], stage: { id: number; isWon: boolean; isLost: boolean }, lostReason?: string | null) {
+    const changed = deals.filter((deal) => deal.pipelineStageId !== stage.id);
+    if (changed.length === 0) return changed;
+
+    await tx.deal.updateMany({
+        where: { id: { in: changed.map((deal) => deal.id) }, organizationId: user.organizationId },
+        data: { pipelineStageId: stage.id, closedAt: closedAtFor(stage), lostReason: stage.isLost ? (lostReason ?? null) : null, updatedById: user.id },
+    });
+    await tx.dealTimeline.createMany({
+        data: changed.map((deal) => ({
+            dealId: deal.id,
+            userId: user.id,
+            type: "STAGE_CHANGED",
+            message: stage.isLost && lostReason ? `Deal lost: ${lostReason}` : "Deal moved to a new pipeline stage",
+        })),
+    });
+    return changed;
+}
+
+export async function assignDeals<T extends { id: number; assignedToId: number | null }>(tx: Tx, user: CurrentUser, deals: T[], agent: Agent) {
+    const changed = deals.filter((deal) => deal.assignedToId !== (agent?.id ?? null));
+    if (changed.length === 0) return changed;
+
+    await tx.deal.updateMany({ where: { id: { in: changed.map((deal) => deal.id) }, organizationId: user.organizationId }, data: { assignedToId: agent?.id ?? null, updatedById: user.id } });
+    await tx.dealTimeline.createMany({ data: changed.map((deal) => ({ dealId: deal.id, userId: user.id, ...assignmentEntry("Deal", deal.assignedToId, agent) })) });
+    return changed;
+}
+
+export async function assignContacts<T extends { id: number; assignedToId: number | null }>(tx: Tx, user: CurrentUser, contacts: T[], agent: Agent) {
+    const changed = contacts.filter((contact) => contact.assignedToId !== (agent?.id ?? null));
+    if (changed.length === 0) return changed;
+
+    await tx.contact.updateMany({ where: { id: { in: changed.map((contact) => contact.id) }, organizationId: user.organizationId }, data: { assignedToId: agent?.id ?? null, updatedById: user.id } });
+    return changed;
+}
+
+// --- What an action needs, looked up and checked once (by the route that starts a job, and
+// --- again by the job itself: things can change in between)
+
+// The stage to move to, if it's this workspace's own
+export function findStage(organizationId: number, entity: BulkEntity, stageId: number | undefined) {
+    if (stageId === undefined || entity === "contact") return Promise.resolve(null);
+    return entity === "lead"
+        ? // a lead stage is never "won" (leads convert instead), which moveDeals' closedAt doesn't apply to anyway
+          prisma.leadStage.findFirst({ where: { id: stageId, organizationId }, select: { id: true, name: true, isLost: true } }).then((stage) => stage && { ...stage, isWon: false })
+        : prisma.pipelineStage.findFirst({ where: { id: stageId, organizationId }, select: { id: true, name: true, isLost: true, isWon: true } });
+}
+
+// The teammate to assign to (null = unassign), if they're in this workspace
+export async function findAgent(organizationId: number, assignedToId: number | null | undefined): Promise<Agent | undefined> {
+    if (assignedToId === null || assignedToId === undefined) return null;
+    return (await prisma.user.findFirst({ where: { id: assignedToId, organizationId }, select: { id: true, name: true } })) ?? undefined;
+}
+
+// What an action needs permission-wise: the same rules as the single-record routes
+export function mayDo(user: CurrentUser, entity: BulkEntity, action: BulkAction) {
+    if (action === "delete") return hasPermission(user, `${entity}:delete`);
+    // handing records to others (or taking them away) is a manager action
+    if (action === "assign") return hasPermission(user, `${entity}:update`) && hasPermission(user, `${entity}:all`);
+    return hasPermission(user, `${entity}:update`);
+}
+
+// --- The job
+
+type Plan = { stage: Awaited<ReturnType<typeof findStage>>; agent: Agent; lostReason?: string | null };
+
+// One batch of a job: only among the records this person may still touch (the same scope as the
+// lists); anything already gone or now out of reach is skipped. Returns how many it changed.
+async function runBatch(tx: Tx, user: CurrentUser, entity: BulkEntity, action: BulkAction, ids: number[], plan: Plan) {
     const where = { id: { in: ids } };
-    if (entity === "lead") return tx.lead.deleteMany({ where: { ...where, ...leadScope(user) } });
-    if (entity === "deal") return tx.deal.deleteMany({ where: { ...where, ...dealScope(user) } });
-    return tx.contact.deleteMany({ where: { ...where, ...contactScope(user) } });
+
+    if (action === "delete") {
+        if (entity === "lead") return (await tx.lead.deleteMany({ where: { ...where, ...leadScope(user) } })).count;
+        if (entity === "deal") return (await tx.deal.deleteMany({ where: { ...where, ...dealScope(user) } })).count;
+        return (await tx.contact.deleteMany({ where: { ...where, ...contactScope(user) } })).count;
+    }
+
+    if (entity === "lead") {
+        const leads = await tx.lead.findMany({ where: { ...where, ...leadScope(user) }, select: { id: true, stageId: true, assignedToId: true } });
+        return (action === "stage" ? await moveLeads(tx, user, leads, plan.stage!, plan.lostReason) : await assignLeads(tx, user, leads, plan.agent)).length;
+    }
+    if (entity === "deal") {
+        const deals = await tx.deal.findMany({ where: { ...where, ...dealScope(user) }, select: { id: true, pipelineStageId: true, assignedToId: true } });
+        return (action === "stage" ? await moveDeals(tx, user, deals, plan.stage!, plan.lostReason) : await assignDeals(tx, user, deals, plan.agent)).length;
+    }
+    const contacts = await tx.contact.findMany({ where: { ...where, ...contactScope(user) }, select: { id: true, assignedToId: true } });
+    return (await assignContacts(tx, user, contacts, plan.agent)).length;
 }
 
 // What the live progress carries
@@ -38,10 +167,18 @@ export async function runBulkJob(bulkJobId: number) {
     const job = await prisma.bulkJob.findUnique({ where: { id: bulkJobId } });
     if (!job || job.status === "DONE") return;
 
+    const entity = job.entity as BulkEntity;
+    const action = job.action as BulkAction;
+    const params = job.params as BulkParams;
+
     const user = await userForJob(job.userId);
     if (!user) throw new Error("The person who started this has left the workspace");
-    // checked again now, not just when it was started: permissions can change in between
-    if (!hasPermission(user, `${job.entity}:delete`)) throw new Error(`You can no longer delete ${job.entity}s`);
+    // checked again now, not just when it was started: permissions and stages can change in between
+    if (!mayDo(user, entity, action)) throw new Error(`You can no longer ${action === "delete" ? "delete" : "change"} ${entity}s`);
+    const stage = await findStage(user.organizationId, entity, params.stageId);
+    if (action === "stage" && !stage) throw new Error("That stage no longer exists");
+    const agent = await findAgent(user.organizationId, params.assignedToId);
+    if (agent === undefined) throw new Error("That teammate is no longer in the workspace");
 
     report(user.id, await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "RUNNING" }, select: progressSelect }));
 
@@ -50,7 +187,7 @@ export async function runBulkJob(bulkJobId: number) {
 
         const progress = await prisma.$transaction(
             async (tx) => {
-                const { count } = await deleteBatch(tx, job.entity as BulkEntity, batch, user);
+                const count = await runBatch(tx, user, entity, action, batch, { stage, agent, lostReason: params.lostReason });
                 return tx.bulkJob.update({
                     where: { id: job.id },
                     data: { processed: { increment: batch.length }, affected: { increment: count } },
@@ -62,11 +199,23 @@ export async function runBulkJob(bulkJobId: number) {
         );
 
         report(user.id, progress);
-        // everyone's lists shrink as it goes
-        broadcastChange(job.organizationId, `${job.entity}s`);
+        // everyone's lists change as it goes
+        broadcastChange(job.organizationId, `${entity}s`);
     }
 
-    report(user.id, await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "DONE", finishedAt: new Date() }, select: progressSelect }));
+    const done = await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "DONE", finishedAt: new Date() }, select: progressSelect });
+    report(user.id, done);
+
+    // one notification for the whole job, not one per batch
+    if (action === "assign" && agent && done.affected > 0 && entity !== "contact") {
+        await notify([agent.id], {
+            organizationId: job.organizationId,
+            actorId: user.id,
+            type: entity === "lead" ? "LEAD_ASSIGNED" : "DEAL_ASSIGNED",
+            title: `${firstName(user.name)} assigned you ${done.affected.toLocaleString()} ${entity}s`,
+            link: `/${entity}s`,
+        });
+    }
 }
 
 export async function failBulkJob(bulkJobId: number, reason: string) {

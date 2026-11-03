@@ -24,6 +24,9 @@ const REFRESH: Record<string, string[]> = {
     "pipeline-stages": ["pipelineStage", "deals", "deal", "dashboard"],
     "custom-fields": ["customFields", "leads", "deals", "contacts"],
     "lead-forms": ["leadForms"],
+    // sent, failed, opened: the Emails tab, and the timeline entry on the lead or deal
+    emails: ["emails", "lead", "deal"],
+    "email-templates": ["emailTemplates"],
     agents: ["agents", "dashboard"],
     roles: ["roles", "permissions"],
     // read in another of your tabs (sent only to you)

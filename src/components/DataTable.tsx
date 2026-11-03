@@ -15,7 +15,7 @@ import { Select, type SelectOption } from "./Select";
 
 export type EditConfig<TRecord> =
     | {
-          type: "text" | "email" | "tel" | "number" | "date";
+          type: "text" | "email" | "tel" | "number" | "date" | "datetime-local";
           getValue: (record: TRecord) => string | number | null;
           onSave: (record: TRecord, value: string | number | null) => void;
       }

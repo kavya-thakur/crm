@@ -7,8 +7,8 @@ import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkDealChangesSchema } from "@/lib/validations/deals";
-import { closedAtFor } from "@/lib/deals/stages";
 import { firstName, notify } from "@/lib/realtime/notify";
+import { assignDeals, moveDeals } from "@/lib/jobs/bulkActions";
 
 const dealIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -125,44 +125,10 @@ export async function PATCH(req: NextRequest) {
                 agentName = agent.name;
             }
 
-            // Deals already assigned this way are skipped, so no duplicate timeline entries
-            const changed = deals.filter((deal) => deal.assignedToId !== assignedToId);
+            // deals already assigned this way are skipped, so no duplicate timeline entries
+            const changed = await prisma.$transaction((tx) => assignDeals(tx, user, deals, assignedToId === null ? null : { id: assignedToId, name: agentName! }));
 
             if (changed.length > 0) {
-                await prisma.$transaction(async (tx) => {
-                    await tx.deal.updateMany({
-                        where: {
-                            id: {
-                                in: changed.map((deal) => deal.id),
-                            },
-                            organizationId: user.organizationId,
-                        },
-                        data: {
-                            assignedToId,
-                            updatedById: user.id,
-                        },
-                    });
-
-                    await tx.dealTimeline.createMany({
-                        data: changed.map((deal) => ({
-                            dealId: deal.id,
-                            userId: user.id,
-                            type:
-                                assignedToId === null
-                                    ? "UNASSIGNED"
-                                    : deal.assignedToId === null
-                                        ? "ASSIGNED"
-                                        : "REASSIGNED",
-                            message:
-                                assignedToId === null
-                                    ? "Deal unassigned"
-                                    : deal.assignedToId === null
-                                        ? `Deal assigned to ${agentName}`
-                                        : `Deal reassigned to ${agentName}`,
-                        })),
-                    });
-                });
-
                 const [only] = changed;
                 await notify([assignedToId], {
                     organizationId: user.organizationId,
@@ -204,37 +170,7 @@ export async function PATCH(req: NextRequest) {
                 );
             }
 
-            const changed = deals.filter(
-                (deal) => deal.pipelineStageId !== data.pipelineStageId
-            );
-
-            if (changed.length > 0) {
-                await prisma.$transaction(async (tx) => {
-                    await tx.deal.updateMany({
-                        where: {
-                            id: {
-                                in: changed.map((deal) => deal.id),
-                            },
-                            organizationId: user.organizationId,
-                        },
-                        data: {
-                            pipelineStageId: data.pipelineStageId,
-                            closedAt: closedAtFor(stage),
-                            lostReason: stage.isLost ? (data.lostReason ?? null) : null,
-                            updatedById: user.id,
-                        },
-                    });
-
-                    await tx.dealTimeline.createMany({
-                        data: changed.map((deal) => ({
-                            dealId: deal.id,
-                            userId: user.id,
-                            type: "STAGE_CHANGED",
-                            message: stage.isLost && data.lostReason ? `Deal lost: ${data.lostReason}` : "Deal moved to a new pipeline stage",
-                        })),
-                    });
-                });
-            }
+            const changed = await prisma.$transaction((tx) => moveDeals(tx, user, deals, stage, data.lostReason));
 
             return NextResponse.json({
                 ok: true,

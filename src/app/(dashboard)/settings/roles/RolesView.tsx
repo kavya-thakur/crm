@@ -61,6 +61,7 @@ const SETUP = [
     { name: "lead-sources:manage", label: "Lead sources", hint: "The list of places leads come from." },
     { name: "custom-fields:manage", label: "Custom fields", hint: "Extra fields on leads, deals and contacts." },
     { name: "lead-forms:manage", label: "Web forms", hint: "Forms on your website that create leads by themselves." },
+    { name: "email-templates:manage", label: "Email templates", hint: "Ready-made emails everyone can send from a lead or deal." },
 ];
 
 const ACTIONS = [

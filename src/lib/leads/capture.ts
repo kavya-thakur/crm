@@ -22,6 +22,10 @@ export const formSubmissionSchema = z.object({
     details: z.record(z.string().max(60), z.string().max(300)).optional(),
     // the spam trap: a field people never see, so only bots fill it in
     website: z.string().optional(),
+    // the ad campaign the visitor came from: the utm_ tags on the link to the form's page
+    utm_source: optionalText(100),
+    utm_medium: optionalText(100),
+    utm_campaign: optionalText(150),
 });
 
 export type FormSubmission = z.infer<typeof formSubmissionSchema>;
@@ -109,7 +113,12 @@ export async function captureLead(formKey: string, input: FormSubmission) {
     const after = { thankYou: formTexts(settings, form.name).thankYou, redirectUrl: settings.redirectUrl };
 
     const { organizationId } = form;
-    const summary = describe(input, checked.answers);
+    // "Campaign: diwali-sale (google / cpc)", for the timeline
+    const campaign = input.utm_campaign
+        ? `Campaign: ${input.utm_campaign}${input.utm_source ? ` (${[input.utm_source, input.utm_medium].filter(Boolean).join(" / ")})` : ""}`
+        : null;
+    const summary = describe(input, [...checked.answers, ...(campaign ? [campaign] : [])]);
+    const utm = { utmSource: input.utm_source ?? null, utmMedium: input.utm_medium ?? null, utmCampaign: input.utm_campaign ?? null };
     const came = `Came in through "${form.name}"${summary ? `: ${summary}` : ""}`;
 
     // A timeline entry belongs to a person, but a website visitor isn't one: entries are
@@ -123,13 +132,16 @@ export async function captureLead(formKey: string, input: FormSubmission) {
 
     if (existing) {
         // new answers fill the lead's empty custom fields; ones it already has stay as they are
-        const current = ((await prisma.lead.findUnique({ where: { id: existing.id }, select: { customFields: true } }))?.customFields ?? {}) as Record<string, unknown>;
+        const before = await prisma.lead.findUnique({ where: { id: existing.id }, select: { customFields: true, utmCampaign: true } });
+        const current = (before?.customFields ?? {}) as Record<string, unknown>;
         const blanks = Object.fromEntries(Object.entries(checked.values).filter(([key]) => current[key] === undefined || current[key] === null || current[key] === ""));
 
         await prisma.lead.update({
             where: { id: existing.id },
             data: {
                 ...(Object.keys(blanks).length > 0 && { customFields: { ...current, ...blanks } as Prisma.InputJsonObject }),
+                // the campaign that first brought them in keeps the credit; a lead without one gets this one
+                ...(!before?.utmCampaign && utm.utmCampaign && utm),
                 timeline: { create: { userId: actor, type: "WEB_FORM", message: came.replace("Came in through", "Sent"), metadata: fromForm } },
             },
         });
@@ -162,6 +174,7 @@ export async function captureLead(formKey: string, input: FormSubmission) {
                 email: input.email,
                 phone: input.phone,
                 companyName: input.company ?? null,
+                ...utm,
                 // the form's answers, in the lead's own custom fields
                 customFields: checked.values as Prisma.InputJsonObject,
                 stageId: firstStage.id,

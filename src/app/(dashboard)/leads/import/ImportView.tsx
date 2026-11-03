@@ -243,15 +243,16 @@ function MapColumns({ parsed, canAssign, onBack, onStarted }: { parsed: ParsedFi
 
             <Step title="Match your columns" hint="Flash guessed where it could. Name and phone are needed for every lead.">
                 <div className="overflow-hidden rounded-xl border border-line">
-                    <div className="grid grid-cols-[1fr_1fr_14rem] gap-3 border-b border-line-light bg-paper px-4 py-2 text-sm font-medium text-faint">
+                    {/* on a phone, just the column and where it goes: the example needs the width of a tablet */}
+                    <div className="grid grid-cols-[1fr_11rem] gap-3 border-b border-line-light bg-paper px-4 py-2 text-sm font-medium text-faint sm:grid-cols-[1fr_1fr_14rem]">
                         <span>Column in your file</span>
-                        <span>Example</span>
+                        <span className="hidden sm:block">Example</span>
                         <span>Goes into</span>
                     </div>
                     {headers.map((header) => (
-                        <div key={header} className="grid grid-cols-[1fr_1fr_14rem] items-center gap-3 border-b border-line-light px-4 py-2 last:border-b-0">
+                        <div key={header} className="grid grid-cols-[1fr_11rem] items-center gap-3 border-b border-line-light px-4 py-2 last:border-b-0 sm:grid-cols-[1fr_1fr_14rem]">
                             <span className="truncate font-medium text-ink">{header}</span>
-                            <span className="truncate text-muted">{example(header) || <span className="text-light">Empty</span>}</span>
+                            <span className="hidden truncate text-muted sm:block">{example(header) || <span className="text-light">Empty</span>}</span>
                             <Select value={mapping[header] ?? ""} onChange={(value) => choose(header, value ?? "")} options={fieldOptions} placeholder="Don't import" />
                         </div>
                     ))}

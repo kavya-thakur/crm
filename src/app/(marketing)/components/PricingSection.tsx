@@ -8,6 +8,7 @@ import { IconCheck } from "@tabler/icons-react";
 
 import { Accent, CONTAINER, Eyebrow, Heading, Lead } from "./Eyebrow";
 import { Button } from "./Button";
+import { WaveField } from "./WaveField";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -63,8 +64,11 @@ export function PricingSection({ as = "h2" }: { as?: "h1" | "h2" }) {
     );
 
     return (
-        <section ref={sectionRef} id="pricing" className={`${as === "h1" ? "bg-[#f4f4f4]" : "bg-white"} py-24 font-(family-name:--font-host-grotesk) min-[921px]:py-30`}>
-            <div className={`${CONTAINER} flex flex-col items-center text-center`}>
+        <section ref={sectionRef} id="pricing" className={`relative overflow-clip ${as === "h1" ? "bg-[#f4f4f4]" : "bg-white pb-48 min-[921px]:pb-64"} py-24 font-(family-name:--font-host-grotesk) min-[921px]:py-30`}>
+            {/* on the landing page, violet ridge lines roll along under the plans, like a floor they stand on */}
+            {as === "h2" && <WaveField className="absolute inset-x-0 bottom-0 h-[60%]" />}
+
+            <div className={`${CONTAINER} relative flex flex-col items-center text-center`}>
                 <Eyebrow>Pricing</Eyebrow>
                 <Heading as={as} className="mt-6 max-w-200">
                     Simple pricing, <Accent>for teams of every size</Accent>
@@ -92,7 +96,7 @@ export function PricingSection({ as = "h2" }: { as?: "h1" | "h2" }) {
                 </div>
             </div>
 
-            <div data-plans className={`${CONTAINER} mt-14 grid max-w-300 items-stretch gap-4 text-left min-[921px]:grid-cols-3`}>
+            <div data-plans className={`${CONTAINER} relative mt-14 grid max-w-300 items-stretch gap-4 text-left min-[921px]:grid-cols-3`}>
                 {PLANS.map((plan) => {
                     const featured = plan.name === "Team";
                     const price = yearly ? plan.yearly : plan.monthly;

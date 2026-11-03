@@ -50,14 +50,26 @@ export function Dropdown({ label, buttonClassName, align = "left", openUp = fals
     };
 
     // The floating menu's fixed position: under the button (or above it, when flipped),
-    // lined up with its left or right edge
+    // lined up with its left or right edge, but always on screen. On a phone the button can be
+    // near (or past) an edge, say in a toolbar scrolled sideways: the menu then stays 8px in from
+    // the screen's edges, and is never wider than the screen.
     function place(flip: boolean) {
         const rect = buttonRef.current?.getBoundingClientRect();
         if (!rect) return;
+        const screen = window.innerWidth;
+        const gap = 8;
+        const right = Math.min(Math.max(gap, screen - rect.right), screen - gap);
+        const left = Math.min(Math.max(gap, rect.left), screen - gap);
+        // a left-aligned menu with little room to its right flips to the screen's right edge
+        const fromLeft = align !== "right" && screen - left - gap >= Math.min(320, screen - 2 * gap);
+        // on a phone a right-aligned menu opens from the screen's edge, so it gets the whole width
+        // to grow into instead of only the room left of its button
+        const fromRight = align === "right" && screen >= 640 ? right : gap;
         setSpot({
             ...(flip ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
-            ...(align === "right" ? { right: window.innerWidth - rect.right } : { left: rect.left }),
+            ...(fromLeft ? { left } : { right: fromRight }),
             ...(matchWidth && { width: rect.width }),
+            maxWidth: fromLeft ? screen - left - gap : screen - fromRight - gap,
         });
     }
 

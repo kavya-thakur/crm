@@ -34,6 +34,7 @@ import { StageBadge } from "@/components/StageBadge";
 import { PriorityBadge } from "./shared/tasks";
 import { ACTIVITY_TYPES, durationLabel, type ActivityStatus, type ActivityType } from "./activities/shared";
 import { TASK_STATUSES, type TaskPriority, type TaskStatus } from "./tasks/shared";
+import { rememberedUrl } from "./shared/useUrlState";
 
 /**
  * The global search, opened with ⌘K (Ctrl+K), "/" or the sidebar's search button.
@@ -381,7 +382,8 @@ function Palette({ pages, kinds, onClose }: { pages: MenuPage[]; kinds: SearchKi
         // records are remembered; pages are always listed anyway
         if (kindOf(item) !== "page") remember(item);
         onClose();
-        router.push(item.href);
+        // a page opens the way you last left it (board or list, your filters)
+        router.push(kindOf(item) === "page" ? rememberedUrl(item.href) : item.href);
     }
 
     function pickKind(next: SearchKind | undefined) {

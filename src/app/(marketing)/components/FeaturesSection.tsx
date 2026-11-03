@@ -4,7 +4,7 @@ import { useRef, type ComponentType, type ReactNode } from "react";
 import gsap from "gsap";
 import { TextPlugin } from "gsap/TextPlugin";
 import { useGSAP } from "@gsap/react";
-import { IconArrowUpRight, IconCheck, IconLayoutKanban, IconNotes, IconPhoneCall, IconSearch, IconSparkles, IconUserCheck, IconUsers } from "@tabler/icons-react";
+import { IconAddressBook, IconCheck, IconCurrencyRupee, IconLayoutKanban, IconPhoneCall, IconSearch, IconTargetArrow, IconUsers } from "@tabler/icons-react";
 
 import { Avatar } from "@/components/Avatar";
 import { Accent, CONTAINER, Eyebrow, Heading } from "./Eyebrow";
@@ -24,19 +24,19 @@ const FEATURES: { icon: Icon; title: string; body: string; picture: ReactNode }[
     {
         icon: IconLayoutKanban,
         title: "A board your team already knows",
-        body: "Deals sit on a board that looks like your process. Drag one to the next stage and everyone sees it move.",
+        body: "Leads, deals and tasks each get a Kanban board of your own stages. Drag a card along and your teammates see it move.",
         picture: <BoardPicture />,
     },
     {
         icon: IconUsers,
         title: "One live record for everyone",
-        body: "The whole team works on the same leads at the same time, so a hand-off never loses context.",
+        body: "When a teammate changes a lead, your screen updates on its own, with no refresh. A hand-off never loses context.",
         picture: <TeamPicture />,
     },
     {
-        icon: IconSparkles,
-        title: "Every action, two keys away",
-        body: "Press ⌘K to assign a lead, add a note or book a call without leaving the record you're on.",
+        icon: IconSearch,
+        title: "Find anything, two keys away",
+        body: "Press ⌘K to search every lead, deal, contact, task and meeting, and jump straight to the one you need.",
         picture: <CommandPicture />,
     },
 ];
@@ -88,11 +88,11 @@ export function FeaturesSection() {
                 });
             });
 
-            // 3. ⌘K: "sched" is typed, the highlight steps down to "Schedule a call",
-            //    it's pressed, and a confirmation pops up
+            // 3. ⌘K: "acme" is typed, the highlight steps down to the Acme deal,
+            //    it's pressed, and the deal opens
             loop("[data-picture=command]", 1)
                 .set("[data-placeholder]", { opacity: 0 }, 0.4)
-                .to("[data-typed]", { text: "sched", duration: 0.6, ease: "none" }, 0.4)
+                .to("[data-typed]", { text: "acme", duration: 0.5, ease: "none" }, 0.4)
                 .to("[data-highlight]", { y: 36, duration: 0.35, ease: "power2.out" }, "+=0.3")
                 .to("[data-highlight]", { y: 72, duration: 0.35, ease: "power2.out" }, "+=0.35")
                 .to("[data-highlight]", { scale: 0.96, duration: 0.1, yoyo: true, repeat: 1 }, "+=0.4")
@@ -296,21 +296,18 @@ function TeamPicture() {
 
 function CommandPicture() {
     const items: { icon: Icon; label: string; keys: string }[] = [
-        { icon: IconUserCheck, label: "Assign to an agent", keys: "A" },
-        { icon: IconNotes, label: "Add a note", keys: "N" },
-        { icon: IconPhoneCall, label: "Schedule a call", keys: "C" },
-        { icon: IconArrowUpRight, label: "Go to Deals", keys: "G D" },
+        { icon: IconTargetArrow, label: "Acme Industries", keys: "Lead" },
+        { icon: IconAddressBook, label: "Riya Sharma · Acme", keys: "Contact" },
+        { icon: IconCurrencyRupee, label: "Acme Industries · ₹4,80,000", keys: "Deal" },
+        { icon: IconPhoneCall, label: "Demo call with Acme", keys: "Call" },
     ];
 
     return (
         <div data-picture="command" aria-hidden className={WINDOW}>
-            <p className="mb-2 flex items-center gap-1.5 text-[10px] text-[#1c1c1c]/50">
-                On <Avatar name="Acme Industries" /> <span className="font-medium text-[#1c1c1c]">Acme Industries</span>
-            </p>
             <div className="relative flex h-8 items-center gap-2 border-b border-[#f1f1f1] pb-2">
                 <IconSearch size={13} className="shrink-0 text-[#999999]" />
                 <span data-placeholder className="absolute left-5 text-[#999999]">
-                    Type a command…
+                    Search leads, deals, contacts…
                 </span>
                 <span data-typed className="font-medium" />
                 <span className="-ml-1.5 h-3.5 w-px animate-pulse bg-[#4a38f5]" />
@@ -330,12 +327,12 @@ function CommandPicture() {
                 ))}
             </div>
 
-            {/* the confirmation once the action has run */}
+            {/* the record opening once it's picked */}
             <div data-toast className="absolute -bottom-12 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 whitespace-nowrap opacity-0 shadow-[0_8px_24px_rgb(0_0_0/0.3)]">
                 <span className="flex size-4 items-center justify-center rounded-full bg-[#059669] text-white">
                     <IconCheck size={10} stroke={3} />
                 </span>
-                Call scheduled with Acme · Tue 11:00
+                Opening deal · Acme Industries
             </div>
         </div>
     );
