@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db/prisma";
-import { DEFAULT_PIPELINE_STAGES } from "../src/lib/pipelineStages";
-import { DEFAULT_LEAD_STAGES } from "../src/lib/leadStages";
-import { DEFAULT_LEAD_SOURCES } from "../src/lib/leadSources";
+import { DEFAULT_PIPELINE_STAGES } from "../src/lib/deals/stages";
+import { DEFAULT_LEAD_STAGES } from "../src/lib/leads/stages";
+import { DEFAULT_LEAD_SOURCES } from "../src/lib/leads/sources";
 
 const resources = ["lead", "deal", "contact", "role", "user"];
 const actions = ["create", "read", "update", "delete"];
@@ -39,6 +39,19 @@ async function main() {
         create: { name: "contact:all", description: "Can see and act on every contact, not just assigned ones" },
     });
 
+    // Anyone can add tasks and calls/meetings; these let someone see and manage everyone's
+    await prisma.permission.upsert({
+        where: { name: "task:all" },
+        update: {},
+        create: { name: "task:all", description: "Can see and act on every task, not just their own" },
+    });
+
+    await prisma.permission.upsert({
+        where: { name: "activity:all" },
+        update: {},
+        create: { name: "activity:all", description: "Can see and act on every call and meeting, not just their own" },
+    });
+
     // One switch for the whole pipeline setup (create, edit, reorder, delete stages), not CRUD
     await prisma.permission.upsert({
         where: { name: "pipeline:manage" },
@@ -58,6 +71,27 @@ async function main() {
         where: { name: "lead-sources:manage" },
         update: {},
         create: { name: "lead-sources:manage", description: "Can create, edit, reorder and delete lead sources" },
+    });
+
+    // Creating web forms that put leads straight into the workspace
+    await prisma.permission.upsert({
+        where: { name: "lead-forms:manage" },
+        update: {},
+        create: { name: "lead-forms:manage", description: "Can create, edit and delete web forms that capture leads" },
+    });
+
+    // The workspace's shared email templates (anyone who can see a lead can still email it)
+    await prisma.permission.upsert({
+        where: { name: "email-templates:manage" },
+        update: {},
+        create: { name: "email-templates:manage", description: "Can create, edit and delete the workspace's email templates" },
+    });
+
+    // "When a lead comes in, do this": rules that act for the team
+    await prisma.permission.upsert({
+        where: { name: "automations:manage" },
+        update: {},
+        create: { name: "automations:manage", description: "Can create, edit and turn off the workspace's automation rules" },
     });
 
     // One switch for defining custom fields, not CRUD on the fields themselves
