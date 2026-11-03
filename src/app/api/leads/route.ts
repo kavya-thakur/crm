@@ -8,6 +8,7 @@ import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { alreadyALead, duplicateLeadsWhere, findOpenCopy, withDuplicateHints } from "@/lib/leads/duplicates";
 import { firstName, notify } from "@/lib/realtime/notify";
+import { startAutomations } from "@/lib/automations/engine";
 import { exportLeads } from "@/lib/api/csvExport";
 import { MAX_BULK } from "@/lib/jobs/bulkActions";
 
@@ -202,6 +203,9 @@ export async function POST(req: NextRequest) {
             body: lead.name,
             link: `/leads?open=${lead.id}`,
         });
+
+        // the workspace's "when a lead is created" rules (they run in the background)
+        await startAutomations({ trigger: "lead.created", organizationId: user.organizationId, leadId: lead.id, viaFormId: null });
 
         return NextResponse.json(
             {

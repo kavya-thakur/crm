@@ -23,10 +23,13 @@ const REFRESH: Record<string, string[]> = {
     "lead-sources": ["leadSource", "leads", "lead", "dashboard"],
     "pipeline-stages": ["pipelineStage", "deals", "deal", "dashboard"],
     "custom-fields": ["customFields", "leads", "deals", "contacts"],
-    "lead-forms": ["leadForms"],
+    // a new integration can add a lead source of its name
+    "lead-forms": ["leadForms", "leadSource"],
     // sent, failed, opened: the Emails tab, and the timeline entry on the lead or deal
     emails: ["emails", "lead", "deal"],
     "email-templates": ["emailTemplates"],
+    // a rule changed, or ran (its run count and log)
+    automations: ["automations"],
     agents: ["agents", "dashboard"],
     roles: ["roles", "permissions"],
     // read in another of your tabs (sent only to you)

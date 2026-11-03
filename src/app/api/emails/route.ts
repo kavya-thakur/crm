@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
@@ -6,25 +5,12 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { dealScope, hasPermission, leadScope, type CurrentUser } from "@/lib/auth/requirePermission";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { tooManyAttempts } from "@/lib/api/rateLimit";
-import { emailsQueue } from "@/lib/jobs/queues";
+import { emailSelect, queueEmail } from "@/lib/emails/send";
 import { listEmailsQuerySchema, sendEmailSchema } from "@/lib/validations/emails";
 import { searchParamsToObject } from "@/lib/validations/common";
 
 // Most emails one person can send in a day: well inside Gmail's own 500, and a stop on mistakes
 const DAILY_LIMIT = 100;
-
-const emailSelect = {
-    id: true,
-    to: true,
-    subject: true,
-    body: true,
-    status: true,
-    error: true,
-    sentAt: true,
-    openedAt: true,
-    createdAt: true,
-    sentBy: { select: { id: true, name: true } },
-} as const;
 
 // The lead or deal an email is about, if this person may see it (and so email it)
 async function findRecord(user: CurrentUser, link: { leadId?: number; dealId?: number }) {
@@ -61,7 +47,7 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// Saves the email, puts it on the queue (the worker sends it) and logs it on the record's timeline
+// Sends an email from a lead's or deal's Emails tab (queueEmail saves it, logs it and queues it)
 export async function POST(req: NextRequest) {
     try {
         const user = await getCurrentUser();
@@ -78,28 +64,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false, message: `You've sent ${DAILY_LIMIT} emails today, the most for one day. Try again tomorrow.` }, { status: 429 });
         }
 
-        const timeline = { create: { userId: user.id, type: "EMAIL_SENT", message: `Emailed ${to}: ${subject}` } };
-        const email = await prisma.$transaction(async (tx) => {
-            const created = await tx.email.create({
-                data: {
-                    organizationId: user.organizationId,
-                    leadId: leadId ?? null,
-                    dealId: dealId ?? null,
-                    sentById: user.id,
-                    to,
-                    subject,
-                    body: text,
-                    // the open-tracking image's address: random, so nobody can mark others' emails opened
-                    trackingToken: randomBytes(18).toString("base64url"),
-                },
-                select: emailSelect,
-            });
-            if (leadId) await tx.lead.update({ where: { id: leadId }, data: { timeline } });
-            else await tx.deal.update({ where: { id: dealId }, data: { timeline } });
-            return created;
-        });
-
-        await emailsQueue().add("send", { emailId: email.id });
+        const email = await queueEmail({ organizationId: user.organizationId, leadId, dealId, sentById: user.id, to, subject, body: text });
 
         return NextResponse.json({ ok: true, message: "Sending", data: email }, { status: 201 });
     } catch (error) {

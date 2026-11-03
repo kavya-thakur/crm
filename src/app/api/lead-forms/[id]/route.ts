@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { allAgentsInOrganization } from "@/lib/work/activities";
@@ -29,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             return body.response;
         }
 
-        const { sourceId, ownerId, assigneeIds, settings } = body.data;
+        const { sourceId, ownerId, assigneeIds, settings, newKey, ...rest } = body.data;
 
         // the source and owner have to be this organization's own
         if (sourceId) {
@@ -62,7 +63,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         const form = await prisma.leadForm.update({
             where: { id: id.data, organizationId: user.organizationId },
             // a fresh rotation starts from its first person
-            data: { ...body.data, ...(assigneeIds && { assigneeIds: [...new Set(assigneeIds)], turn: 0 }) },
+            data: {
+                ...rest,
+                sourceId,
+                ownerId,
+                settings,
+                ...(assigneeIds && { assigneeIds: [...new Set(assigneeIds)], turn: 0 }),
+                ...(newKey && { key: randomBytes(18).toString("base64url") }),
+            },
             include,
         });
 

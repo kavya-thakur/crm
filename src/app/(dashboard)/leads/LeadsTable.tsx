@@ -49,7 +49,7 @@ export const LEAD_COLUMNS: LeadColumn[] = [
         cell: (lead) => lead.phone && <a href={`tel:${lead.phone}`} className="hover:underline">{lead.phone}</a>,
     },
     { key: "source", label: "Source", icon: IconTag, width: 150, cell: (lead) => lead.source && <StageBadge name={lead.source.name} color={lead.source.color} /> },
-    { key: "campaign", label: "Campaign", icon: IconSpeakerphone, width: 170, cell: (lead) => lead.utmCampaign },
+    { key: "campaign", label: "Campaign", icon: IconSpeakerphone, width: 170, hiddenByDefault: true, cell: (lead) => lead.utmCampaign },
     {
         key: "assignedTo", label: "Assigned to", icon: IconUserCircle, width: 180,
         cell: (lead) => lead.assignedTo && (
@@ -60,7 +60,7 @@ export const LEAD_COLUMNS: LeadColumn[] = [
         ),
     },
     { key: "createdAt", label: "Created", icon: IconCalendar, width: 150, cell: (lead) => formatDate(lead.createdAt) },
-    { key: "lostReason", label: "Lost reason", icon: IconThumbDown, width: 180, cell: (lead) => lead.stage.isLost && lead.lostReason },
+    { key: "lostReason", label: "Lost reason", icon: IconThumbDown, width: 180, hiddenByDefault: true, cell: (lead) => lead.stage.isLost && lead.lostReason },
     ...peopleColumns<Lead>(),
 ];
 

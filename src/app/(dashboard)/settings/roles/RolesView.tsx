@@ -60,7 +60,8 @@ const SETUP = [
     { name: "lead-stages:manage", label: "Lead stages", hint: "The same for the leads board's stages." },
     { name: "lead-sources:manage", label: "Lead sources", hint: "The list of places leads come from." },
     { name: "custom-fields:manage", label: "Custom fields", hint: "Extra fields on leads, deals and contacts." },
-    { name: "lead-forms:manage", label: "Web forms", hint: "Forms on your website that create leads by themselves." },
+    { name: "lead-forms:manage", label: "Web forms & integrations", hint: "Forms on your website, and other tools (Google Ads, IndiaMART, Zapier) that send in leads by themselves." },
+    { name: "automations:manage", label: "Automations", hint: "Rules that assign, email and add tasks to new leads by themselves." },
     { name: "email-templates:manage", label: "Email templates", hint: "Ready-made emails everyone can send from a lead or deal." },
 ];
 

@@ -90,6 +90,7 @@ model Organization {
   bulkJobs               BulkJob[]
   emails                 Email[]
   emailTemplates         EmailTemplate[]
+  automationRules        AutomationRule[]
 }
 
 model Role {
@@ -680,6 +681,10 @@ model Task {
 model LeadForm {
   id             Int      @id @default(autoincrement())
   organizationId Int
+  // FORM = a web form (hosted page / HTML embed); WEBHOOK = a lead integration: another
+  // tool (Google Ads, IndiaMART, Zapier/Make/Pabbly, a developer's code) posting leads to
+  // /api/public/leads/<key>. Both share the source, owner, rotation and capture rules.
+  kind           String   @default("FORM")
   // "Website demo requests"
   name           String
   // the form's public id, in its link and embed code: long and random, so it can't be guessed
@@ -701,8 +706,29 @@ model LeadForm {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   source       LeadSource?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   owner        User?        @relation("LeadFormOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  deliveries   LeadFormDelivery[]
 
   @@index([organizationId])
+}
+
+// What arrived at a lead integration and what became of it, so whoever set it up can see
+// "Google Ads sent Rahul at 10:42 → new lead" or "rejected: Phone is missing". The newest
+// 50 per integration are kept.
+model LeadFormDelivery {
+  id        Int      @id @default(autoincrement())
+  formId    Int
+  // CREATED (a new lead), UPDATED (an open lead they already were), REJECTED
+  status    String
+  // what happened, in words
+  message   String
+  leadId    Int?
+  // what the other tool sent, as it arrived (trimmed if very large)
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  form LeadForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId, createdAt])
 }
 
 // One entry in someone's bell: "Priya assigned you a lead". Saved so it's still there after
@@ -853,4 +879,56 @@ model EmailTemplate {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+// A "when → if → then" recipe the workspace sets up in Settings > Automations:
+//   when a lead is created, if its source is Google Ads, then assign it to Priya,
+//   send the "First reply" email and add a call task.
+// The worker runs it (src/lib/automations/engine.ts). Conditions and actions are JSON,
+// checked by automationRuleSchema (src/lib/validations/automations.ts).
+model AutomationRule {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  // what sets it off; only "lead.created" for now
+  trigger        String
+  // [{ field: "source", op: "is", value: "12" }], all of which have to match
+  conditions     Json     @default("[]")
+  // [{ type: "assign", userIds: [4, 7] }, { type: "email", templateId: 3 }, ...], run in order
+  actions        Json     @default("[]")
+  enabled        Boolean  @default(true)
+  // rules run top to bottom
+  order          Int      @default(0)
+  // how many leads its "assign, taking turns" action has handed out
+  turn           Int      @default(0)
+  // whose name its timeline entries go under
+  createdById    Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         AutomationRun[]
+
+  @@index([organizationId, trigger])
+}
+
+// One time a rule's conditions matched and it ran: what it did, or why it stopped. The newest
+// 50 per rule are kept. (ruleId, eventKey) is unique, so a job that's retried never runs a
+// rule twice for the same lead: no second email, no second task.
+model AutomationRun {
+  id        Int      @id @default(autoincrement())
+  ruleId    Int
+  // "lead.created:812"
+  eventKey  String
+  leadId    Int?
+  // RUNNING, DONE or FAILED
+  status    String
+  // "Assigned to Priya · Emailed rahul@acme.com · Task "Call Rahul""
+  summary   String   @default("")
+  createdAt DateTime @default(now())
+
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, eventKey])
+  @@index([ruleId, createdAt])
 }

@@ -27,7 +27,8 @@ export async function GET() {
     }
 }
 
-// A new form starts by giving its leads to whoever made it, with no source; both can be changed
+// A new form starts by giving its leads to whoever made it, tagged with a fitting source
+// (see startingSource); both can be changed
 export async function POST(req: NextRequest) {
     try {
         const user = await requirePermission("lead-forms:manage");
@@ -42,6 +43,8 @@ export async function POST(req: NextRequest) {
             data: {
                 organizationId: user.organizationId,
                 name: body.data.name,
+                kind: body.data.kind,
+                sourceId: await startingSource(user.organizationId, body.data),
                 // 24 random characters: the form's public id, which nobody could guess
                 key: randomBytes(18).toString("base64url"),
                 ownerId: user.id,
@@ -53,4 +56,23 @@ export async function POST(req: NextRequest) {
     } catch (error) {
         return handleRouteError(error, "Create web form");
     }
+}
+
+/**
+ * Where a new form's leads are tagged from the start. A web form: the workspace's "Website"
+ * source, if it has one. An integration: a source with the integration's own name ("Google
+ * Ads"), made at the end of the list if there isn't one yet, so its leads are told apart in
+ * filters and on the dashboard's source card from the first lead.
+ */
+async function startingSource(organizationId: number, { name, kind }: { name: string; kind: "FORM" | "WEBHOOK" }) {
+    const wanted = (kind === "WEBHOOK" ? name : "Website").slice(0, 50);
+    const existing = await prisma.leadSource.findFirst({
+        where: { organizationId, name: { equals: wanted, mode: "insensitive" } },
+        select: { id: true },
+    });
+    if (existing || kind === "FORM") return existing?.id ?? null;
+
+    const last = await prisma.leadSource.findFirst({ where: { organizationId }, orderBy: { order: "desc" }, select: { order: true } });
+    const source = await prisma.leadSource.create({ data: { organizationId, name: wanted, order: (last?.order ?? -1) + 1 }, select: { id: true } });
+    return source.id;
 }

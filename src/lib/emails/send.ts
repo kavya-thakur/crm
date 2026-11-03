@@ -1,8 +1,10 @@
+import { randomBytes } from "node:crypto";
 import nodemailer, { type Transporter } from "nodemailer";
 
 import { prisma } from "@/lib/db/prisma";
 import { isDemoWorkspace } from "@/lib/demo/workspace";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
+import { emailsQueue } from "@/lib/jobs/queues";
 
 /*
  * Sending the CRM's emails, over SMTP (any provider: Gmail, Brevo, Resend...), set in .env:
@@ -14,6 +16,47 @@ import { broadcastChange, notify } from "@/lib/realtime/notify";
  */
 
 const holder = globalThis as unknown as { crmMailer?: Transporter };
+
+export const emailSelect = {
+    id: true,
+    to: true,
+    subject: true,
+    body: true,
+    status: true,
+    error: true,
+    sentAt: true,
+    openedAt: true,
+    createdAt: true,
+    sentBy: { select: { id: true, name: true } },
+} as const;
+
+/**
+ * Saves an email to a lead or deal, logs it on that record's timeline, and puts it on the
+ * queue for the worker to send. Used by the Emails tab and by automations.
+ */
+export async function queueEmail(email: { organizationId: number; leadId?: number; dealId?: number; sentById: number; to: string; subject: string; body: string }) {
+    const { leadId, dealId, ...fields } = email;
+    const timeline = { create: { userId: email.sentById, type: "EMAIL_SENT", message: `Emailed ${email.to}: ${email.subject}` } };
+
+    const saved = await prisma.$transaction(async (tx) => {
+        const created = await tx.email.create({
+            data: {
+                ...fields,
+                leadId: leadId ?? null,
+                dealId: dealId ?? null,
+                // the open-tracking image's address: random, so nobody can mark others' emails opened
+                trackingToken: randomBytes(18).toString("base64url"),
+            },
+            select: emailSelect,
+        });
+        if (leadId) await tx.lead.update({ where: { id: leadId }, data: { timeline } });
+        else await tx.deal.update({ where: { id: dealId }, data: { timeline } });
+        return created;
+    });
+
+    await emailsQueue().add("send", { emailId: saved.id });
+    return saved;
+}
 
 // What's missing from .env before email can go out, said plainly; null when it's all there
 export function emailSetupProblem() {

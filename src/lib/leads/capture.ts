@@ -7,6 +7,7 @@ import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { addTaskToTimeline, startOfToday } from "@/lib/work/tasks";
 import { findOpenCopy } from "@/lib/leads/duplicates";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
+import { startAutomations } from "@/lib/automations/engine";
 
 // What a web form sends. Name and phone always (every lead and contact needs them); the
 // form's own settings decide whether email, company and message are required (see
@@ -58,29 +59,38 @@ function shown(type: CustomFieldType, value: unknown) {
 /**
  * Checks a submission against what its form asks: the built-in fields it makes required,
  * and the lead custom fields it asks for (required or not as the form says, whatever the
- * field's own setting). Returns the custom field values to save on the lead, and the
- * answers in words for the timeline.
+ * field's own setting). A lead integration (kind WEBHOOK) asks nothing beyond name and
+ * phone, and takes any of the lead's custom fields it's sent. Returns the custom field
+ * values to save on the lead, and the answers in words for the timeline.
  */
 async function checkAnswers(form: LeadForm, input: FormSubmission) {
     const settings = readFormSettings(form.settings);
     const errors: Record<string, string> = {};
+    const webhook = form.kind === "WEBHOOK";
 
     for (const field of ["email", "company", "message"] as const) {
-        if (settings[field] === "required" && !input[field]) errors[field] = `${BUILT_IN_LABELS[field]} is required`;
+        if (!webhook && settings[field] === "required" && !input[field]) errors[field] = `${BUILT_IN_LABELS[field]} is required`;
     }
 
     const asked = settings.customFields;
     const definitions =
-        asked.length === 0
+        asked.length === 0 && !webhook
             ? []
             : await prisma.customFieldDefinition.findMany({
-                  where: { organizationId: form.organizationId, entity: "lead", key: { in: asked.map((field) => field.key) }, type: { not: "AGENT" } },
+                  where: {
+                      organizationId: form.organizationId,
+                      entity: "lead",
+                      type: { not: "AGENT" },
+                      ...(!webhook && { key: { in: asked.map((field) => field.key) } }),
+                  },
               });
     // in the form's order, required as the form says; a field deleted since is skipped
-    const fields = asked.flatMap((field) => {
-        const definition = definitions.find((item) => item.key === field.key);
-        return definition ? [{ ...definition, required: field.required }] : [];
-    });
+    const fields = webhook
+        ? definitions.map((definition) => ({ ...definition, required: false }))
+        : asked.flatMap((field) => {
+              const definition = definitions.find((item) => item.key === field.key);
+              return definition ? [{ ...definition, required: field.required }] : [];
+          });
 
     const submitted = Object.fromEntries(fields.map((field) => [field.key, fromForm(field.type, input.customFields?.[field.key])]));
     const result = validateCustomFieldValues(fields, submitted);
@@ -217,6 +227,8 @@ export async function captureLead(formKey: string, input: FormSubmission) {
         body: input.name,
         link: `/leads?open=${lead.id}`,
     });
+    // the workspace's "when a lead is created" rules, which can check which form it came through
+    await startAutomations({ trigger: "lead.created", organizationId, leadId: lead.id, viaFormId: form.id });
 
     return { ok: true as const, created: true, leadId: lead.id, ...after };
 }

@@ -32,6 +32,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     const canSeeCustomFields = hasPermission(user, "custom-fields:manage");
     const canSeeLeadForms = hasPermission(user, "lead-forms:manage");
     const canSeeEmailTemplates = hasPermission(user, "email-templates:manage");
+    const canSeeAutomations = hasPermission(user, "automations:manage");
     const canSeeNotes = hasPermission(user, "lead:read") || hasPermission(user, "deal:read") || hasPermission(user, "contact:read");
 
     // What this person can open: the workspace pages, and the settings pages grouped the
@@ -56,7 +57,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
             : []),
         ...(canSeeCustomFields ? [{ href: "/settings/custom-fields", label: "Custom fields", section: "customFields" as const }] : []),
         ...(canSeeLeadForms ? [{ href: "/settings/lead-forms", label: "Web forms", section: "leadForms" as const }] : []),
+        ...(canSeeLeadForms ? [{ href: "/settings/integrations", label: "Lead integrations", section: "integrations" as const }] : []),
         ...(canSeeEmailTemplates ? [{ href: "/settings/email-templates", label: "Email templates", section: "emailTemplates" as const }] : []),
+        ...(canSeeAutomations ? [{ href: "/settings/automations", label: "Automations", section: "automations" as const }] : []),
     ];
     const settings: NavGroup[] = [
         // everyone has their own profile, so Settings always has somewhere to land

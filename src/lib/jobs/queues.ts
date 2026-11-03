@@ -11,6 +11,7 @@ export const IMPORTS_QUEUE = "imports";
 export const BULK_QUEUE = "bulk";
 export const DEMO_QUEUE = "demo";
 export const EMAILS_QUEUE = "emails";
+export const AUTOMATIONS_QUEUE = "automations";
 
 export interface ImportJobData {
     importJobId: number;
@@ -24,11 +25,21 @@ export interface EmailJobData {
     emailId: number;
 }
 
+// "Lead 812 was created (through form 3)": the event automation rules react to
+export interface AutomationJobData {
+    trigger: "lead.created";
+    organizationId: number;
+    leadId: number;
+    // the web form or integration it came in through; null = added by hand
+    viaFormId: number | null;
+}
+
 const holder = globalThis as unknown as {
     crmImportsQueue?: Queue<ImportJobData>;
     crmBulkQueue?: Queue<BulkJobData>;
     crmDemoQueue?: Queue;
     crmEmailsQueue?: Queue<EmailJobData>;
+    crmAutomationsQueue?: Queue<AutomationJobData>;
 };
 
 const retries = {
@@ -66,4 +77,14 @@ export function bulkQueue() {
 export function emailsQueue() {
     holder.crmEmailsQueue ??= new Queue<EmailJobData>(EMAILS_QUEUE, { connection: queueConnection("emails queue"), defaultJobOptions: retries });
     return holder.crmEmailsQueue;
+}
+
+// Events for automation rules: the route that saved the lead answers at once, and the worker
+// works out which rules match and runs them
+export function automationsQueue() {
+    holder.crmAutomationsQueue ??= new Queue<AutomationJobData>(AUTOMATIONS_QUEUE, {
+        connection: queueConnection("automations queue"),
+        defaultJobOptions: retries,
+    });
+    return holder.crmAutomationsQueue;
 }

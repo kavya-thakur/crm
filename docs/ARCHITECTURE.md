@@ -3,7 +3,8 @@
 How Flash is put together: the request lifecycle, the folders, and how each feature works.
 For *what* is built and *why* it was decided, see [PROJECT.md](PROJECT.md). For the live
 updates and notifications, see [REALTIME.md](REALTIME.md). For email from the CRM, see
-[EMAIL.md](EMAIL.md).
+[EMAIL.md](EMAIL.md); for leads sent in by other tools, [INTEGRATIONS.md](INTEGRATIONS.md); for rules that act on new
+leads, [AUTOMATIONS.md](AUTOMATIONS.md).
 
 _Last updated: 2026-11-02_
 
