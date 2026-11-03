@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IconCircle, IconCircleCheckFilled } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { DoneCheck } from "@/components/DoneCheck";
 import { Board, BoardCard, BoardColumn, CardControl, CardFields, ColumnTitle, useBoardColumn } from "@/components/Board";
 import type { DataColumn } from "@/components/DataTable";
 import { toast } from "@/components/Toast";
@@ -113,19 +113,18 @@ function StatusColumn({
                                 <TypeIcon size={18} className="mt-0.5 shrink-0 text-light" />
                             ) : (
                                 <CardControl className="-mt-0.5 -ml-0.5">
-                                    <button
-                                        type="button"
-                                        aria-label={done ? "Mark as not done" : "Mark as done"}
+                                    <DoneCheck
+                                        done={done}
+                                        size={18}
+                                        label={done ? "Mark as not done" : "Mark as done"}
                                         onClick={() => onChange(activity.id, toggledStatus(activity.status))}
-                                        className="flex size-6 items-center justify-center rounded-full text-light hover:text-accent"
-                                    >
-                                        {done ? <IconCircleCheckFilled size={19} className="text-accent" /> : <IconCircle size={19} />}
-                                    </button>
+                                        className="size-6"
+                                    />
                                 </CardControl>
                             )}
                             <p
                                 className={`line-clamp-2 min-w-0 flex-1 font-medium ${
-                                    activity.status === "SCHEDULED" ? "text-ink" : "text-faint line-through"
+                                    activity.status === "SCHEDULED" ? "text-ink" : "text-muted"
                                 }`}
                             >
                                 {activity.title}

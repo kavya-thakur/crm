@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconChevronDown, IconFlag, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
-import { ListHeader, ViewSwitcher } from "@/components/ListPage";
+import { ListHeader, Pagination, ViewSwitcher } from "@/components/ListPage";
 import { toast } from "@/components/Toast";
 import type { AgentOption } from "../shared/customFields";
 import { PriorityBadge } from "../shared/tasks";
@@ -16,8 +15,8 @@ import TaskPanel from "./TaskPanel";
 import TasksTable from "./TasksTable";
 import TasksBoard from "./TasksBoard";
 import { TASK_PRIORITIES, refreshTasks, type Paginated, type Task, type TaskPriority, type TaskScope } from "./shared";
+import { oneOf, PAGE_SIZES, usePaging, useUrlState } from "../shared/useUrlState";
 
-const PAGE_SIZE = 50;
 
 const SCOPES: { value: TaskScope; label: string }[] = [
     { value: "open", label: "Open" },
@@ -27,32 +26,37 @@ const SCOPES: { value: TaskScope; label: string }[] = [
 ];
 
 export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
-    const router = useRouter();
     const queryClient = useQueryClient();
-    const searchParams = useSearchParams();
 
-    const [view, setView] = useState<"table" | "board">("table");
-    const [scope, setScope] = useState<TaskScope>("open");
+    // Everything you've chosen here lives in the URL, so a refresh (or a shared link) keeps it:
+    // board or list, which tasks, whose, which priority, and the open task (?open=12, which is
+    // also how a link from a timeline lands on one)
+    const page = useUrlState();
+    const view = page.get("view") === "table" ? "table" : "board";
+    const setView = (next: "table" | "board") => page.set({ view: next === "board" ? null : next });
+    const scope = oneOf(page.get("scope"), SCOPES.map((item) => item.value), "open");
+    const setScope = (next: TaskScope) => page.set({ page: null, scope: next === "open" ? null : next });
     // your own tasks are what you usually want; switch it to see the whole team's
-    const [mineOnly, setMineOnly] = useState(true);
+    const mineOnly = page.get("whose") !== "team";
+    const setMineOnly = (mine: boolean) => page.set({ page: null, whose: mine ? null : "team" });
     // undefined = every priority
-    const [priority, setPriority] = useState<TaskPriority | undefined>();
+    const priority = TASK_PRIORITIES.find((item) => item.value === page.get("priority"))?.value;
+    const setPriority = (next: TaskPriority | undefined) => page.set({ page: null, priority: next ?? null });
     const [creating, setCreating] = useState(false);
 
-    // The open task lives in the URL, so a link from a timeline (or a row here) lands on it
-    const openTaskId = Number(searchParams.get("open")) || null;
+    const openTaskId = Number(page.get("open")) || null;
+    const openTask = (id: number | null) => page.set({ open: id ? String(id) : null }, "push");
 
-    const tasksQuery = useInfiniteQuery({
-        queryKey: ["tasks", "list", scope, mineOnly, priority],
-        queryFn: ({ pageParam }) =>
+    // one page of the list at a time; which one, and its size, are in the URL (the Pagination bar)
+    const paging = usePaging();
+    const tasksQuery = useQuery({
+        queryKey: ["tasks", "list", scope, mineOnly, priority, paging.page, paging.size],
+        queryFn: () =>
             api
                 .get<Paginated<Task>>("/tasks", {
-                    params: { scope, assignedTo: mineOnly ? "me" : undefined, priority, page: pageParam, limit: PAGE_SIZE },
+                    params: { scope, assignedTo: mineOnly ? "me" : undefined, priority, page: paging.page, limit: paging.size },
                 })
                 .then((res) => res.data),
-        initialPageParam: 1,
-        getNextPageParam: ({ pagination }) =>
-            pagination.page < pagination.totalPages ? pagination.page + 1 : undefined,
         placeholderData: keepPreviousData,
     });
 
@@ -73,8 +77,8 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
         onError: (error) => toast.error(errorMessage(error)),
     });
 
-    const tasks = tasksQuery.data?.pages.flatMap((page) => page.data) ?? [];
-    const total = tasksQuery.data?.pages[0]?.pagination.total;
+    const tasks = tasksQuery.data?.data ?? [];
+    const total = tasksQuery.data?.pagination.total;
 
     if (creating) {
         return (
@@ -84,7 +88,7 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
                 onCreated={(task) => {
                     setCreating(false);
                     refreshTasks(queryClient);
-                    router.push(`/tasks?open=${task.id}`);
+                    openTask(task.id);
                 }}
             />
         );
@@ -97,7 +101,7 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
                 key={openTaskId}
                 taskId={openTaskId}
                 agents={agents.data}
-                onClose={() => router.push("/tasks")}
+                onClose={() => openTask(null)}
             />
         );
     }
@@ -106,7 +110,7 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
         <div className="flex h-full flex-col">
             <ListHeader section="tasks" title="Tasks" count={total} createLabel="New Task" onCreate={() => setCreating(true)} />
 
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
+            <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0">
                 <ViewSwitcher view={view} onChange={setView} />
 
                 {/* the board's columns already split tasks by status, so these are table-only */}
@@ -178,7 +182,7 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
                     <TasksBoard
                         filters={{ assignedTo: mineOnly ? "me" : undefined, priority }}
                         agents={seeAgents ? agents.data : undefined}
-                        onOpen={(id) => router.push(`/tasks?open=${id}`)}
+                        onOpen={openTask}
                         onCreate={() => setCreating(true)}
                     />
                 ) : (
@@ -190,18 +194,18 @@ export default function TasksView({ seeAgents }: { seeAgents: boolean }) {
                         failed={tasksQuery.isError}
                         error={tasksQuery.error}
                         onRetry={() => tasksQuery.refetch()}
-                        hasMore={tasksQuery.hasNextPage}
-                        loadingMore={tasksQuery.isFetchingNextPage}
-                        onLoadMore={tasksQuery.fetchNextPage}
                         onToggle={(task) =>
                             updateTask.mutate({ id: task.id, changes: { status: task.status === "COMPLETED" ? "PENDING" : "COMPLETED" } })
                         }
                         onUpdate={(task, changes) => updateTask.mutate({ id: task.id, changes })}
-                        onOpen={(id) => router.push(`/tasks?open=${id}`)}
+                        onOpen={openTask}
                         onCreate={() => setCreating(true)}
                     />
                 )}
             </div>
+
+            {/* which page of the list, and how many rows a page */}
+            {view === "table" && <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />}
         </div>
     );
 }

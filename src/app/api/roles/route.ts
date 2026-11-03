@@ -5,6 +5,7 @@ import { assertHoldsPermissions, requirePermission } from "@/lib/auth/requirePer
 import { createRoleSchema } from "@/lib/validations/roles";
 import { escapeLike } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { assertNotDemo } from "@/lib/demo/workspace";
 
 const roleSelect = {
     id: true,
@@ -38,6 +39,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
     try {
         const user = await requirePermission("role:create");
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const body = await parseBody(req, createRoleSchema);
 

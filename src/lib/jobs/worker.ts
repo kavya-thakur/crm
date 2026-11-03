@@ -2,7 +2,9 @@ import { Worker } from "bullmq";
 import { queueConnection } from "@/lib/db/redis";
 import { failImport, runImport } from "@/lib/jobs/leadImport";
 import { failBulkJob, runBulkJob } from "@/lib/jobs/bulkActions";
-import { BULK_QUEUE, IMPORTS_QUEUE, type BulkJobData, type ImportJobData } from "./queues";
+import { buildDemoWorkspace } from "@/lib/demo/workspace";
+import { failEmail, sendEmail } from "@/lib/emails/send";
+import { BULK_QUEUE, DEMO_QUEUE, demoQueue, EMAILS_QUEUE, IMPORTS_QUEUE, type BulkJobData, type EmailJobData, type ImportJobData } from "./queues";
 
 /**
  * The worker: takes jobs off the queue in Redis and runs them. Started by server.ts, so it
@@ -34,5 +36,26 @@ export function startWorkers() {
         if (job.attemptsMade >= (job.opts.attempts ?? 1)) void failBulkJob(job.data.bulkJobId, error.message);
     });
 
-    return [imports, bulk];
+    const emails = new Worker<EmailJobData>(EMAILS_QUEUE, (job) => sendEmail(job.data.emailId), {
+        connection: queueConnection("emails worker"),
+        concurrency: 2,
+    });
+
+    emails.on("failed", (job, error) => {
+        if (!job) return;
+        console.error(`Email ${job.data.emailId} failed (attempt ${job.attemptsMade}):`, error.message);
+        // the mail server kept saying no (wrong password, blocked address): the sender is told
+        if (job.attemptsMade >= (job.opts.attempts ?? 1)) void failEmail(job.data.emailId, error.message);
+    });
+
+    // The demo workspace is rebuilt every night, undoing whatever visitors changed. A job
+    // scheduler is BullMQ's cron: the schedule lives in Redis, so it survives restarts and runs
+    // once a night however many servers there are. "upsert" means starting again doesn't add a second one.
+    const demo = new Worker(DEMO_QUEUE, () => buildDemoWorkspace(), { connection: queueConnection("demo worker") });
+    demo.on("failed", (_job, error) => console.error("Nightly demo reset failed:", error.message));
+    void demoQueue()
+        .upsertJobScheduler("nightly-demo-reset", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "reset" })
+        .catch((error) => console.error("Couldn't schedule the nightly demo reset:", error.message));
+
+    return [imports, bulk, emails, demo];
 }

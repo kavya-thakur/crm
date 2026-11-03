@@ -145,6 +145,18 @@ export default function RegisterPage() {
                         {registerMutation.isPending ? <Spinner size={16} /> : <IconArrowRight size={16} className="transition-transform duration-300 group-hover:-rotate-45" />}
                     </span>
                 </button>
+
+                <p className="text-center text-[12px] text-balance text-[#1c1c1c]/45">
+                    By creating a workspace you agree to our{" "}
+                    <Link href="/terms" className="underline underline-offset-2 hover:text-[#1c1c1c]">
+                        Terms
+                    </Link>{" "}
+                    and{" "}
+                    <Link href="/privacy" className="underline underline-offset-2 hover:text-[#1c1c1c]">
+                        Privacy policy
+                    </Link>
+                    .
+                </p>
             </form>
 
             <p className="mt-8 text-center text-[14px] text-[#1c1c1c]/55">

@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
     IconCalendar,
     IconCalendarDue,
     IconChecklist,
-    IconCircle,
-    IconCircleCheckFilled,
     IconFlag,
     IconLink,
     IconPlus,
@@ -15,6 +12,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 
+import { DoneCheck } from "@/components/DoneCheck";
 import { Avatar } from "@/components/Avatar";
 import { DataCell, type DataColumn, type EditConfig } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
@@ -135,9 +133,6 @@ interface TasksTableProps {
     failed: boolean;
     error: unknown;
     onRetry: () => void;
-    hasMore: boolean;
-    loadingMore: boolean;
-    onLoadMore: () => void;
     onToggle: (task: Task) => void;
     onUpdate: (task: Task, changes: Record<string, unknown>) => void;
     onOpen: (id: number) => void;
@@ -145,19 +140,8 @@ interface TasksTableProps {
 }
 
 export default function TasksTable({
-    tasks, scope, agents, loading, failed, error, onRetry, hasMore, loadingMore, onLoadMore, onToggle, onUpdate, onOpen, onCreate,
+    tasks, scope, agents, loading, failed, error, onRetry, onToggle, onUpdate, onOpen, onCreate,
 }: TasksTableProps) {
-    // Infinite scroll: when this invisible div at the bottom comes into view, load the next page
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const bottom = bottomRef.current;
-        if (!bottom || !hasMore || loadingMore) return;
-
-        const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && onLoadMore());
-        observer.observe(bottom);
-        return () => observer.disconnect();
-    }, [hasMore, loadingMore, onLoadMore]);
 
     const columns = taskColumns({ agents, onUpdate });
     const colSpan = columns.length + 3;
@@ -201,20 +185,18 @@ export default function TasksTable({
                                 className="[&>td]:h-8 [&>td]:border-r [&>td]:border-b [&>td]:border-line-light [&>td]:bg-surface [&>td]:px-2 [&>td]:whitespace-nowrap"
                             >
                                 <td className="sticky left-0 z-1 px-0! text-center">
-                                    <button
-                                        type="button"
-                                        aria-label={done ? `Mark "${task.title}" as not completed` : `Mark "${task.title}" as completed`}
+                                    <DoneCheck
+                                        done={done}
+                                        label={done ? `Mark "${task.title}" as not completed` : `Mark "${task.title}" as completed`}
                                         onClick={() => onToggle(task)}
-                                        className="inline-flex items-center text-faint hover:text-accent"
-                                    >
-                                        {done ? <IconCircleCheckFilled size={16} className="text-accent" /> : <IconCircle size={16} />}
-                                    </button>
+                                        className="mx-auto size-6"
+                                    />
                                 </td>
                                 <td className="sticky left-8 z-1 px-1!">
                                     <button
                                         type="button"
                                         onClick={() => onOpen(task.id)}
-                                        className={`flex max-w-full items-center rounded px-1 py-0.5 hover:bg-fill ${done ? "text-faint line-through" : ""}`}
+                                        className={`flex max-w-full items-center rounded px-1 py-0.5 hover:bg-fill ${done ? "text-muted" : ""}`}
                                     >
                                         <span className="truncate">{task.title}</span>
                                     </button>
@@ -227,7 +209,7 @@ export default function TasksTable({
                         );
                     })}
 
-                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
+                    {loading && <SkeletonRows colSpan={colSpan} />}
 
                     {!loading && (
                         <tr>
@@ -258,7 +240,6 @@ export default function TasksTable({
                 </div>
             )}
 
-            <div ref={bottomRef} className="h-px" />
         </>
     );
 }

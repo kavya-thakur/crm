@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { IconCircleCheckFilled, IconTrash } from "@tabler/icons-react";
+import { IconCircleCheckFilled, IconProgress, IconTrash, IconUserCircle } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
 import { Spinner } from "@/components/Loader";
@@ -19,6 +19,24 @@ export interface BulkProgress {
 }
 
 export const bulkNoun = (job: Pick<BulkProgress, "entity">, count: number) => `${count.toLocaleString()} ${job.entity}${count === 1 ? "" : "s"}`;
+
+// How each kind of job reads on its card: while running, when done, its icon
+const WORDS: Record<string, { running: string; done: string; icon: typeof IconTrash; tone: string }> = {
+    delete: { running: "Deleting", done: "Deleted", icon: IconTrash, tone: "text-danger" },
+    stage: { running: "Moving", done: "Moved", icon: IconProgress, tone: "text-accent" },
+    assign: { running: "Assigning", done: "Assigned", icon: IconUserCircle, tone: "text-accent" },
+};
+
+/**
+ * Starts a big bulk action as a background job and puts its card up straight away. `ids` are
+ * the records picked; the rest says what to do: { action: "delete" }, { action: "stage",
+ * stageId, lostReason } or { action: "assign", assignedToId }.
+ */
+export async function startBulkJob(queryClient: QueryClient, body: { entity: BulkProgress["entity"]; action: string; ids: number[] } & Record<string, unknown>) {
+    const job = (await api.post<{ data: BulkProgress }>("/bulk-jobs", body)).data.data;
+    trackBulkJob(queryClient, job);
+    return job;
+}
 
 const ACTIVE = new Set(["QUEUED", "RUNNING"]);
 // a finished job stays on its card this long, so even one done in a blink is seen finishing
@@ -41,7 +59,7 @@ export function trackBulkJob(queryClient: QueryClient, update: BulkProgress) {
 
     if (!ACTIVE.has(update.status)) {
         if (update.status === "FAILED") {
-            toast.error("A bulk delete stopped", `${update.error ?? "Something went wrong"}. ${bulkNoun(update, update.affected)} were deleted before it stopped.`);
+            toast.error("A bulk action stopped", `${update.error ?? "Something went wrong"}. ${bulkNoun(update, update.affected)} were done before it stopped.`);
         }
         setTimeout(() => queryClient.setQueryData<BulkProgress[]>(["bulk-jobs"], (jobs = []) => jobs.filter((job) => job.id !== update.id)), SHOW_FINISHED_MS);
     }
@@ -49,7 +67,7 @@ export function trackBulkJob(queryClient: QueryClient, update: BulkProgress) {
 
 /**
  * A small card in the corner, on every page, for each big bulk action: "Deleting 4,230
- * leads… 2,000 of 4,230", then "Deleted 4,230 leads" for a few seconds. Progress arrives over
+ * leads… 2,000 of 4,230" (or Moving, Assigning), then "Deleted 4,230 leads" for a few seconds. Progress arrives over
  * the socket; the running ones are also loaded from the API, so they're back after a reload.
  */
 export function BackgroundJobs() {
@@ -69,6 +87,7 @@ export function BackgroundJobs() {
                 const done = job.status === "DONE";
                 const failed = job.status === "FAILED";
                 const share = done ? 1 : job.total > 0 ? job.processed / job.total : 0;
+                const words = WORDS[job.action] ?? WORDS.delete;
                 return (
                     <div key={job.id} className="rounded-xl border border-line bg-surface p-3 shadow-strong">
                         <p className="flex items-center gap-2 font-medium text-ink">
@@ -77,13 +96,13 @@ export function BackgroundJobs() {
                             ) : job.status === "QUEUED" ? (
                                 <Spinner size={14} />
                             ) : (
-                                <IconTrash size={15} className="text-danger" />
+                                <words.icon size={15} className={words.tone} />
                             )}
                             {done
-                                ? `Deleted ${bulkNoun(job, job.affected)}`
+                                ? `${words.done} ${bulkNoun(job, job.affected)}`
                                 : failed
                                   ? `Stopped after ${bulkNoun(job, job.affected)}`
-                                  : `Deleting ${bulkNoun(job, job.total)}`}
+                                  : `${words.running} ${bulkNoun(job, job.total)}`}
                         </p>
                         {/* the bar grows by scaling, so it moves smoothly */}
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-fill">
@@ -95,7 +114,7 @@ export function BackgroundJobs() {
                         <p className="mt-1.5 text-sm text-faint tabular-nums">
                             {done
                                 ? job.affected < job.total
-                                    ? `${(job.total - job.affected).toLocaleString()} were already gone or out of reach`
+                                    ? `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" ? "gone" : "that way"} or out of reach`
                                     : "All done"
                                 : failed
                                   ? (job.error ?? "Something went wrong")

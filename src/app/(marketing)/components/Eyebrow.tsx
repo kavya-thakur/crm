@@ -9,7 +9,7 @@ export function Eyebrow({ children, dark = false, className = "" }: { children: 
         <p
             className={`flex items-center gap-2 font-(family-name:--font-host-grotesk) text-[18px] leading-6 font-medium tracking-[-0.04em] ${dark ? "text-white/60" : "text-[#1c1c1c]/60"} ${className}`}
         >
-            <span aria-hidden className="h-1.5 w-3.5 shrink-0 bg-[#4a38f5]" />
+            <span data-eyebrow-bar aria-hidden className="h-1.5 w-3.5 shrink-0 bg-[#4a38f5]" />
             {children}
         </p>
     );
@@ -22,7 +22,8 @@ const SIZES = {
     xl: "text-[clamp(3.75rem,2.8319rem+3.7665vw,5rem)] leading-[clamp(4.125rem,3.2069rem+3.7665vw,5.375rem)]",
 };
 
-// A light serif heading. Wrap the words that should stand out in <Accent>.
+// A light serif heading. Wrap the words that should stand out in <Accent>. (data-heading lets
+// the landing page find it to animate its words in as you scroll.)
 export function Heading({
     as: Tag = "h2",
     size = "lg",
@@ -37,7 +38,7 @@ export function Heading({
     children: ReactNode;
 }) {
     return (
-        <Tag className={`font-(family-name:--font-aleo) font-light tracking-[-0.02em] text-balance ${dark ? "text-white" : "text-[#1c1c1c]"} ${SIZES[size]} ${className}`}>
+        <Tag data-heading className={`font-(family-name:--font-aleo) font-light tracking-[-0.02em] text-balance ${dark ? "text-white" : "text-[#1c1c1c]"} ${SIZES[size]} ${className}`}>
             {children}
         </Tag>
     );
@@ -52,7 +53,7 @@ export function Accent({ children }: { children: ReactNode }) {
 // Body copy under a heading
 export function Lead({ children, dark = false, className = "" }: { children: ReactNode; dark?: boolean; className?: string }) {
     return (
-        <p className={`font-(family-name:--font-host-grotesk) text-[16px] leading-[1.55] ${dark ? "text-white/60" : "text-[#1c1c1c]/60"} ${className}`}>
+        <p data-lead className={`font-(family-name:--font-host-grotesk) text-[16px] leading-[1.55] ${dark ? "text-white/60" : "text-[#1c1c1c]/60"} ${className}`}>
             {children}
         </p>
     );

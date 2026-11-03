@@ -13,7 +13,7 @@ const CORS = {
     "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const KNOWN_FIELDS = new Set(["name", "email", "phone", "company", "message", "details", "website", "redirect"]);
+const KNOWN_FIELDS = new Set(["name", "email", "phone", "company", "message", "details", "website", "redirect", "utm_source", "utm_medium", "utm_campaign"]);
 const MAX_BODY_BYTES = 20_000;
 
 export function OPTIONS() {

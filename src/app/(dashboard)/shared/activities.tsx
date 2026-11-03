@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconCircle, IconCircleCheckFilled, IconPlus, IconX } from "@tabler/icons-react";
+import { IconPlus, IconX } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { DoneCheck } from "@/components/DoneCheck";
 import { Avatar } from "@/components/Avatar";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
@@ -262,19 +263,16 @@ function ActivityRow({ activity }: { activity: Activity }) {
 
     return (
         <li className="flex h-9 items-center gap-2.5 border-b border-line-light px-3 last:border-b-0 hover:bg-paper">
-            <button
-                type="button"
-                aria-label={done ? "Mark as not completed" : "Mark as completed"}
+            <DoneCheck
+                done={done}
+                label={done ? "Mark as not completed" : "Mark as completed"}
                 onClick={() => toggle.mutate()}
                 disabled={toggle.isPending}
-                className="flex shrink-0 items-center text-faint hover:text-accent disabled:opacity-60"
-            >
-                {done ? <IconCircleCheckFilled size={16} className="text-accent" /> : <IconCircle size={16} />}
-            </button>
+            />
 
             <Link
                 href={`/activities?open=${activity.id}`}
-                className={`flex min-w-0 flex-1 items-center gap-1.5 hover:underline ${closed ? "text-faint line-through" : "text-ink"}`}
+                className={`flex min-w-0 flex-1 items-center gap-1.5 hover:underline ${closed ? "text-muted" : "text-ink"}`}
             >
                 <span className="truncate">{activity.title}</span>
             </Link>

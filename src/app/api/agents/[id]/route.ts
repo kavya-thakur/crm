@@ -5,6 +5,7 @@ import { findManageableRole, requirePermission } from "@/lib/auth/requirePermiss
 import { idParamSchema } from "@/lib/validations/common";
 import { updateAgentSchema } from "@/lib/validations/agents";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { assertNotDemo } from "@/lib/demo/workspace";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -56,6 +57,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
     try {
         const user = await requirePermission("user:update");
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const id = idParamSchema.safeParse((await params).id);
 
@@ -134,6 +137,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(req: NextRequest, { params }: Params) {
     try {
         const user = await requirePermission("user:delete");
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const id = idParamSchema.safeParse((await params).id);
 

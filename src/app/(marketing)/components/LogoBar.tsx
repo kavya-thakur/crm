@@ -4,11 +4,11 @@ import {
     IconCalendarEvent,
     IconChecklist,
     IconCurrencyRupee,
-    IconNotes,
+    IconFileImport,
+    IconForms,
+    IconLayoutDashboard,
     IconPlus,
-    IconShieldLock,
     IconTargetArrow,
-    IconTimeline,
 } from "@tabler/icons-react";
 
 import { CONTAINER, PlusMark } from "./Eyebrow";
@@ -20,10 +20,10 @@ const MODULES: { icon: ComponentType<{ size?: number; className?: string }>; lab
     { icon: IconCurrencyRupee, label: "Deals" },
     { icon: IconAddressBook, label: "Contacts" },
     { icon: IconChecklist, label: "Tasks" },
-    { icon: IconCalendarEvent, label: "Activities" },
-    { icon: IconNotes, label: "Notes" },
-    { icon: IconTimeline, label: "Timeline" },
-    { icon: IconShieldLock, label: "Roles" },
+    { icon: IconCalendarEvent, label: "Calls & meetings" },
+    { icon: IconForms, label: "Web forms" },
+    { icon: IconFileImport, label: "CSV import" },
+    { icon: IconLayoutDashboard, label: "Dashboard" },
 ];
 
 const LABEL = "font-(family-name:--font-azeret-mono) text-[12px] font-medium whitespace-nowrap text-[#1c1c1c]/60 uppercase";

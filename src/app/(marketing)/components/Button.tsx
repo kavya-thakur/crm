@@ -41,13 +41,17 @@ export function Button({ href, children, variant = "filled", size = "regular", s
                 : "bg-[#1c1c1c] text-white hover:bg-[#333333]"
             : scheme === "dark"
               ? "border border-white/25 text-white hover:bg-white/10"
-              : "border border-[#1c1c1c]/15 bg-white/60 text-[#1c1c1c] hover:bg-[#1c1c1c]/5";
+              : "border border-[#1c1c1c]/15 bg-white text-[#1c1c1c] hover:bg-[#f4f4f4]";
 
     const height = size === "small" ? "h-9 text-[13px]" : "h-11 text-[15px]";
     const padding = variant === "filled" ? (size === "small" ? "pr-1 pl-4" : "pr-1.5 pl-5") : size === "small" ? "px-4" : "px-5";
 
+    // API routes get a plain <a>: Link fetches its target ahead of time, which on /api/auth/demo
+    // would sign the visitor in before they click
+    const Tag = href.startsWith("/api/") ? "a" : Link;
+
     return (
-        <Link
+        <Tag
             ref={ref}
             href={href}
             onPointerMove={onMove}
@@ -63,6 +67,6 @@ export function Button({ href, children, variant = "filled", size = "regular", s
                     <IconArrowRight size={size === "small" ? 14 : 16} className="transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-hover:-rotate-45" />
                 </span>
             )}
-        </Link>
+        </Tag>
     );
 }

@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     IconCalendar,
     IconCalendarDue,
-    IconCircle,
     IconCircleCheckFilled,
     IconClock,
     IconFileDescription,
@@ -19,6 +18,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { DoneCheck } from "@/components/DoneCheck";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Dropdown, MenuItem, SearchableItems } from "@/components/Dropdown";
@@ -117,27 +117,26 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
             )}
 
             {task && (
-                <div className="flex min-h-0 flex-1">
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
                     {/* Fields: left column, Twenty's record-page width */}
-                    <div className="flex w-full max-w-sm shrink-0 flex-col overflow-y-auto border-r border-line-light">
+                    <div className="flex w-full shrink-0 flex-col border-b border-line-light md:max-w-sm md:overflow-y-auto md:border-r md:border-b-0">
                         {/* Identifier: the circle finishes (or reopens) the task, then its title */}
                         <div className="flex items-center gap-3 border-b border-line-light px-4 py-4">
-                            <button
-                                type="button"
-                                aria-label={done ? "Mark as not completed" : "Mark as completed"}
+                            <DoneCheck
+                                done={done}
+                                size={26}
+                                label={done ? "Mark as not completed" : "Mark as completed"}
                                 onClick={() => update.mutate({ status: done ? "PENDING" : "COMPLETED" })}
                                 disabled={update.isPending}
-                                className="flex size-10 shrink-0 items-center justify-center rounded-full text-faint hover:bg-fill hover:text-accent disabled:opacity-60"
-                            >
-                                {done ? <IconCircleCheckFilled size={28} className="text-accent" /> : <IconCircle size={28} />}
-                            </button>
+                                className="size-10 hover:bg-fill"
+                            />
                             <div className="min-w-0 flex-1">
                                 <EditableText
                                     value={task.title}
                                     placeholder="Title"
                                     // a task needs a title, so clearing it just keeps the old one
                                     onSave={(title) => title && update.mutate({ title })}
-                                    className={`text-lg font-semibold ${done ? "text-faint line-through" : ""}`}
+                                    className={`text-lg font-semibold ${done ? "text-muted" : ""}`}
                                 />
                                 <p className="px-1 text-faint">Added {timeAgo(task.createdAt)}</p>
                             </div>
@@ -237,7 +236,7 @@ export default function TaskPanel({ taskId, agents, onClose }: { taskId: number;
                     </div>
 
                     {/* Description: takes the rest of the width, under a tab-style header like the other records */}
-                    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+                    <div className="flex min-w-0 flex-1 flex-col md:overflow-y-auto">
                         <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line-light px-4">
                             <span className="flex h-8 items-center gap-1.5 border-b-2 border-accent px-2 text-sm font-medium text-ink">
                                 <IconFileDescription size={14} />

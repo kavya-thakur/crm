@@ -2,7 +2,8 @@
 
 How Flash is put together: the request lifecycle, the folders, and how each feature works.
 For *what* is built and *why* it was decided, see [PROJECT.md](PROJECT.md). For the live
-updates and notifications, see [REALTIME.md](REALTIME.md).
+updates and notifications, see [REALTIME.md](REALTIME.md). For email from the CRM, see
+[EMAIL.md](EMAIL.md).
 
 _Last updated: 2026-11-02_
 
@@ -113,6 +114,8 @@ crm/
 │       ├── work/             tasks.ts and activities.ts: what their API responses include, timeline entries
 │       ├── settings/         what admins set up: customFields.ts (validating values), optionLists.ts
 │       │                     (stage/source editing), stageColors.ts
+│       ├── demo/             workspace.ts: builds the demo workspace (npm run db:demo, and nightly),
+│       │                     isDemoWorkspace(), assertNotDemo()
 │       ├── dashboard/        periods.ts: date ranges and chart buckets
 │       ├── utils/            format.ts: dates, money, "2 hours ago"
 │       └── validations/      zod schemas, one file per resource, shared by forms and routes
@@ -171,7 +174,7 @@ All under `/api`, JSON in and out (`{ ok, data, message }`), most needing a logi
 
 | Area | Routes |
 |---|---|
-| Auth | `auth/login`, `auth/register`, `auth/logout`, `me`, `me/password` |
+| Auth | `auth/login`, `auth/register`, `auth/logout`, `auth/demo` (one-click demo sign-in), `me`, `me/password` |
 | Leads | `leads` (list with filters, create), `leads/[id]` (get, edit, delete), `.../assign`, `.../convert` (→ deal), `.../merge`, `.../notes`, `.../timeline`, `leads/bulkUpdate`, `leads/duplicates` |
 | Deals | the same shape, plus `deals/[id]/duplicates` |
 | Contacts | the same shape (no convert or merge) |
@@ -202,8 +205,10 @@ helpers), and mirrored in the UI by the `can` flags.
 ## 7. How the features work
 
 ### Lists, filters and boards
-- **Lists** (`LeadsView` → `LeadsTable`): `useInfiniteQuery` pages through `GET /api/leads`,
-  50 at a time, loading more when you scroll to the bottom. Columns can be shown, hidden,
+- **Lists** (`LeadsView` → `LeadsTable`): one page of `GET /api/leads` at a time, with a
+  **Pagination** bar underneath (rows per page 25 / 50 / 100, previous / next, "1–50 of 4,230").
+  The page and its size are in the URL (`?page=3&size=25`, `usePaging`); a filter or tab change
+  goes back to page 1. Kanban boards keep their own "Load more" per column. Columns can be shown, hidden,
   reordered and resized (`useColumnPrefs`, saved per browser).
 - **Filters** (`FilterPanel.tsx`): each page lists its filter fields (stage multi-select,
   source, owner, created/modified by and date, possible duplicates, custom fields marked
@@ -216,6 +221,15 @@ helpers), and mirrored in the UI by the `can` flags.
 - **Kanban boards** (`Board.tsx`): one column per stage, each column its own paged query
   (`useBoardColumn`, 25 cards at a time). Dragging a card `PUT`s its new stage.
   Leads, deals, tasks (by status), activities and notes all have boards.
+
+### Page state lives in the URL
+What you're looking at is kept in the address bar, e.g. `/leads?view=board&open=12&filters={"stageIds":[3]}`
+(`useUrlState` in `shared/useUrlState.ts`; filters via `useListQuery`). So a refresh keeps the view,
+filters and open record, Back closes a record you opened, and a pasted link opens the same screen.
+It's written with the browser's own `history.pushState/replaceState`, which Next.js follows, so
+nothing reloads. Tasks and Activities keep their tabs, "whose" and priority there too. Each page's last
+view and filters are also remembered in the browser (`rememberedUrl`), so the sidebar and the ⌘K
+menu take you back to a page the way you left it.
 
 ### Record panels
 `LeadPanel`, `DealPanel`, `ContactPanel`: fields you click to edit, then tabs for the
@@ -263,10 +277,19 @@ returning lead only gets its empty fields filled. The owner is fixed, or **rotat
 through chosen people (an atomic counter in the database, so two leads at once never share
 a turn). The marketing site's `/demo` page posts to a form in Flash's own workspace.
 
+**Campaigns (UTM tags).** A marketer puts `?utm_source=google&utm_medium=cpc&utm_campaign=diwali-sale`
+on the link to an ad's landing page. The hosted page sends the tags in its own URL with the
+submission; the HTML embed has hidden `utm_*` inputs that a three-line script fills from the
+page's URL; a developer's JSON can send them as fields. They're saved on the lead
+(`utmSource`, `utmMedium`, `utmCampaign`), and mentioned in the timeline entry. A returning lead
+keeps the campaign it first came from (first touch). The dashboard groups leads by
+`utmCampaign`, and won deals by their lead's `utmCampaign`, for revenue per campaign. An
+imported file's "Campaign" column fills it too.
+
 ### Dashboard
 `GET /api/dashboard?range=30d&agentId=` computes everything with `groupBy`/`aggregate` in
 parallel: revenue won and its trend vs the previous period, win rate, weighted pipeline,
-deals closing soon, lead funnel, sources (leads, conversion, revenue), lost reasons, the
+deals closing soon, lead funnel, sources and ad campaigns (leads, conversion, revenue), lost reasons, the
 team table (per agent) and your own tasks and upcoming calls. Managers see the team;
 others see their own numbers.
 
@@ -295,6 +318,10 @@ See [REALTIME.md](REALTIME.md).
   which is exactly what live updates do.
 - **Dropdowns** float in a portal (so no `overflow: hidden` parent can clip them), except
   inside native `<dialog>`s (Modal, SidePanel), where lists of buttons are used instead.
+- **Phones** (below Tailwind's `md`, 768px): the sidebar becomes a ☰ drawer (`SidebarShell.tsx`),
+  toolbars and the bulk bar scroll sideways, record panels and forms stack into one column, and
+  dropdowns never get wider than the screen (`maxWidth` in `Dropdown`'s placement). The app uses
+  `h-dvh` so mobile browser bars don't hide its bottom. Desktop layouts are unchanged.
 - **Design:** light theme in the style of twenty.com; tokens (`--color-accent: #4a38f5`,
   `ink`, `muted`, `faint`, `line`, ...) in `globals.css`. Animations use only transform and
   opacity (GSAP, respecting reduced motion).

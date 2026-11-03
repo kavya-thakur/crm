@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     IconCalendar,
     IconCalendarDue,
-    IconCircle,
+    IconCalendarRepeat,
     IconCircleCheckFilled,
     IconClock,
     IconFileDescription,
@@ -20,13 +20,14 @@ import {
 } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { DoneCheck } from "@/components/DoneCheck";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmDeleteModal } from "@/components/ListPage";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
-import { formatDate, timeAgo } from "@/lib/utils/format";
+import { formatDate, formatDateTime, timeAgo } from "@/lib/utils/format";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import type { AgentOption } from "../shared/customFields";
 import { linkedRecord } from "../shared/linkedRecord";
@@ -34,6 +35,7 @@ import { AttendeePicker, AttendeeStack, StatusBadge, TypeDropdown, toggledStatus
 import {
     ACTIVITY_STATUSES,
     DURATIONS,
+    RESCHEDULE_OPTIONS,
     durationLabel,
     fromDateTimeLocal,
     refreshActivities,
@@ -77,7 +79,9 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
                         ? "Activity reopened"
                         : changes.status === "CANCELLED"
                             ? "Activity cancelled"
-                            : "Activity updated"
+                            : changes.scheduledAt
+                                ? `Moved to ${formatDateTime(changes.scheduledAt)}`
+                                : "Activity updated"
             );
             // show the saved value right away, then refresh the lists
             queryClient.setQueryData(["activity", activityId], res.data.data);
@@ -137,27 +141,26 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
             )}
 
             {activity && (
-                <div className="flex min-h-0 flex-1">
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
                     {/* Fields: left column, Twenty's record-page width */}
-                    <div className="flex w-full max-w-sm shrink-0 flex-col overflow-y-auto border-r border-line-light">
+                    <div className="flex w-full shrink-0 flex-col border-b border-line-light md:max-w-sm md:overflow-y-auto md:border-r md:border-b-0">
                         {/* Identifier: the circle finishes (or reopens) the activity, then its title */}
                         <div className="flex items-center gap-3 border-b border-line-light px-4 py-4">
-                            <button
-                                type="button"
-                                aria-label={done ? "Mark as not completed" : "Mark as completed"}
+                            <DoneCheck
+                                done={done}
+                                size={26}
+                                label={done ? "Mark as not completed" : "Mark as completed"}
                                 onClick={() => update.mutate({ status: toggledStatus(activity.status) })}
                                 disabled={update.isPending}
-                                className="flex size-10 shrink-0 items-center justify-center rounded-full text-faint hover:bg-fill hover:text-accent disabled:opacity-60"
-                            >
-                                {done ? <IconCircleCheckFilled size={28} className="text-accent" /> : <IconCircle size={28} />}
-                            </button>
+                                className="size-10 hover:bg-fill"
+                            />
                             <div className="min-w-0 flex-1">
                                 <EditableText
                                     value={activity.title}
                                     placeholder="Title"
                                     // an activity needs a title, so clearing it just keeps the old one
                                     onSave={(title) => title && update.mutate({ title })}
-                                    className={`text-lg font-semibold ${activity.status !== "SCHEDULED" ? "text-faint line-through" : ""}`}
+                                    className={`text-lg font-semibold ${activity.status !== "SCHEDULED" ? "text-muted" : ""}`}
                                 />
                                 <p className="px-1 text-faint">Added {timeAgo(activity.createdAt)}</p>
                             </div>
@@ -185,6 +188,8 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
 
                             <FieldRow icon={IconCalendarDue} label="When">
                                 <input
+                                    // a fresh field when the time changes from elsewhere (Reschedule, the start-time popup)
+                                    key={activity.scheduledAt}
                                     type="datetime-local"
                                     defaultValue={toDateTimeLocal(activity.scheduledAt)}
                                     // saved when you leave the field; clearing it is ignored (an activity needs a time)
@@ -197,6 +202,20 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
                                     className="h-7 rounded-lg px-1 outline-none hover:bg-fill focus:bg-fill"
                                 />
                             </FieldRow>
+
+                            {activity.status === "SCHEDULED" && (
+                                <FieldRow icon={IconCalendarRepeat} label="Reschedule">
+                                    <PickMenu
+                                        label={<span className="text-muted">Move it…</span>}
+                                        items={RESCHEDULE_OPTIONS.map((option) => ({
+                                            key: option.label,
+                                            content: option.label,
+                                            selected: false,
+                                            onPick: () => update.mutate({ scheduledAt: option.at(activity.scheduledAt) }),
+                                        }))}
+                                    />
+                                </FieldRow>
+                            )}
 
                             <FieldRow icon={IconClock} label="Duration">
                                 <PickMenu
@@ -278,7 +297,7 @@ export default function ActivityPanel({ activityId, agents, onClose }: { activit
                     </div>
 
                     {/* Description: takes the rest of the width, under a tab-style header like the other records */}
-                    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+                    <div className="flex min-w-0 flex-1 flex-col md:overflow-y-auto">
                         <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line-light px-4">
                             <span className="flex h-8 items-center gap-1.5 border-b-2 border-accent px-2 text-sm font-medium text-ink">
                                 <IconFileDescription size={14} />

@@ -7,6 +7,7 @@ import {
     IconForms,
     IconLayoutDashboard,
     IconLayoutKanban,
+    IconMail,
     IconNotes,
     IconShieldLock,
     IconTargetArrow,
@@ -70,6 +71,9 @@ export const SECTIONS = {
     stages: { icon: IconLayoutKanban, ink: "grey" },
     customFields: { icon: IconAdjustmentsHorizontal, ink: "grey" },
     leadForms: { icon: IconForms, ink: "grey" },
+    emailTemplates: { icon: IconMail, ink: "grey" },
+    // the bell's icon for emails opened or not sent
+    emails: { icon: IconMail, ink: "blue" },
 } satisfies Record<string, { icon: Icon; ink: keyof typeof INKS }>;
 
 export type Section = keyof typeof SECTIONS;

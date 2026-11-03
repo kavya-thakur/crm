@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { updateProfileSchema } from "@/lib/validations/auth";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { assertNotDemo } from "@/lib/demo/workspace";
 
 // The signed-in user editing their own profile. No permission needed: it's only ever yourself.
 export async function PATCH(req: NextRequest) {
@@ -12,6 +13,8 @@ export async function PATCH(req: NextRequest) {
         if (!user) {
             throw new Error("UNAUTHORIZED");
         }
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const body = await parseBody(req, updateProfileSchema);
 

@@ -7,11 +7,11 @@ const COLUMNS = [
     {
         title: "Product",
         links: [
-            { label: "Leads", href: "/#product" },
-            { label: "Deals", href: "/#product" },
-            { label: "Contacts", href: "/#product" },
-            { label: "Tasks & activities", href: "/#how-it-works" },
-            { label: "Roles & permissions", href: "/#how-it-works" },
+            { label: "Overview", href: "/product" },
+            { label: "Leads", href: "/product#leads" },
+            { label: "Deals", href: "/product#deals" },
+            { label: "Follow-ups", href: "/product#follow-ups" },
+            { label: "Everything else", href: "/product#more" },
         ],
     },
     {
@@ -33,8 +33,8 @@ const COLUMNS = [
     {
         title: "Legal",
         links: [
-            { label: "Privacy policy", href: "#" },
-            { label: "Terms of service", href: "#" },
+            { label: "Privacy policy", href: "/privacy" },
+            { label: "Terms of service", href: "/terms" },
         ],
     },
 ];

@@ -95,16 +95,18 @@ export function PromiseSection({ primaryHref, primaryLabel }: { primaryHref: str
                 </div>
             </div>
 
-            {/* the two columns, faded out at the top and bottom edges */}
-            <div className="relative mt-12 flex h-150 flex-1 gap-4 overflow-clip min-[921px]:mt-0 min-[921px]:h-auto min-[921px]:gap-6" style={{ maskImage: EDGE_FADE, WebkitMaskImage: EDGE_FADE }}>
-                <div className="relative flex-1">
+            {/* the two columns, faded out at the top and bottom edges. On a phone there's room for
+                one: the first (whose cards are all positioned, so it has no width of its own) would
+                otherwise be squeezed to a sliver beside the second */}
+            <div className="relative mt-12 flex h-130 flex-1 gap-4 overflow-clip min-[921px]:mt-0 min-[921px]:h-auto min-[921px]:gap-6" style={{ maskImage: EDGE_FADE, WebkitMaskImage: EDGE_FADE }}>
+                <div className="relative hidden min-w-0 flex-1 min-[921px]:block">
                     <div data-column="up" className="absolute inset-x-0 top-0 flex flex-col gap-4 pt-32 min-[921px]:gap-6">
                         {WINS.map((win) => (
                             <WinCard key={win.what} win={win} />
                         ))}
                     </div>
                 </div>
-                <div data-column="down" className="-mt-24 flex flex-1 flex-col gap-4 min-[921px]:mt-0 min-[921px]:gap-6">
+                <div data-column="down" className="flex min-w-0 flex-1 flex-col gap-4 min-[921px]:gap-6">
                     {[...WINS.slice(4), ...WINS.slice(0, 4)].map((win) => (
                         <WinCard key={win.what} win={win} />
                     ))}

@@ -25,6 +25,8 @@ const description =
   "Manage leads, deals and your sales team in one workspace. Track every activity and close more deals.";
 
 export const metadata: Metadata = {
+  // Link previews need the full address of the share image (opengraph-image.tsx)
+  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
   // Pages set just their own name ("Leads"), the template turns it into "Leads · Flash"
   title: {
     default: appName,
@@ -38,6 +40,8 @@ export const metadata: Metadata = {
     siteName: appName,
     type: "website",
   },
+  // X shows the share image large instead of as a small square
+  twitter: { card: "summary_large_image" },
   // Every page is a private workspace behind login, so keep it out of search engines
   robots: {
     index: false,

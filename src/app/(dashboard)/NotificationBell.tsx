@@ -28,6 +28,8 @@ const SECTION_OF: Record<string, Section> = {
     REMINDER: "activities",
     MENTIONED: "notes",
     IMPORT_FINISHED: "leads",
+    EMAIL_OPENED: "emails",
+    EMAIL_FAILED: "emails",
 };
 
 /**

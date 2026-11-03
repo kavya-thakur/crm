@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCurrencyRupee, IconGitMerge, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
 
@@ -21,6 +20,7 @@ import {
     SearchBox,
     SortMenu,
     ViewSwitcher,
+    Pagination,
 } from "@/components/ListPage";
 import {
     ActiveFilterChips,
@@ -48,11 +48,14 @@ import DealsBoard from "./DealsBoard";
 import DealsTable, { DEAL_COLUMNS, withDealEdits } from "./DealsTable";
 import DealPanel from "./DealPanel";
 import { MergeDealsPanel } from "./MergeDeals";
+import { startBulkJob } from "../BackgroundJobs";
+import { SelectAllBar, useSelectAll } from "../shared/useSelectAll";
+import { PAGE_SIZES } from "../shared/useUrlState";
 import NewDealDialog from "./NewDealDialog";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
+import { useUrlState } from "../shared/useUrlState";
 
-const PAGE_SIZE = 50;
 
 const SORT_FIELDS: { field: DealFilters["sortBy"]; label: string }[] = [
     { field: "title", label: "Title" },
@@ -75,17 +78,14 @@ interface OptionsResponse<T> {
 
 export default function DealsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
-    const [view, setView] = useState<"table" | "board">("table");
-    const searchParams = useSearchParams();
-    // Lets a link elsewhere (the Notes feed, a notification) land straight on a deal's panel,
-    // including one followed while this page is already open
-    const openParam = searchParams.get("open");
-    const [selectedDealId, setSelectedDealId] = useState<number | null>(openParam ? Number(openParam) : null);
-    const [followedParam, setFollowedParam] = useState(openParam);
-    if (openParam !== followedParam) {
-        setFollowedParam(openParam);
-        if (openParam) setSelectedDealId(Number(openParam));
-    }
+    // list or board, kept in the URL so a refresh keeps it (the list is the default)
+    // The open deal lives in the URL (?open=12): a refresh reopens it, Back closes it, and a
+    // link from elsewhere (the Notes feed, a notification) lands straight on it
+    const page = useUrlState();
+    const selectedDealId = Number(page.get("open")) || null;
+    const setSelectedDealId = (id: number | null) => page.set({ open: id ? String(id) : null }, "push");
+    const view = page.get("view") === "board" ? "board" : "table";
+    const setView = (next: "table" | "board") => page.set({ view: next === "table" ? null : next });
     const [creating, setCreating] = useState(false);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     // two deals picked in the table, being merged; the one added first (lower id) stays
@@ -93,6 +93,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
 
     const {
         query: dealsQuery,
+        paging,
         items: deals,
         total,
         filters,
@@ -105,7 +106,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         "deals",
         "/deals",
         { sortBy: "createdAt", sortOrder: "desc", search: "" },
-        { pageSize: PAGE_SIZE, enabled: can.read, onSearch: (trimmed) => ({ search: trimmed }) },
+        { enabled: can.read, onSearch: (trimmed) => ({ search: trimmed }) },
     );
 
     const agentsQuery = useQuery({
@@ -126,6 +127,23 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
 
     const customFieldsQuery = useCustomFields("deal");
     const customFields = customFieldsQuery.data ?? [];
+
+    // "Select all 4,230 matching deals", and whether the selection is big enough for a background job
+    const selection = useSelectAll({ endpoint: "/deals", filters, total, items: deals, selected, setSelected });
+
+    // More than a couple of hundred, or every match: a background job with a progress card in the
+    // corner (docs/QUEUES.md). A job names its stage "stageId", for leads and deals alike.
+    const bulkJob = useMutation({
+        mutationFn: async (action: BulkAction) => {
+            const { pipelineStageId, ...rest } = action as BulkAction & { pipelineStageId?: number };
+            return startBulkJob(queryClient, { entity: "deal", ...rest, ...(pipelineStageId && { stageId: pipelineStageId }), ids: await selection.ids() });
+        },
+        onSuccess: () => {
+            selection.clear();
+            setConfirmingDelete(false);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+    });
 
     const bulk = useMutation({
         // the count rides along with the action, since the selection is cleared on success
@@ -148,6 +166,9 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         },
         onError: (error) => toast.error(errorMessage(error)),
     });
+
+    // a bulk action: done in the request for a small selection, as a background job for a big one
+    const runBulk = (action: BulkAction) => (selection.big ? bulkJob.mutate(action) : bulk.mutate(action));
 
     // Inline edits from the table — a single-row PUT, same endpoint the deal
     // panel itself uses. Assignment goes through its own endpoint so it's
@@ -272,7 +293,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 onCreate={can.create ? () => setCreating(true) : undefined}
             />
 
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
+            <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0">
                 <ViewSwitcher
                     view={view}
                     onChange={(next) => {
@@ -333,6 +354,8 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 </div>
             )}
 
+            {view === "table" && (can.update || can.delete) && <SelectAllBar selection={selection} noun="deal" />}
+
             <div className="relative min-h-0 flex-1 overflow-auto">
                 {!can.read ? (
                     <p className="p-4 text-danger">You don&apos;t have permission to view deals.</p>
@@ -342,17 +365,14 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         columns={visibleColumns}
                         tableColumns={{ getWidth, resize, reorderVisible }}
                         loading={dealsQuery.isPending}
-                        loadingMore={dealsQuery.isFetchingNextPage}
                         failed={dealsQuery.isError}
                         error={dealsQuery.error}
                         onRetry={() => dealsQuery.refetch()}
                         retrying={dealsQuery.isFetching}
                         filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
-                        hasMore={dealsQuery.hasNextPage}
-                        onLoadMore={dealsQuery.fetchNextPage}
                         selectable={can.update || can.delete}
                         selected={selected}
-                        onSelect={setSelected}
+                        onSelect={selection.onSelect}
                         onOpen={setSelectedDealId}
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
@@ -367,9 +387,12 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 )}
             </div>
 
+            {/* which page of the list, and how many rows a page */}
+            {view === "table" && can.read && <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />}
+
             <BulkBar
-                count={selected.size}
-                onClear={() => setSelected(new Set())}
+                count={selection.count}
+                onClear={selection.clear}
                 onDelete={can.delete ? () => setConfirmingDelete(true) : undefined}
             >
                 {can.update && stagesQuery.data && (
@@ -384,7 +407,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                                 onClick={async () => {
                                     close();
                                     const answer = stage.isLost ? await askLostReason("deal") : {};
-                                    if (answer) bulk.mutate({ action: "stage", pipelineStageId: stage.id, ...answer });
+                                    if (answer) runBulk({ action: "stage", pipelineStageId: stage.id, ...answer });
                                 }}
                             >
                                 <StageLabel stage={stage} />
@@ -396,11 +419,11 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 {can.assign && agentsQuery.data && (
                     <AssignMenu
                         agents={agentsQuery.data}
-                        onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                        onAssign={(assignedToId) => runBulk({ action: "assign", assignedToId })}
                     />
                 )}
 
-                {can.update && can.delete && selected.size === 2 && (
+                {!selection.allMatching && can.update && can.delete && selected.size === 2 && (
                     <button
                         type="button"
                         onClick={() => {
@@ -413,7 +436,8 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                     </button>
                 )}
 
-                {can.update && (
+                {/* editing a field runs in the request, so only for a selection that fits in one */}
+                {!selection.big && can.update && (
                     <BulkEditButton
                         count={selected.size}
                         noun="deal"
@@ -449,11 +473,12 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
 
             <ConfirmDeleteModal
                 open={confirmingDelete}
-                count={selected.size}
+                count={selection.count}
                 noun="deal"
-                pending={bulk.isPending}
+                description={selection.big ? "It runs in the background, so you can keep working. This can't be undone." : undefined}
+                pending={bulk.isPending || bulkJob.isPending}
                 onCancel={() => setConfirmingDelete(false)}
-                onConfirm={() => bulk.mutate({ action: "delete" })}
+                onConfirm={() => runBulk({ action: "delete" })}
             />
         </div>
     );

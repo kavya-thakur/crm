@@ -53,6 +53,7 @@ import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
+import { EmailsTab } from "../shared/emails";
 import {
     StageLabel,
     formatDealAmount,
@@ -88,6 +89,7 @@ const TIMELINE_ICONS: Record<string, typeof IconTargetArrow> = {
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
     MERGED: IconGitMerge,
+    EMAIL_SENT: IconMailFast,
 };
 
 type DealChanges = Partial<
@@ -130,7 +132,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     // a duplicate being merged into this deal
     const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
-    const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities">("timeline");
+    const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities" | "emails">("timeline");
 
     const dealQuery = useQuery({
         queryKey: ["deal", dealId],
@@ -255,9 +257,9 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
             )}
 
             {deal && (
-                <div className="flex min-h-0 flex-1">
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
                     {/* Fields: left column, Twenty's record-page width */}
-                    <div className="flex w-full max-w-sm shrink-0 flex-col overflow-y-auto border-r border-line-light">
+                    <div className="flex w-full shrink-0 flex-col border-b border-line-light md:max-w-sm md:overflow-y-auto md:border-r md:border-b-0">
                         {/* Identifier */}
                         <div className="flex items-center gap-3 border-b border-line-light px-4 py-4">
                             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
@@ -507,15 +509,15 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                         </section>
                     </div>
 
-                    {/* Timeline, Notes, Tasks... — Tasks/Files/Emails/Calendar aren't built yet */}
-                    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+                    {/* Timeline, Notes, Tasks, Activities, Emails; Files and Calendar aren't built yet */}
+                    <div className="flex min-w-0 flex-1 flex-col md:overflow-y-auto">
                         <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line-light px-4">
                             <TabButton active={tab === "timeline"} onClick={() => setTab("timeline")}>Timeline</TabButton>
                             <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Notes</TabButton>
                             <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")}>Tasks</TabButton>
                             <TabButton active={tab === "activities"} onClick={() => setTab("activities")}>Activities</TabButton>
                             <LockedTabButton icon={IconFiles} label="Files" />
-                            <LockedTabButton icon={IconMailFast} label="Emails" />
+                            <TabButton active={tab === "emails"} onClick={() => setTab("emails")}>Emails</TabButton>
                             <LockedTabButton icon={IconCalendarEvent} label="Calendar" />
                         </div>
 
@@ -530,6 +532,10 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                         ) : tab === "activities" ? (
                             <section className="px-4 py-4">
                                 <ActivitiesTab entity="deal" recordId={deal.id} />
+                            </section>
+                        ) : tab === "emails" ? (
+                            <section className="px-4 py-4">
+                                <EmailsTab entity="deal" recordId={deal.id} to={deal.lead?.email ?? null} values={{ "lead.firstName": deal.lead?.name.split(" ")[0], "lead.name": deal.lead?.name, "deal.title": deal.title }} />
                             </section>
                         ) : (
                             <section className="px-4 py-4">

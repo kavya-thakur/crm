@@ -9,6 +9,7 @@ import {
 import { escapeLike, idParamSchema } from "@/lib/validations/common";
 import { updateRoleSchema } from "@/lib/validations/roles";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { assertNotDemo } from "@/lib/demo/workspace";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -59,6 +60,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
     try {
         const user = await requirePermission("role:update");
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const id = idParamSchema.safeParse((await params).id);
 
@@ -138,6 +141,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(req: NextRequest, { params }: Params) {
     try {
         const user = await requirePermission("role:delete");
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const id = idParamSchema.safeParse((await params).id);
 

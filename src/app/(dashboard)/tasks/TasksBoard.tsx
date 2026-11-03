@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IconCircle, IconCircleCheckFilled } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
+import { DoneCheck } from "@/components/DoneCheck";
 import { Board, BoardCard, BoardColumn, CardControl, CardFields, ColumnTitle, useBoardColumn } from "@/components/Board";
 import type { DataColumn } from "@/components/DataTable";
 import { toast } from "@/components/Toast";
@@ -102,16 +102,15 @@ function StatusColumn({
                     <BoardCard key={task.id} id={task.id} columnId={status.value} draggable onOpen={() => onOpen(task.id)}>
                         <div className="flex items-start gap-2">
                             <CardControl className="-mt-0.5 -ml-0.5">
-                                <button
-                                    type="button"
-                                    aria-label={done ? "Mark as not done" : "Mark as done"}
+                                <DoneCheck
+                                    done={done}
+                                    size={18}
+                                    label={done ? "Mark as not done" : "Mark as done"}
                                     onClick={() => onChange(task.id, { status: done ? "PENDING" : "COMPLETED" })}
-                                    className="flex size-6 items-center justify-center rounded-full text-light hover:text-accent"
-                                >
-                                    {done ? <IconCircleCheckFilled size={19} className="text-accent" /> : <IconCircle size={19} />}
-                                </button>
+                                    className="size-6"
+                                />
                             </CardControl>
-                            <p className={`line-clamp-2 min-w-0 flex-1 font-medium ${done ? "text-faint line-through" : "text-ink"}`}>{task.title}</p>
+                            <p className={`line-clamp-2 min-w-0 flex-1 font-medium ${done ? "text-muted" : "text-ink"}`}>{task.title}</p>
                         </div>
                         {task.description && <p className="mt-1 line-clamp-2 pl-8 text-sm text-faint">{task.description}</p>}
                         <CardFields record={task} columns={fields} />

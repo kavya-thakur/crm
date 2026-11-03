@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     IconArrowDown,
@@ -16,8 +16,7 @@ import {
     IconUpload,
 } from "@tabler/icons-react";
 
-import { api, errorMessage, toQueryParams } from "@/lib/api/client";
-import { INSTANT_BULK_LIMIT } from "@/lib/validations/common";
+import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { toast } from "@/components/Toast";
 import { askLostReason } from "@/components/LostReasonPrompt";
@@ -36,6 +35,7 @@ import {
     SearchBox,
     SortMenu,
     ViewSwitcher,
+    Pagination,
 } from "@/components/ListPage";
 import {
     ActiveFilterChips,
@@ -64,12 +64,14 @@ import LeadsTable, { LEAD_COLUMNS, withLeadEdits } from "./LeadsTable";
 import LeadsBoard from "./LeadsBoard";
 import LeadPanel from "./LeadPanel";
 import { MergeLeadsPanel } from "./MergeLeads";
-import { trackBulkJob, type BulkProgress } from "../BackgroundJobs";
+import { startBulkJob } from "../BackgroundJobs";
+import { SelectAllBar, useSelectAll } from "../shared/useSelectAll";
+import { PAGE_SIZES } from "../shared/useUrlState";
 import NewLeadDialog from "./NewLeadDialog";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
+import { useUrlState } from "../shared/useUrlState";
 
-const PAGE_SIZE = 50;
 
 const SORT_FIELDS: { field: LeadFilters["sortBy"]; label: string }[] = [
     { field: "name", label: "Name" },
@@ -87,17 +89,14 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     const queryClient = useQueryClient();
     const router = useRouter();
 
-    const [view, setView] = useState<"table" | "board">("table");
-    const searchParams = useSearchParams();
-    // Lets a link elsewhere (the Notes feed, a notification) land straight on a lead's panel,
-    // including one followed while this page is already open
-    const openParam = searchParams.get("open");
-    const [openLeadId, setOpenLeadId] = useState<number | null>(openParam ? Number(openParam) : null);
-    const [followedParam, setFollowedParam] = useState(openParam);
-    if (openParam !== followedParam) {
-        setFollowedParam(openParam);
-        if (openParam) setOpenLeadId(Number(openParam));
-    }
+    // list or board, kept in the URL so a refresh keeps it (the list is the default)
+    // The open lead lives in the URL (?open=12): a refresh reopens it, Back closes it, and a
+    // link from elsewhere (the Notes feed, a notification) lands straight on it
+    const page = useUrlState();
+    const openLeadId = Number(page.get("open")) || null;
+    const setOpenLeadId = (id: number | null) => page.set({ open: id ? String(id) : null }, "push");
+    const view = page.get("view") === "board" ? "board" : "table";
+    const setView = (next: "table" | "board") => page.set({ view: next === "table" ? null : next });
     const [creating, setCreating] = useState(false);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     // two leads picked in the table, being merged; the one added first (lower id) stays
@@ -105,6 +104,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
     const {
         query: leadsQuery,
+        paging,
         items: leads,
         total,
         filters,
@@ -117,24 +117,11 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         "leads",
         "/leads",
         { sortBy: "createdAt", sortOrder: "desc" },
-        { pageSize: PAGE_SIZE, onSearch: (trimmed) => ({ search: trimmed || undefined }) },
+        { onSearch: (trimmed) => ({ search: trimmed || undefined }) },
     );
 
-    // "Select all 4,230 matching leads": every lead the filters match, not just the ones loaded.
-    // Changing the filters changes what "all" means, so it's dropped then.
-    const [allMatching, setAllMatching] = useState(false);
-    const filtersKey = JSON.stringify(filters);
-    const [filtersWhenAll, setFiltersWhenAll] = useState(filtersKey);
-    if (filtersKey !== filtersWhenAll) {
-        setFiltersWhenAll(filtersKey);
-        if (allMatching) setAllMatching(false);
-    }
-    const selectedCount = allMatching ? (total ?? selected.size) : selected.size;
-    const allLoadedSelected = leads.length > 0 && leads.every((lead) => selected.has(lead.id));
-    const clearSelection = () => {
-        setAllMatching(false);
-        setSelected(new Set());
-    };
+    // "Select all 4,230 matching leads", and whether the selection is big enough for a background job
+    const selection = useSelectAll({ endpoint: "/leads", filters, total, items: leads, selected, setSelected });
 
     // For the assignee filter and the assign menus
     const agents = useQuery({
@@ -156,19 +143,12 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         queryFn: () => api.get<{ data: LeadSource[] }>("/lead-sources").then((res) => res.data.data),
     });
 
-    // More than a couple of hundred: deleted in the background by the job queue (docs/QUEUES.md),
-    // with a progress card in the corner. "All matching" first asks for every match's id.
-    const bulkDelete = useMutation({
-        mutationFn: async () => {
-            const ids = allMatching
-                ? (await api.get<{ data: number[] }>("/leads", { params: { ...toQueryParams(filters), format: "ids" } })).data.data
-                : [...selected];
-            return (await api.post<{ data: BulkProgress }>("/bulk-jobs", { entity: "lead", action: "delete", ids })).data.data;
-        },
-        onSuccess: (job) => {
-            // its progress card appears now; the worker's messages move it from here
-            trackBulkJob(queryClient, job);
-            clearSelection();
+    // More than a couple of hundred, or every match: a background job with a progress card in the
+    // corner (docs/QUEUES.md). The ids are the ticked rows, or every match.
+    const bulkJob = useMutation({
+        mutationFn: async (action: BulkAction) => startBulkJob(queryClient, { entity: "lead", ...action, ids: await selection.ids() }),
+        onSuccess: () => {
+            selection.clear();
             setConfirmingDelete(false);
         },
         onError: (error) => toast.error(errorMessage(error)),
@@ -198,6 +178,9 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         },
         onError: (error) => toast.error(errorMessage(error)),
     });
+
+    // a bulk action: done in the request for a small selection, as a background job for a big one
+    const runBulk = (action: BulkAction) => (selection.big ? bulkJob.mutate(action) : bulk.mutate(action));
 
     // Inline edits from the table — a single-row PUT, same endpoint the lead
     // panel itself uses, so both stay in sync. Assignment goes through its
@@ -359,7 +342,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
             />
 
             {/* View bar: view switcher on the left, search / filter / sort on the right */}
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
+            <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0">
                 <ViewSwitcher
                     view={view}
                     onChange={(next) => {
@@ -441,26 +424,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                 <ActiveFilterChips fields={FILTER_FIELDS} filters={filters} onChange={updateFilters} />
             </FilterBar>
 
-            {/* everything loaded is ticked, but the filters match more: offer to take them all */}
-            {view === "table" && can.delete && (allMatching || (allLoadedSelected && (total ?? 0) > leads.length)) && (
-                <div className="flex h-9 shrink-0 items-center justify-center gap-2 border-b border-line-light bg-accent-faint text-sm text-ink">
-                    {allMatching ? (
-                        <>
-                            All {(total ?? 0).toLocaleString()} leads matching your filters are selected.
-                            <button type="button" onClick={clearSelection} className="font-medium text-accent hover:underline">
-                                Clear selection
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            All {leads.length.toLocaleString()} leads shown are selected.
-                            <button type="button" onClick={() => setAllMatching(true)} className="font-medium text-accent hover:underline">
-                                Select all {(total ?? 0).toLocaleString()} matching leads
-                            </button>
-                        </>
-                    )}
-                </div>
-            )}
+            {view === "table" && (can.update || can.delete) && <SelectAllBar selection={selection} noun="lead" />}
 
             <div className="relative min-h-0 flex-1 overflow-auto">
                 {view === "table" ? (
@@ -473,16 +437,9 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                         error={leadsQuery.error}
                         onRetry={() => leadsQuery.refetch()}
                         filtered={Boolean(filters.search) || FILTER_FIELDS.some((field) => field.isActive(filters))}
-                        hasMore={leadsQuery.hasNextPage}
-                        loadingMore={leadsQuery.isFetchingNextPage}
-                        onLoadMore={leadsQuery.fetchNextPage}
                         selectable={can.update || can.delete}
                         selected={selected}
-                        onSelect={(next) => {
-                            // unticking a row means it's no longer "all of them"
-                            setAllMatching(false);
-                            setSelected(next);
-                        }}
+                        onSelect={selection.onSelect}
                         onOpen={setOpenLeadId}
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
@@ -497,14 +454,16 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                 )}
             </div>
 
+            {/* which page of the list, and how many rows a page */}
+            {view === "table" && <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />}
+
             {/* Bulk actions, Twenty's floating bar */}
             <BulkBar
-                count={selectedCount}
-                onClear={clearSelection}
+                count={selection.count}
+                onClear={selection.clear}
                 onDelete={can.delete ? () => setConfirmingDelete(true) : undefined}
             >
-                {/* with every match selected, only Delete applies (it runs as a background job) */}
-                {!allMatching && can.update && stagesQuery.data && (
+                {can.update && stagesQuery.data && (
                     <Dropdown
                         openUp
                         buttonClassName="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
@@ -517,7 +476,7 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                                     onClick={async () => {
                                         close();
                                         const answer = stage.isLost ? await askLostReason("lead") : {};
-                                        if (answer) bulk.mutate({ action: "stage", stageId: stage.id, ...answer });
+                                        if (answer) runBulk({ action: "stage", stageId: stage.id, ...answer });
                                     }}
                                 >
                                     <StageLabel stage={stage} />
@@ -527,14 +486,14 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     </Dropdown>
                 )}
 
-                {!allMatching && can.assign && agents.data && (
+                {can.assign && agents.data && (
                     <AssignMenu
                         agents={agents.data}
-                        onAssign={(assignedToId) => bulk.mutate({ action: "assign", assignedToId })}
+                        onAssign={(assignedToId) => runBulk({ action: "assign", assignedToId })}
                     />
                 )}
 
-                {!allMatching && can.update && can.delete && selected.size === 2 && (
+                {!selection.allMatching && can.update && can.delete && selected.size === 2 && (
                     <button
                         type="button"
                         onClick={() => {
@@ -547,7 +506,8 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     </button>
                 )}
 
-                {!allMatching && can.update && (
+                {/* editing a field runs in the request, so only for a selection that fits in one */}
+                {!selection.big && can.update && (
                     <BulkEditButton
                         count={selected.size}
                         noun="lead"
@@ -586,16 +546,16 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
 
             <ConfirmDeleteModal
                 open={confirmingDelete}
-                count={selectedCount}
+                count={selection.count}
                 noun="lead"
                 description={
-                    allMatching || selectedCount > INSTANT_BULK_LIMIT
+                    selection.big
                         ? "Their timelines, notes, tasks and activities go too. It runs in the background, so you can keep working. This can't be undone."
                         : "Their timeline history is deleted too. This can't be undone."
                 }
-                pending={bulk.isPending || bulkDelete.isPending}
+                pending={bulk.isPending || bulkJob.isPending}
                 onCancel={() => setConfirmingDelete(false)}
-                onConfirm={() => (allMatching || selectedCount > INSTANT_BULK_LIMIT ? bulkDelete.mutate() : bulk.mutate({ action: "delete" }))}
+                onConfirm={() => runBulk({ action: "delete" })}
             />
         </div>
     );

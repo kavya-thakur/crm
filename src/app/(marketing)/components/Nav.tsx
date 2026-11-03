@@ -7,7 +7,7 @@ import { LogoMark } from "@/components/Logo";
 import { Button } from "./Button";
 
 const LINKS = [
-    { href: "/#product", label: "Product" },
+    { href: "/product", label: "Product" },
     { href: "/#how-it-works", label: "How it works" },
     { href: "/pricing", label: "Pricing" },
     { href: "/demo", label: "Book a demo" },
@@ -18,19 +18,25 @@ function Divider() {
     return <span aria-hidden className="h-2.5 w-px shrink-0 bg-current opacity-40" />;
 }
 
-export function Nav({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolean; primaryHref: string; primaryLabel: string }) {
+// `resting` is the bar's colour before any scrolling: it matches the hero under it (grey on most
+// pages, white on the product page)
+export function Nav({ loggedIn, primaryHref, primaryLabel, resting = "grey" }: { loggedIn: boolean; primaryHref: string; primaryLabel: string; resting?: "grey" | "white" }) {
     // Two looks besides the resting one: white with a hairline once the page has scrolled
-    // (the resting grey matches the hero), and dark over the dark sections at the end of
-    // the page, like twenty.com's bar. React skips the re-render when nothing changed.
+    // (the resting grey matches the hero), and dark over any dark section (the product
+    // page's hero, the FAQ and footer), like twenty.com's bar. React skips the re-render when nothing changed.
     const [scrolled, setScrolled] = useState(false);
     const [dark, setDark] = useState(false);
 
     useEffect(() => {
-        const firstDark = document.querySelector("[data-scheme=dark]");
+        const darkSections = [...document.querySelectorAll("[data-scheme=dark]")];
 
         function update() {
             setScrolled(window.scrollY > 80);
-            setDark(firstDark !== null && firstDark.getBoundingClientRect().top <= 64);
+            // dark while one of the dark sections is under the bar (its 64px line)
+            setDark(darkSections.some((section) => {
+                const { top, bottom } = section.getBoundingClientRect();
+                return top <= 64 && bottom > 64;
+            }));
         }
 
         update();
@@ -45,7 +51,7 @@ export function Nav({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolean
                     ? "bg-[#1c1c1c] text-white"
                     : scrolled
                       ? "bg-white text-[#1c1c1c] shadow-[0_1px_0_rgb(28_28_28/0.1)]"
-                      : "bg-[#f4f4f4] text-[#1c1c1c]"
+                      : `${resting === "white" ? "bg-white" : "bg-[#f4f4f4]"} text-[#1c1c1c]`
             }`}
         >
             <div className="mx-auto flex min-h-16 w-full max-w-378 items-center justify-between gap-5 px-4 min-[921px]:px-10">

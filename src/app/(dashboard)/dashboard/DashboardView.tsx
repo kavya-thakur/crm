@@ -7,6 +7,7 @@ import gsap from "gsap";
 import {
     IconAlertTriangle,
     IconAntenna,
+    IconSpeakerphone,
     IconArrowDownRight,
     IconArrowRight,
     IconArrowUpRight,
@@ -63,6 +64,7 @@ interface Dashboard {
             trend: TrendPoint[];
             previousTrend: number[];
             bySource: { sourceId: number | null; value: number; count: number }[];
+            byCampaign: { campaign: string; value: number; count: number }[];
         };
         lost: { count: number; previousCount: number; reasons: LostReason[] };
         open: { value: number; count: number; weighted: number; stages: (Stage & { value: number })[] };
@@ -81,6 +83,7 @@ interface Dashboard {
         trend: TrendPoint[];
         stages: (Stage & { isConverted: boolean; isLost: boolean })[];
         sources: { id: number | null; name: string; color: string | null; count: number; converted: number }[];
+        campaigns: { campaign: string; count: number; converted: number }[];
         lostReasons: LostReason[];
     } | null;
     team: Team | null;
@@ -285,6 +288,7 @@ function Overview({
             {leads && <NewLeadsCard leads={leads} range={range} against={against} />}
             {(deals || leads) && <LostReasonsCard deals={deals?.lost.reasons} leads={leads?.lostReasons} period={period} className={leads ? "" : "lg:col-span-3"} />}
             {leads && <SourcePerformanceCard sources={leads.sources} won={deals?.won.bySource} period={period} />}
+            {leads && <CampaignPerformanceCard campaigns={leads.campaigns} won={deals?.won.byCampaign} period={period} />}
 
             <div className="grid gap-4 lg:col-span-3 lg:grid-cols-2">
                 <TasksCard tasks={data.tasks} />
@@ -559,15 +563,10 @@ function NewLeadsCard({ leads, range, against }: { leads: Leads; range: Dashboar
 // Which sources are worth the effort: how many leads each brought this period, how many of
 // those converted, and the revenue won from deals that started as one of its leads
 function SourcePerformanceCard({ sources, won, period }: { sources: Leads["sources"]; won: Deals["won"]["bySource"] | undefined; period: string }) {
-    const rows = sources
-        .map((source) => {
-            const deals = won?.find((row) => row.sourceId === source.id);
-            return { ...source, revenue: deals?.value ?? 0, wonCount: deals?.count ?? 0 };
-        })
-        .filter((row) => row.count > 0 || row.revenue > 0)
-        .sort((a, b) => b.revenue - a.revenue || b.count - a.count);
-    const topRevenue = Math.max(...rows.map((row) => row.revenue), 1);
-    const head = "py-2 pr-5 text-right font-medium whitespace-nowrap";
+    const rows = sources.map((source) => {
+        const deals = won?.find((row) => row.sourceId === source.id);
+        return { key: String(source.id), name: source.name, color: source.color ?? "#d6d6d6", count: source.count, converted: source.converted, revenue: deals?.value ?? 0, wonCount: deals?.count ?? 0 };
+    });
 
     return (
         <Card
@@ -577,53 +576,90 @@ function SourcePerformanceCard({ sources, won, period }: { sources: Leads["sourc
             tone="sky"
             className="lg:col-span-3"
         >
-            {rows.length === 0 ? (
-                <Empty>No new leads in the last {period}.</Empty>
-            ) : (
-                <div className="-mx-5 overflow-x-auto">
-                    <table className="w-full min-w-[640px] border-collapse">
-                        <thead>
-                            <tr className="border-y border-line-light text-left text-sm text-faint">
-                                <th className="py-2 pr-4 pl-5 font-medium">Source</th>
-                                <th className={head}>New leads</th>
-                                <th className={head}>Converted</th>
-                                <th className={head}>Conversion rate</th>
-                                {won && <th className={head}>Deals won</th>}
-                                {won && <th className={head}>Revenue won</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((row) => {
-                                const rate = percent(row.converted, row.count);
-                                return (
-                                    <tr key={row.id ?? "none"} className="border-b border-line-light text-muted tabular-nums last:border-b-0">
-                                        <td className="py-2.5 pr-4 pl-5">
-                                            <span className="flex items-center gap-2">
-                                                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: row.color ?? "#d6d6d6" }} />
-                                                <span className="font-medium whitespace-nowrap text-ink">{row.name}</span>
-                                            </span>
-                                        </td>
-                                        <td className="py-2.5 pr-5 text-right">{row.count}</td>
-                                        <td className="py-2.5 pr-5 text-right">{row.converted}</td>
-                                        <td className="py-2.5 pr-5 text-right">{row.count === 0 ? <span className="text-light">—</span> : `${rate}%`}</td>
-                                        {won && <td className="py-2.5 pr-5 text-right">{row.wonCount}</td>}
-                                        {won && (
-                                            <td className="py-2.5 pr-5 text-right">
-                                                <span className="font-medium text-ink">{formatMoney(row.revenue)}</span>
-                                                {/* a thin bar: its share of the best source's revenue */}
-                                                <span className="mt-1 ml-auto block h-1 w-24 rounded-full bg-accent-soft">
-                                                    <span className="block h-full rounded-full bg-accent" style={{ width: `${(row.revenue / topRevenue) * 100}%` }} />
-                                                </span>
-                                            </td>
-                                        )}
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <PerformanceTable label="Source" rows={rows} showRevenue={!!won} empty={`No new leads in the last ${period}.`} />
         </Card>
+    );
+}
+
+// The same for ad campaigns: leads that came in through a web form link tagged
+// ?utm_campaign=…, and the revenue won from them. Leads with no campaign aren't listed.
+function CampaignPerformanceCard({ campaigns, won, period }: { campaigns: Leads["campaigns"]; won: Deals["won"]["byCampaign"] | undefined; period: string }) {
+    const names = [...new Set([...campaigns.map((row) => row.campaign), ...(won ?? []).map((row) => row.campaign)])];
+    const rows = names.map((name) => {
+        const leads = campaigns.find((row) => row.campaign === name);
+        const deals = won?.find((row) => row.campaign === name);
+        return { key: name, name, count: leads?.count ?? 0, converted: leads?.converted ?? 0, revenue: deals?.value ?? 0, wonCount: deals?.count ?? 0 };
+    });
+
+    return (
+        <Card
+            title="Campaign performance"
+            description={`Which ad campaigns brought leads and revenue in the last ${period}`}
+            icon={IconSpeakerphone}
+            tone="violet"
+            className="lg:col-span-3"
+        >
+            <PerformanceTable
+                label="Campaign"
+                rows={rows}
+                showRevenue={!!won}
+                empty={`No leads from a campaign in the last ${period}. Add ?utm_campaign=your-campaign to a web form's link to track one.`}
+            />
+        </Card>
+    );
+}
+
+type PerformanceRow = { key: string; name: string; color?: string; count: number; converted: number; revenue: number; wonCount: number };
+
+// Leads, conversion and revenue per row (a source or a campaign), best earners first; rows
+// that brought neither leads nor revenue this period are left out
+function PerformanceTable({ label, rows: all, showRevenue, empty }: { label: string; rows: PerformanceRow[]; showRevenue: boolean; empty: string }) {
+    const rows = all.filter((row) => row.count > 0 || row.revenue > 0).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
+    const topRevenue = Math.max(...rows.map((row) => row.revenue), 1);
+    const head = "py-2 pr-5 text-right font-medium whitespace-nowrap";
+
+    if (rows.length === 0) return <Empty>{empty}</Empty>;
+
+    return (
+        <div className="-mx-5 overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse">
+                <thead>
+                    <tr className="border-y border-line-light text-left text-sm text-faint">
+                        <th className="py-2 pr-4 pl-5 font-medium">{label}</th>
+                        <th className={head}>New leads</th>
+                        <th className={head}>Converted</th>
+                        <th className={head}>Conversion rate</th>
+                        {showRevenue && <th className={head}>Deals won</th>}
+                        {showRevenue && <th className={head}>Revenue won</th>}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row) => (
+                        <tr key={row.key} className="border-b border-line-light text-muted tabular-nums last:border-b-0">
+                            <td className="py-2.5 pr-4 pl-5">
+                                <span className="flex items-center gap-2">
+                                    {row.color && <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />}
+                                    <span className="font-medium whitespace-nowrap text-ink">{row.name}</span>
+                                </span>
+                            </td>
+                            <td className="py-2.5 pr-5 text-right">{row.count}</td>
+                            <td className="py-2.5 pr-5 text-right">{row.converted}</td>
+                            <td className="py-2.5 pr-5 text-right">{row.count === 0 ? <span className="text-light">—</span> : `${percent(row.converted, row.count)}%`}</td>
+                            {showRevenue && <td className="py-2.5 pr-5 text-right">{row.wonCount}</td>}
+                            {showRevenue && (
+                                <td className="py-2.5 pr-5 text-right">
+                                    <span className="font-medium text-ink">{formatMoney(row.revenue)}</span>
+                                    {/* a thin bar: its share of the best row's revenue */}
+                                    <span className="mt-1 ml-auto block h-1 w-24 rounded-full bg-accent-soft">
+                                        <span className="block h-full rounded-full bg-accent" style={{ width: `${(row.revenue / topRevenue) * 100}%` }} />
+                                    </span>
+                                </td>
+                            )}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     );
 }
 

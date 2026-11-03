@@ -8,6 +8,7 @@ import { IconArrowRight, IconCheck, IconCircleCheckFilled } from "@tabler/icons-
 import { Nav } from "../components/Nav";
 import { Footer } from "../components/Footer";
 import { CONTAINER, Eyebrow } from "../components/Eyebrow";
+import { Orb } from "../components/Orb";
 
 const TEAM_SIZES = ["Just me", "2–5", "6–20", "21–50", "50+"];
 const INTERESTS = ["Moving off spreadsheets", "Managing a sales team", "Tracking deals", "Something else"];
@@ -36,6 +37,8 @@ function check(values: Values) {
 // through the same web form feature customers put on their websites.
 export default function DemoPage({ loggedIn, formKey }: { loggedIn: boolean; formKey: string | null }) {
     const rootRef = useRef<HTMLDivElement>(null);
+    // how stirred up the orb is: typing nudges it, sending the request sets it ringing
+    const energy = useRef(0);
 
     // the copy and the form card settle in once, when the page opens
     useLayoutEffect(() => {
@@ -56,7 +59,7 @@ export default function DemoPage({ loggedIn, formKey }: { loggedIn: boolean; for
                 <div aria-hidden className="pointer-events-none absolute top-28 right-[-6%] h-72 w-[42%] rounded-[32px] border border-[#1c1c1c]/8" />
 
                 <div className={`${CONTAINER} relative grid gap-12 pt-14 pb-24 min-[921px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[921px]:gap-20 min-[921px]:pt-24`}>
-                    <div className="min-[921px]:pt-4">
+                    <div className="relative min-[921px]:pt-4">
                         <div data-rise>
                             <Eyebrow>Book a demo</Eyebrow>
                         </div>
@@ -90,13 +93,18 @@ export default function DemoPage({ loggedIn, formKey }: { loggedIn: boolean; for
                             ))}
                         </ul>
 
-                        <p data-rise className={`${MONO} mt-12 text-[11px] tracking-wide text-[#1c1c1c]/45 uppercase`}>
+                        {/* on desktop it floats in the gap between the text and the form; on phones it sits in line */}
+                        <div data-rise className="-mx-6 mt-2 h-75 min-[921px]:absolute min-[921px]:top-80 min-[921px]:-right-18 min-[921px]:m-0 min-[921px]:size-100">
+                            <Orb energy={energy} className="h-full w-full" />
+                        </div>
+
+                        <p data-rise className={`${MONO} text-[11px] tracking-wide text-[#1c1c1c]/45 uppercase min-[921px]:mt-12`}>
                             We usually reply within one working day
                         </p>
                     </div>
 
                     <div data-rise>
-                        <DemoForm formKey={formKey} />
+                        <DemoForm formKey={formKey} onStir={(amount) => (energy.current = Math.max(energy.current, Math.min(amount >= 2 ? 2 : 1, energy.current + amount)))} />
                     </div>
                 </div>
             </main>
@@ -106,7 +114,7 @@ export default function DemoPage({ loggedIn, formKey }: { loggedIn: boolean; for
     );
 }
 
-function DemoForm({ formKey }: { formKey: string | null }) {
+function DemoForm({ formKey, onStir }: { formKey: string | null; onStir: (amount: number) => void }) {
     const [values, setValues] = useState<Values>(EMPTY);
     const [teamSize, setTeamSize] = useState<string | null>(null);
     const [interest, setInterest] = useState<string | null>(null);
@@ -118,6 +126,7 @@ function DemoForm({ formKey }: { formKey: string | null }) {
 
     function set(field: Field, value: string) {
         setValues((current) => ({ ...current, [field]: value }));
+        onStir(0.25);
         if (errors[field]) setErrors((current) => ({ ...current, [field]: undefined }));
     }
 
@@ -150,6 +159,7 @@ function DemoForm({ formKey }: { formKey: string | null }) {
             });
             const body = await res.json().catch(() => null);
             if (!res.ok) throw new Error(body?.message ?? "Something went wrong. Please try again.");
+            onStir(2);
             setState("sent");
         } catch (error) {
             setProblem(error instanceof Error ? error.message : "Something went wrong. Please try again.");
@@ -183,8 +193,14 @@ function DemoForm({ formKey }: { formKey: string | null }) {
                 </Line>
             </div>
 
-            <Choices label="Team size" options={TEAM_SIZES} value={teamSize} onChange={setTeamSize} />
-            <Choices label="What are you looking for?" options={INTERESTS} value={interest} onChange={setInterest} />
+            <Choices label="Team size" options={TEAM_SIZES} value={teamSize} onChange={(size) => {
+                setTeamSize(size);
+                onStir(0.6);
+            }} />
+            <Choices label="What are you looking for?" options={INTERESTS} value={interest} onChange={(choice) => {
+                setInterest(choice);
+                onStir(0.6);
+            }} />
 
             <Line label="How can we help?" className="mt-7">
                 <textarea

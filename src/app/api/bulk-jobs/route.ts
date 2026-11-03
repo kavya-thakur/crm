@@ -2,18 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { hasPermission } from "@/lib/auth/requirePermission";
 import { handleRouteError, parseBody } from "@/lib/api/http";
-import { dbIdSchema } from "@/lib/validations/common";
+import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { tooManyAttempts } from "@/lib/api/rateLimit";
-import { bulkJobSelect, MAX_BULK } from "@/lib/jobs/bulkActions";
+import { bulkJobSelect, findAgent, findStage, MAX_BULK, mayDo } from "@/lib/jobs/bulkActions";
 import { bulkQueue } from "@/lib/jobs/queues";
 
-const startBulkJobSchema = z.object({
-    entity: z.enum(["lead", "deal", "contact"]),
-    action: z.literal("delete"),
-    ids: z.array(dbIdSchema).min(1).max(MAX_BULK),
-});
+const ids = z.array(dbIdSchema).min(1).max(MAX_BULK);
+const entity = z.enum(["lead", "deal", "contact"]);
+
+const startBulkJobSchema = z.discriminatedUnion("action", [
+    z.object({ action: z.literal("delete"), entity, ids }),
+    // contacts have no stages
+    z.object({ action: z.literal("stage"), entity: z.enum(["lead", "deal"]), ids, stageId: dbIdSchema, lostReason: optionalText(200) }),
+    // null = unassign
+    z.object({ action: z.literal("assign"), entity, ids, assignedToId: dbIdSchema.nullable() }),
+]);
 
 async function signedInUser() {
     const user = await getCurrentUser();
@@ -39,9 +43,10 @@ export async function GET() {
 }
 
 /**
- * Starts a big bulk action (deleting thousands of records): saves which ones (the ids, a
- * snapshot of what was selected) and queues it. The worker deletes them in batches, only
- * among the records this person may touch, and reports progress live.
+ * Starts a big bulk action (deleting, moving or assigning thousands of records): saves which
+ * ones (the ids, a snapshot of what was selected) and what to do, and queues it. The worker
+ * works through them in batches, only among the records this person may touch, and reports
+ * progress live.
  */
 export async function POST(req: NextRequest) {
     try {
@@ -50,21 +55,30 @@ export async function POST(req: NextRequest) {
         const body = await parseBody(req, startBulkJobSchema);
         if (!body.success) return body.response;
 
-        const { entity, action, ids } = body.data;
-        if (!hasPermission(user, `${entity}:delete`)) throw new Error("FORBIDDEN");
+        const data = body.data;
+        if (!mayDo(user, data.entity, data.action)) throw new Error("FORBIDDEN");
+
+        // what the action needs, checked now so a mistake is told straight away, not later
+        const params = data.action === "stage" ? { stageId: data.stageId, lostReason: data.lostReason } : data.action === "assign" ? { assignedToId: data.assignedToId } : {};
+        if (data.action === "stage" && !(await findStage(user.organizationId, data.entity, data.stageId))) {
+            return NextResponse.json({ ok: false, message: "Invalid stage" }, { status: 400 });
+        }
+        if (data.action === "assign" && (await findAgent(user.organizationId, data.assignedToId)) === undefined) {
+            return NextResponse.json({ ok: false, message: "Agent not found in your organization" }, { status: 404 });
+        }
 
         if (await tooManyAttempts(`bulk:${user.id}`, 20, 60 * 60 * 1000)) {
             return NextResponse.json({ ok: false, message: "That's a lot of bulk actions in an hour. Please wait a little." }, { status: 429 });
         }
 
-        const unique = [...new Set(ids)];
+        const unique = [...new Set(data.ids)];
         const job = await prisma.bulkJob.create({
-            data: { organizationId: user.organizationId, userId: user.id, entity, action, ids: unique, total: unique.length },
+            data: { organizationId: user.organizationId, userId: user.id, entity: data.entity, action: data.action, params, ids: unique, total: unique.length },
             select: bulkJobSelect,
         });
 
         try {
-            await bulkQueue().add(action, { bulkJobId: job.id }, { jobId: `bulk-${job.id}` });
+            await bulkQueue().add(data.action, { bulkJobId: job.id }, { jobId: `bulk-${job.id}` });
         } catch {
             await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "FAILED", error: "The job queue isn't available" } });
             return NextResponse.json({ ok: false, message: "Big bulk actions aren't available right now. Please try again in a few minutes." }, { status: 503 });

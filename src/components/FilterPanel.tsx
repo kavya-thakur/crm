@@ -639,9 +639,10 @@ function FilterPanelContent<TFilters extends object>({
         .filter((field): field is FilterFieldDef<TFilters> => !!field);
 
     return (
-        <div className="flex h-125">
-            {/* Saved filters */}
-            <div className="flex w-45 shrink-0 flex-col border-r border-line-light p-2">
+        // 500px tall, or less on a short (phone) screen
+        <div className="flex h-[min(31.25rem,calc(100dvh-9rem))]">
+            {/* Saved filters (from a bit wider than a phone: on one, the filters themselves need the room) */}
+            <div className="hidden w-45 shrink-0 flex-col border-r border-line-light p-2 sm:flex">
                 <p className="px-1.5 py-1 text-xs font-semibold text-faint">Saved filters</p>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                     {savedFiltersQuery.data?.map((saved) => (
@@ -678,6 +679,17 @@ function FilterPanelContent<TFilters extends object>({
                     <TabButton active={tab === "fields"} onClick={() => setTab("fields")}>
                         <IconLayoutColumns size={14} /> Manage fields
                     </TabButton>
+                    {/* every filter off in one go (each field knows how to clear itself) */}
+                    {fields.some((field) => field.isActive(filters)) && (
+                        <button
+                            type="button"
+                            onClick={() => onChange(fields.reduce<Partial<TFilters>>((acc, field) => ({ ...acc, ...field.clear(filters) }), {}))}
+                            className="ml-auto flex h-7 items-center gap-1 rounded-lg px-2 text-sm font-medium text-muted hover:bg-fill hover:text-ink"
+                        >
+                            <IconX size={13} />
+                            Clear all
+                        </button>
+                    )}
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-2">

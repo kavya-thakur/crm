@@ -46,7 +46,7 @@ const STEPS: Step[] = [
                 Shape a pipeline <Accent>that fits how you sell</Accent>
             </>
         ),
-        body: "Name your own deal stages and lead sources, and add the custom fields your team actually fills in.",
+        body: "Import your spreadsheet in minutes, name your own deal stages and lead sources, and add the custom fields your team actually fills in.",
         cards: [
             {
                 icon: IconLayoutKanban,
@@ -75,7 +75,7 @@ const STEPS: Step[] = [
                 Bring in the team, <Accent>with the right access</Accent>
             </>
         ),
-        body: "Invite your agents, give each one a role, and every lead goes to the right person automatically.",
+        body: "Invite your agents and give each one a role. Leads from your website forms are shared out among them in turn.",
         cards: [
             {
                 icon: IconShieldLock,
@@ -103,7 +103,7 @@ const STEPS: Step[] = [
                 Work every deal <Accent>until it closes</Accent>
             </>
         ),
-        body: "Book calls and meetings, leave notes that @mention a teammate, and watch every change land on the timeline.",
+        body: "Book calls and meetings with a reminder 10 minutes before, @mention a teammate in a note, and see every change on the record's timeline.",
         cards: [
             {
                 icon: IconCalendarEvent,

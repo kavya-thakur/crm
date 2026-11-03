@@ -313,6 +313,18 @@ export function embedHtml(endpoint: string, settings: LeadFormSettings, formName
     if (!settings.redirectUrl) {
         lines.push(`  <!-- optional: send people to your own page afterwards -->`, `  <!-- <input type="hidden" name="redirect" value="https://your-site.com/thanks"> -->`);
     }
-    lines.push(`  <button type="submit">${texts.buttonLabel}</button>`, `</form>`);
+    lines.push(
+        `  <!-- the ad campaign the visitor came from (?utm_campaign=… on your page's link) -->`,
+        `  <input type="hidden" name="utm_source">`,
+        `  <input type="hidden" name="utm_medium">`,
+        `  <input type="hidden" name="utm_campaign">`,
+        `  <button type="submit">${texts.buttonLabel}</button>`,
+        `</form>`,
+        `<script>`,
+        `  new URLSearchParams(location.search).forEach(function (value, key) {`,
+        `    document.querySelectorAll('input[name="' + key + '"][type="hidden"]').forEach(function (input) { input.value = value; });`,
+        `  });`,
+        `</script>`,
+    );
     return lines.join("\n");
 }

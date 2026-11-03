@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
     IconCalendarDue,
     IconCalendarEvent,
-    IconCircle,
-    IconCircleCheckFilled,
     IconClock,
     IconLink,
     IconPlus,
@@ -16,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 
+import { DoneCheck } from "@/components/DoneCheck";
 import { Avatar } from "@/components/Avatar";
 import { DataCell, type DataColumn, type EditConfig } from "@/components/DataTable";
 import { ErrorState } from "@/components/ErrorState";
@@ -25,7 +23,7 @@ import { formatDateTime } from "@/lib/utils/format";
 import type { AgentOption } from "../shared/customFields";
 import { linkedRecord } from "../shared/linkedRecord";
 import { ActivityTypeLabel, AttendeeStack, DURATION_OPTIONS, StatusBadge, TYPE_OPTIONS, toggledStatus } from "../shared/activities";
-import { durationLabel, isOverdue, type Activity, type ActivityScope } from "./shared";
+import { durationLabel, fromDateTimeLocal, isOverdue, toDateTimeLocal, type Activity, type ActivityScope } from "./shared";
 
 const EMPTY_STATE: Record<ActivityScope, { title: string; hint: string }> = {
     upcoming: { title: "Nothing scheduled", hint: "Book a call or meeting and it shows up here." },
@@ -36,8 +34,8 @@ const EMPTY_STATE: Record<ActivityScope, { title: string; hint: string }> = {
 };
 
 // Title is pinned (it's how an activity is opened); the rest are plain columns, with
-// Type, Duration and Assigned to editable in place via the hover pencil. When,
-// attendees and status are changed in the activity's own panel.
+// Type, When (reschedule), Duration and Assigned to editable in place via the hover pencil,
+// here and on board cards. Attendees and status are changed in the activity's own panel.
 export function activityColumns(context: {
     agents?: AgentOption[];
     onUpdate: (activity: Activity, changes: Record<string, unknown>) => void;
@@ -49,6 +47,16 @@ export function activityColumns(context: {
         getValue: (activity) => activity.type,
         options: TYPE_OPTIONS,
         onSave: (activity, value) => value && context.onUpdate(activity, { type: value }),
+    };
+
+    // a time in the viewer's own timezone; a half-typed one isn't saved
+    const whenEdit: EditConfig<Activity> = {
+        type: "datetime-local",
+        getValue: (activity) => toDateTimeLocal(activity.scheduledAt),
+        onSave: (activity, value) => {
+            const scheduledAt = fromDateTimeLocal(String(value ?? ""));
+            if (scheduledAt) context.onUpdate(activity, { scheduledAt });
+        },
     };
 
     const durationEdit: EditConfig<Activity> = {
@@ -70,7 +78,7 @@ export function activityColumns(context: {
     return [
         { key: "type", label: "Type", icon: IconTag, width: 130, edit: typeEdit, cell: (activity) => <ActivityTypeLabel type={activity.type} /> },
         {
-            key: "scheduledAt", label: "When", icon: IconCalendarDue, width: 190,
+            key: "scheduledAt", label: "When", icon: IconCalendarDue, width: 190, edit: whenEdit,
             cell: (activity) => (
                 <span className={isOverdue(activity) ? "font-medium text-danger" : ""}>{formatDateTime(activity.scheduledAt)}</span>
             ),
@@ -115,9 +123,6 @@ interface ActivitiesTableProps {
     failed: boolean;
     error: unknown;
     onRetry: () => void;
-    hasMore: boolean;
-    loadingMore: boolean;
-    onLoadMore: () => void;
     onToggle: (activity: Activity) => void;
     onUpdate: (activity: Activity, changes: Record<string, unknown>) => void;
     onOpen: (id: number) => void;
@@ -125,19 +130,8 @@ interface ActivitiesTableProps {
 }
 
 export default function ActivitiesTable({
-    activities, scope, agents, loading, failed, error, onRetry, hasMore, loadingMore, onLoadMore, onToggle, onUpdate, onOpen, onCreate,
+    activities, scope, agents, loading, failed, error, onRetry, onToggle, onUpdate, onOpen, onCreate,
 }: ActivitiesTableProps) {
-    // Infinite scroll: when this invisible div at the bottom comes into view, load the next page
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const bottom = bottomRef.current;
-        if (!bottom || !hasMore || loadingMore) return;
-
-        const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && onLoadMore());
-        observer.observe(bottom);
-        return () => observer.disconnect();
-    }, [hasMore, loadingMore, onLoadMore]);
 
     const columns = activityColumns({ agents, onUpdate });
     const colSpan = columns.length + 3;
@@ -182,24 +176,22 @@ export default function ActivitiesTable({
                                 className="[&>td]:h-8 [&>td]:border-r [&>td]:border-b [&>td]:border-line-light [&>td]:bg-surface [&>td]:px-2 [&>td]:whitespace-nowrap"
                             >
                                 <td className="sticky left-0 z-1 px-0! text-center">
-                                    <button
-                                        type="button"
-                                        aria-label={
+                                    <DoneCheck
+                                        done={done}
+                                        label={
                                             toggledStatus(activity.status) === "COMPLETED"
                                                 ? `Mark "${activity.title}" as completed`
                                                 : `Mark "${activity.title}" as not completed`
                                         }
                                         onClick={() => onToggle(activity)}
-                                        className="inline-flex items-center text-faint hover:text-accent"
-                                    >
-                                        {done ? <IconCircleCheckFilled size={16} className="text-accent" /> : <IconCircle size={16} />}
-                                    </button>
+                                        className="mx-auto size-6"
+                                    />
                                 </td>
                                 <td className="sticky left-8 z-1 px-1!">
                                     <button
                                         type="button"
                                         onClick={() => onOpen(activity.id)}
-                                        className={`flex max-w-full items-center rounded px-1 py-0.5 hover:bg-fill ${closed ? "text-faint line-through" : ""}`}
+                                        className={`flex max-w-full items-center rounded px-1 py-0.5 hover:bg-fill ${closed ? "text-muted" : ""}`}
                                     >
                                         <span className="truncate">{activity.title}</span>
                                     </button>
@@ -212,7 +204,7 @@ export default function ActivitiesTable({
                         );
                     })}
 
-                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
+                    {loading && <SkeletonRows colSpan={colSpan} />}
 
                     {!loading && (
                         <tr>
@@ -243,7 +235,6 @@ export default function ActivitiesTable({
                 </div>
             )}
 
-            <div ref={bottomRef} className="h-px" />
         </>
     );
 }

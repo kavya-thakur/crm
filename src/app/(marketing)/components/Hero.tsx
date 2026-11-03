@@ -36,7 +36,7 @@ export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolea
                         className="group inline-flex items-center gap-2 rounded-full border border-[#1c1c1c]/10 bg-white py-1 pr-3 pl-1 font-(family-name:--font-host-grotesk) text-[13px] text-[#1c1c1c]/70 transition-colors hover:text-[#1c1c1c]"
                     >
                         <span className="rounded-full bg-[#4a38f5] px-2 py-0.5 text-[11px] font-medium text-white">New</span>
-                        Scheduled activities with your whole team
+                        Import thousands of leads from a CSV
                         <IconArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                     </a>
 
@@ -51,14 +51,15 @@ export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolea
                     </h1>
 
                     <p data-hero-line className="mt-6 max-w-140 font-(family-name:--font-host-grotesk) text-[17px] leading-[1.55] text-[#1c1c1c]/60">
-                        Flash is the CRM your whole team actually opens: leads, deals, follow-ups and notes in one fast workspace, set up in minutes and shaped around how you sell.
+                        Flash is the CRM your whole team actually opens. Website enquiries arrive already assigned, no customer gets chased twice, and every call, deal and note lives in one shared workspace.
                     </p>
 
                     <div data-hero-line className="mt-9 flex flex-wrap justify-center gap-3">
                         <Button href={primaryHref}>{primaryLabel}</Button>
+                        {/* straight into the demo workspace with sample data, no sign-up (see /api/auth/demo) */}
                         {!loggedIn && (
-                            <Button href="/demo" variant="outlined">
-                                Book a demo
+                            <Button href="/api/auth/demo?as=manager" variant="outlined">
+                                Explore the live demo
                             </Button>
                         )}
                     </div>

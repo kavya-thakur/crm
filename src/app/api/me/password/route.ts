@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { changePasswordSchema } from "@/lib/validations/auth";
 import { handleRouteError, parseBody } from "@/lib/api/http";
+import { assertNotDemo } from "@/lib/demo/workspace";
 
 export async function PATCH(req: NextRequest) {
     try {
@@ -12,6 +13,8 @@ export async function PATCH(req: NextRequest) {
         if (!user) {
             throw new Error("UNAUTHORIZED");
         }
+        // the demo workspace stays the same for every visitor
+        assertNotDemo(user);
 
         const body = await parseBody(req, changePasswordSchema);
 

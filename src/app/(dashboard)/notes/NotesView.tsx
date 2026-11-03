@@ -62,7 +62,7 @@ export default function NotesView({ meId, entities }: { meId: number; entities: 
                 {notesQuery.data && <span className="text-faint">{notesQuery.data.length}</span>}
             </header>
 
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2">
+            <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 [&>*]:shrink-0">
                 <div className="font-medium text-muted">
                     <ViewSwitcher view={view} onChange={setView} />
                 </div>

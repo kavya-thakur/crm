@@ -57,7 +57,8 @@ export default function HostedForm({ formKey, workspace, texts, intro, redirectU
             const res = await fetch(`/api/public/forms/${formKey}`, {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ ...values, customFields: answers }),
+                // the campaign tags on the link they came in on (?utm_campaign=…), for the lead
+                body: JSON.stringify({ ...values, ...utmTags(window.location.search), customFields: answers }),
             });
             const body = await res.json().catch(() => ({}));
 
@@ -224,3 +225,11 @@ function CustomInput({ field, value, error, onChange }: { field: HostedField; va
         </Field>
     );
 }
+
+// utm_source / utm_medium / utm_campaign from a query string; the ones that aren't there are left out
+function utmTags(search: string) {
+    const params = new URLSearchParams(search);
+    return Object.fromEntries(UTM_TAGS.flatMap((tag) => (params.get(tag) ? [[tag, params.get(tag)]] : [])));
+}
+
+const UTM_TAGS = ["utm_source", "utm_medium", "utm_campaign"] as const;

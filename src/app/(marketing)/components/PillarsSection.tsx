@@ -6,19 +6,19 @@ const PILLARS: { title: string; shape: ShapeName; body: string; tags: [string, s
     {
         title: "Capture every lead",
         shape: "funnel",
-        body: "Leads from your website, referrals and events land with the right person straight away, instead of sitting in a shared inbox.",
-        tags: ["Leads", "Lead sources"],
+        body: "Forms on your website create leads by themselves and share them out across your team in turn. If that phone number or email is already an open lead, Flash stops the duplicate.",
+        tags: ["Web forms", "Duplicate check"],
     },
     {
         title: "Close deals faster",
         shape: "coins",
-        body: "Move deals across a board that matches your pipeline. Every stage change, note and hand-off is logged, so anyone can pick it up.",
+        body: "Turn a qualified lead into a deal in one click, then drag it across your own stages. When a deal is lost, the reason is recorded, so you learn why.",
         tags: ["Deals", "Pipeline"],
     },
     {
         title: "Control who sees what",
         shape: "shield",
-        body: "Roles decide exactly who can see, assign or delete what, right down to agents seeing only their own leads. No shared logins.",
+        body: "Roles decide who can view, create, edit, delete and assign. Managers see the whole pipeline, while agents can be limited to their own leads, deals and tasks.",
         tags: ["Roles", "Permissions"],
     },
 ];

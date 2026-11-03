@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
     IconCalendar,
     IconCurrencyRupee,
@@ -134,14 +133,11 @@ interface DealsTableProps {
     columns: DealColumn[];
     tableColumns: Pick<ReturnType<typeof useTableColumns<DealColumn>>, "getWidth" | "resize" | "reorderVisible">;
     loading: boolean;
-    loadingMore: boolean;
     failed: boolean;
     error: unknown;
     onRetry: () => void;
     retrying: boolean;
     filtered: boolean;
-    hasMore: boolean;
-    onLoadMore: () => void;
     selectable: boolean;
     selected: Set<number>;
     onSelect: (selected: Set<number>) => void;
@@ -154,30 +150,17 @@ export default function DealsTable({
     columns,
     tableColumns,
     loading,
-    loadingMore,
     failed,
     error,
     onRetry,
     retrying,
     filtered,
-    hasMore,
-    onLoadMore,
     selectable,
     selected,
     onSelect,
     onOpen,
     onCreate,
 }: DealsTableProps) {
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const bottom = bottomRef.current;
-        if (!bottom || !hasMore || loadingMore) return;
-
-        const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && onLoadMore());
-        observer.observe(bottom);
-        return () => observer.disconnect();
-    }, [hasMore, loadingMore, onLoadMore]);
 
     const allSelected = deals.length > 0 && deals.every((deal) => selected.has(deal.id));
     const colSpan = columns.length + 3;
@@ -266,7 +249,7 @@ export default function DealsTable({
                         );
                     })}
 
-                    {(loading || loadingMore) && <SkeletonRows colSpan={colSpan} />}
+                    {loading && <SkeletonRows colSpan={colSpan} />}
 
                     {onCreate && !loading && (
                         <tr>
@@ -299,7 +282,6 @@ export default function DealsTable({
                 </div>
             )}
 
-            <div ref={bottomRef} className="h-px" />
         </>
     );
 }

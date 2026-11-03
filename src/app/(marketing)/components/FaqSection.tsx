@@ -8,11 +8,24 @@ import { IconMinus, IconPlus } from "@tabler/icons-react";
 import { Accent, CONTAINER, Eyebrow, Heading } from "./Eyebrow";
 import { Button } from "./Button";
 import { DashArt, blobs } from "./DashArt";
+import { Orb } from "./Orb";
 
 const FAQS = [
     {
         q: "Can my whole team work in one workspace?",
         a: "Yes. Invite your team, give each person a role, and everyone works from the same leads, deals and contacts. No per-person silos.",
+    },
+    {
+        q: "Can I bring in my existing spreadsheet?",
+        a: "Yes. Upload a CSV of your leads and Flash guesses which column is which, including your custom fields; fix any guess it gets wrong. The import runs in the background, skips anyone who's already an open lead, and lists any rows it couldn't add.",
+    },
+    {
+        q: "What if the same customer gets in touch twice?",
+        a: "Flash keeps one open lead per person, matched on phone number or email. Adding them again by hand or by import is stopped, and a second web form enquiry fills in their existing lead instead of making a new one.",
+    },
+    {
+        q: "Will my team know when something needs them?",
+        a: "Yes. People are notified when a lead, deal or task is assigned to them, when they're added to a meeting and when someone @mentions them. Calls and meetings also get a reminder 10 minutes before.",
     },
     {
         q: "Can I change the fields and pipeline stages?",
@@ -21,10 +34,6 @@ const FAQS = [
     {
         q: "How do permissions work?",
         a: "Every role is built from permissions to view, create, edit, delete and assign, so an agent can be limited to their own leads while a manager sees everything.",
-    },
-    {
-        q: "Can the team leave notes and loop each other in?",
-        a: "Every record has a notes thread with @mentions, and a Notes page shows everything tagged to you or written by you.",
     },
     {
         q: "Is there a history of what happened on a record?",
@@ -49,6 +58,8 @@ const CLOUDS = blobs([
 
 export function FaqSection({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel: string }) {
     const [open, setOpen] = useState<number | null>(null);
+    // the orb beside the heading stirs whenever a question is opened
+    const energy = useRef(0);
 
     return (
         <section id="faq" data-scheme="dark" data-reveal className="relative overflow-clip bg-[#1c1c1c] py-30">
@@ -58,6 +69,8 @@ export function FaqSection({ primaryHref, primaryLabel }: { primaryHref: string;
                 sample={CLOUDS}
                 className="pointer-events-none absolute top-0 right-0 hidden text-[#4a38f5]/45 min-[921px]:block"
             />
+            {/* lilac and white, so it stands out from the violet clouds behind it */}
+            <Orb energy={energy} color="#8f84ff" glow="#ffffff" className="absolute top-10 right-[8%] hidden size-90 min-[921px]:block" />
 
             <div className={`${CONTAINER} relative`}>
                 <Eyebrow dark>Any questions?</Eyebrow>
@@ -80,7 +93,10 @@ export function FaqSection({ primaryHref, primaryLabel }: { primaryHref: string;
                             question={item.q}
                             answer={item.a}
                             isOpen={open === index}
-                            onToggle={() => setOpen(open === index ? null : index)}
+                            onToggle={() => {
+                                setOpen(open === index ? null : index);
+                                energy.current = 1;
+                            }}
                         />
                     ))}
                 </ul>

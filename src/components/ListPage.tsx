@@ -9,6 +9,7 @@ import {
     IconCalendar,
     IconCheck,
     IconChevronDown,
+    IconChevronLeft,
     IconChevronRight,
     IconDownload,
     IconHash,
@@ -32,7 +33,7 @@ import { Spinner } from "./Loader";
 import { toQueryParams } from "@/lib/api/client";
 import { Modal } from "./Modal";
 import { SidePanel } from "./SidePanel";
-import type { SelectOption } from "./Select";
+import { Select, type SelectOption } from "./Select";
 
 /**
  * Shared chrome for an entity list page (Leads, Deals, ...): header, view
@@ -105,6 +106,55 @@ export function ExportButton({ endpoint, filters }: { endpoint: string; filters:
             <IconDownload size={14} />
             Export
         </a>
+    );
+}
+
+// The bar under a list: how many rows a page shows, which rows these are, and the way to the
+// next and previous page. `page` and `size` come from usePaging (kept in the URL).
+export function Pagination({
+    page,
+    size,
+    total,
+    sizes,
+    onPage,
+    onSize,
+}: {
+    page: number;
+    size: number;
+    total: number | undefined;
+    sizes: readonly number[];
+    onPage: (page: number) => void;
+    onSize: (size: number) => void;
+}) {
+    const count = total ?? 0;
+    const pages = Math.max(1, Math.ceil(count / size));
+    const first = count === 0 ? 0 : (page - 1) * size + 1;
+    const last = Math.min(page * size, count);
+    const arrow = "flex size-7 items-center justify-center rounded-lg text-muted hover:bg-fill hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
+
+    return (
+        <div className="flex h-10 shrink-0 items-center gap-3 border-t border-line-light bg-surface px-3 text-sm text-muted">
+            <span className="flex items-center gap-2">
+                <span className="hidden sm:inline">Rows per page</span>
+                <span className="w-18">
+                    <Select value={String(size)} onChange={(value) => value && onSize(Number(value))} options={sizes.map((option) => ({ value: String(option), label: String(option) }))} placeholder="50" />
+                </span>
+            </span>
+            <span className="ml-auto tabular-nums">
+                {total === undefined ? "…" : `${first.toLocaleString()}–${last.toLocaleString()} of ${count.toLocaleString()}`}
+            </span>
+            <span className="flex items-center gap-1">
+                <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} className={arrow}>
+                    <IconChevronLeft size={15} />
+                </button>
+                <span className="tabular-nums">
+                    Page {Math.min(page, pages).toLocaleString()} of {pages.toLocaleString()}
+                </span>
+                <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)} className={arrow}>
+                    <IconChevronRight size={15} />
+                </button>
+            </span>
+        </div>
     );
 }
 
@@ -267,7 +317,8 @@ export function BulkBar({
     if (count === 0) return null;
 
     return (
-        <div className="fixed bottom-6 left-1/2 z-30 flex h-10 -translate-x-1/2 items-center gap-1 rounded-lg border border-line bg-surface px-1.5 font-medium text-muted shadow-strong">
+        // on a phone it scrolls sideways rather than running off the screen
+        <div className="fixed bottom-6 left-1/2 z-30 flex h-10 max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-line bg-surface px-1.5 font-medium text-muted shadow-strong [&>*]:shrink-0">
             <span className="px-2 text-ink">{count} selected</span>
             <span className="h-4 w-px bg-line" />
 

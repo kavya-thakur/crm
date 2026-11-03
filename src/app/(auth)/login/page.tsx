@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -111,6 +111,24 @@ export default function LoginPage() {
                 </button>
             </form>
 
+            {/* One click into the demo workspace, no sign-up (see /api/auth/demo) */}
+            <div className="mt-8">
+                <p className="flex items-center gap-3 text-[13px] text-[#1c1c1c]/45 before:h-px before:flex-1 before:bg-[#1c1c1c]/10 after:h-px after:flex-1 after:bg-[#1c1c1c]/10">
+                    or explore the live demo
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                    <a href="/api/auth/demo?as=manager" className="flex h-11 flex-col items-center justify-center rounded-xl border border-[#1c1c1c]/10 text-[14px] font-medium text-[#1c1c1c] transition-colors hover:border-[#4a38f5] hover:bg-[#4a38f5]/5">
+                        As a manager
+                    </a>
+                    <a href="/api/auth/demo?as=agent" className="flex h-11 flex-col items-center justify-center rounded-xl border border-[#1c1c1c]/10 text-[14px] font-medium text-[#1c1c1c] transition-colors hover:border-[#4a38f5] hover:bg-[#4a38f5]/5">
+                        As a sales agent
+                    </a>
+                </div>
+                <Suspense>
+                    <DemoNotice />
+                </Suspense>
+            </div>
+
             <p className="mt-8 text-center text-[14px] text-[#1c1c1c]/55">
                 New here?{" "}
                 <Link href="/register" className="font-medium text-[#4a38f5] hover:underline">
@@ -118,5 +136,17 @@ export default function LoginPage() {
                 </Link>
             </p>
         </>
+    );
+}
+
+// Why the demo didn't open, when /api/auth/demo sends someone back here
+function DemoNotice() {
+    const reason = useSearchParams().get("demo");
+    if (!reason) return null;
+
+    return (
+        <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3.5 py-2.5 text-sm text-danger">
+            {reason === "busy" ? "That's a lot of demo visits from here. Please wait a few minutes." : "The demo isn't available right now. Please try again a little later."}
+        </p>
     );
 }

@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconChevronDown, IconUserCircle } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
-import { ListHeader, ViewSwitcher } from "@/components/ListPage";
+import { ListHeader, Pagination, ViewSwitcher } from "@/components/ListPage";
 import { toast } from "@/components/Toast";
 import type { AgentOption } from "../shared/customFields";
 import { toggledStatus } from "../shared/activities";
@@ -16,8 +15,8 @@ import ActivitiesBoard from "./ActivitiesBoard";
 import ActivityPanel from "./ActivityPanel";
 import NewActivityDialog from "./NewActivityDialog";
 import { refreshActivities, type Activity, type ActivityScope, type Paginated } from "./shared";
+import { oneOf, PAGE_SIZES, usePaging, useUrlState } from "../shared/useUrlState";
 
-const PAGE_SIZE = 50;
 
 const SCOPES: { value: ActivityScope; label: string }[] = [
     { value: "upcoming", label: "Upcoming" },
@@ -28,30 +27,33 @@ const SCOPES: { value: ActivityScope; label: string }[] = [
 ];
 
 export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
-    const router = useRouter();
     const queryClient = useQueryClient();
-    const searchParams = useSearchParams();
 
-    const [view, setView] = useState<"table" | "board">("table");
-    const [scope, setScope] = useState<ActivityScope>("upcoming");
+    // Everything you've chosen here lives in the URL, so a refresh (or a shared link) keeps it:
+    // board or list, which activities, whose, and the open one (?open=12)
+    const page = useUrlState();
+    const view = page.get("view") === "table" ? "table" : "board";
+    const setView = (next: "table" | "board") => page.set({ view: next === "board" ? null : next });
+    const scope = oneOf(page.get("scope"), SCOPES.map((item) => item.value), "upcoming");
+    const setScope = (next: ActivityScope) => page.set({ page: null, scope: next === "upcoming" ? null : next });
     // your own schedule (assigned to you or tagged on) is what you usually want; switch it to see the team's
-    const [mineOnly, setMineOnly] = useState(true);
+    const mineOnly = page.get("whose") !== "team";
+    const setMineOnly = (mine: boolean) => page.set({ page: null, whose: mine ? null : "team" });
     const [creating, setCreating] = useState(false);
 
-    // The open activity lives in the URL, so a link from elsewhere (or a row here) lands on it
-    const openActivityId = Number(searchParams.get("open")) || null;
+    const openActivityId = Number(page.get("open")) || null;
+    const openActivity = (id: number | null) => page.set({ open: id ? String(id) : null }, "push");
 
-    const activitiesQuery = useInfiniteQuery({
-        queryKey: ["activities", "list", scope, mineOnly],
-        queryFn: ({ pageParam }) =>
+    // one page of the list at a time; which one, and its size, are in the URL (the Pagination bar)
+    const paging = usePaging();
+    const activitiesQuery = useQuery({
+        queryKey: ["activities", "list", scope, mineOnly, paging.page, paging.size],
+        queryFn: () =>
             api
                 .get<Paginated<Activity>>("/activities", {
-                    params: { scope, assignedTo: mineOnly ? "me" : undefined, page: pageParam, limit: PAGE_SIZE },
+                    params: { scope, assignedTo: mineOnly ? "me" : undefined, page: paging.page, limit: paging.size },
                 })
                 .then((res) => res.data),
-        initialPageParam: 1,
-        getNextPageParam: ({ pagination }) =>
-            pagination.page < pagination.totalPages ? pagination.page + 1 : undefined,
         placeholderData: keepPreviousData,
     });
 
@@ -80,8 +82,8 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
         onError: (error) => toast.error(errorMessage(error)),
     });
 
-    const activities = activitiesQuery.data?.pages.flatMap((page) => page.data) ?? [];
-    const total = activitiesQuery.data?.pages[0]?.pagination.total;
+    const activities = activitiesQuery.data?.data ?? [];
+    const total = activitiesQuery.data?.pagination.total;
 
     if (creating) {
         return (
@@ -91,7 +93,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
                 onCreated={(activity) => {
                     setCreating(false);
                     refreshActivities(queryClient);
-                    router.push(`/activities?open=${activity.id}`);
+                    openActivity(activity.id);
                 }}
             />
         );
@@ -104,7 +106,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
                 key={openActivityId}
                 activityId={openActivityId}
                 agents={agents.data}
-                onClose={() => router.push("/activities")}
+                onClose={() => openActivity(null)}
             />
         );
     }
@@ -113,7 +115,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
         <div className="flex h-full flex-col">
             <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
 
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line-light px-2 font-medium text-muted">
+            <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0">
                 <ViewSwitcher view={view} onChange={setView} />
 
                 {/* the board's columns already split activities by status, so these are table-only */}
@@ -160,7 +162,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
                     <ActivitiesBoard
                         mineOnly={mineOnly}
                         agents={seeAgents ? agents.data : undefined}
-                        onOpen={(id) => router.push(`/activities?open=${id}`)}
+                        onOpen={openActivity}
                         onCreate={() => setCreating(true)}
                     />
                 ) : (
@@ -172,16 +174,16 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
                         failed={activitiesQuery.isError}
                         error={activitiesQuery.error}
                         onRetry={() => activitiesQuery.refetch()}
-                        hasMore={activitiesQuery.hasNextPage}
-                        loadingMore={activitiesQuery.isFetchingNextPage}
-                        onLoadMore={activitiesQuery.fetchNextPage}
                         onToggle={(activity) => updateActivity.mutate({ id: activity.id, changes: { status: toggledStatus(activity.status) } })}
                         onUpdate={(activity, changes) => updateActivity.mutate({ id: activity.id, changes })}
-                        onOpen={(id) => router.push(`/activities?open=${id}`)}
+                        onOpen={openActivity}
                         onCreate={() => setCreating(true)}
                     />
                 )}
             </div>
+
+            {/* which page of the list, and how many rows a page */}
+            {view === "table" && <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />}
         </div>
     );
 }

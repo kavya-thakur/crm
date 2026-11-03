@@ -16,7 +16,8 @@ export const LEAD_IMPORT_FIELDS = [
     { id: "email", label: "Email", required: false, guesses: ["email", "emailaddress", "emailid", "mail"] },
     { id: "company", label: "Company", required: false, guesses: ["company", "companyname", "organisation", "organization", "business", "firm", "account"] },
     { id: "stage", label: "Stage", required: false, guesses: ["stage", "status", "leadstatus", "leadstage"] },
-    { id: "source", label: "Source", required: false, guesses: ["source", "leadsource", "channel", "utmsource", "campaign"] },
+    { id: "source", label: "Source", required: false, guesses: ["source", "leadsource", "channel", "utmsource"] },
+    { id: "campaign", label: "Campaign", required: false, guesses: ["campaign", "utmcampaign", "campaignname", "adcampaign"] },
     { id: "owner", label: "Assigned to", required: false, guesses: ["owner", "assignedto", "assignee", "agent", "salesrep", "rep", "salesperson", "leadowner"] },
     { id: "note", label: "Note", required: false, guesses: ["note", "notes", "comment", "comments", "remark", "remarks", "message", "description"] },
 ] as const;
