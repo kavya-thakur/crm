@@ -84,6 +84,11 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Campaign tracking (UTM tags)**: `?utm_campaign=…` on the link to a form's page (or the
       site page an embedded form sits on) is saved on the lead; shown on the lead, as a list
       column and in exports; the dashboard shows each campaign's leads, conversions and revenue won
+- [x] **Lead integrations (webhooks)**: a private link per tool (Google Ads lead forms, IndiaMART,
+      Facebook/Typeform/Sheets via Zapier, Make or Pabbly, or any code); leads go through the same
+      rules as web forms; a log of what arrived and why anything was rejected; test button; new
+      link on demand. See [INTEGRATIONS.md](INTEGRATIONS.md)
+- [x] `/api/health` for the host's health check and a free uptime ping (keeps a sleeping free server awake)
 - [x] **Lost reasons** asked when anything moves to a lost stage
 - [x] **Duplicates**: one open lead per person (enforced), warning while typing, "possible
       duplicates" filter, **merge** for leads and deals
@@ -108,6 +113,14 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Reminders** 10 minutes before calls and meetings, and a **popup in the middle of the
       screen at the start time** on any page (chime; mark done, reschedule, open)
 - [x] **Reschedule** an activity: the When pencil in the list and on board cards, or one click in its panel and the start-time popup (in 10/30/60 minutes, tomorrow same time, or any time)
+
+### Automations
+- [x] **When → If → Then rules** on every new lead (by hand, web form or integration): conditions on
+      source, where it came in, campaign, owner or any custom field; actions: assign (one person or
+      taking turns), send an email template, add a task. Run in the background, in order, with a
+      log of what each rule did. See [AUTOMATIONS.md](AUTOMATIONS.md)
+- [x] Safe by design: never runs twice for one lead (retries), rules can't trigger rules, imports
+      don't trigger them, a broken step stops with a clear reason
 
 ### Email
 - [x] **Email from a lead or deal** (its Emails tab): sent through a queue over free SMTP (Gmail),
@@ -141,10 +154,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 
 1. **Speed-to-lead rule**: alert the owner (then their manager) if a new lead isn't contacted in X hours (a delayed job)
 2. **Booking link**: a public page where a visitor picks a free slot → lead + meeting
-3. Webhooks / API keys for integrations
-4. Products & quotes on deals
-5. README for the repo, and deployment (Railway/Render, since the custom server needs a long-running Node process)
-6. Presence ("Priya is viewing this lead"), email for missed notifications
+3. Products & quotes on deals
+4. README for the repo, and deployment (Railway/Render, since the custom server needs a long-running Node process)
+5. Presence ("Priya is viewing this lead"), email for missed notifications
 
 Known gaps: moving lost leads back to open **in bulk** doesn't check for duplicates yet;
 11 old lint errors remain (none in new code).
@@ -158,6 +170,14 @@ Newest first. The reason matters more than the choice.
 | Date | Decision | Why |
 |---|---|---|
 | 2026-11-03 | **Lenis** smooth scrolling on the marketing pages (not GSAP's ScrollSmoother) | a mouse wheel jumps ~100px a notch, so scroll-linked text animations stepped; Lenis keeps native scrolling, so `position: sticky` (nav, quote, steps) still works, which ScrollSmoother breaks |
+| 2026-11-03 | Automations run from a **queue after the save**, and only if the workspace has a rule | saving a lead never waits on or fails because of a rule; no jobs at all for workspaces without rules |
+| 2026-11-03 | **One run per rule per lead**, claimed with a unique row before acting | BullMQ retries a failed job; without this a retry would send a second email |
+| 2026-11-03 | **Actions don't trigger rules**; **imports don't trigger rules** (for now) | no loops between rules; a big import can't send thousands of emails by surprise |
+| 2026-11-03 | Rule conditions and actions as **JSON checked by Zod**, not tables per action | a new action type needs no migration; same approach as web form settings |
+| 2026-11-03 | **Campaign and Lost reason columns hidden by default** (turn on in Options) | empty for most records; the data still feeds the dashboard. A column added later starts hidden for people with saved column settings too |
+| 2026-11-03 | A new integration gets a **source of its own name**, created if missing; a new web form starts as "Website" | its leads are told apart in filters and on the source card from the first lead, with no setup step |
+| 2026-11-03 | A lead integration is a **`LeadForm` with `kind = WEBHOOK`**, not a new model | the same source, owner, rotation and capture rules for free; only the payload reader and a delivery log are new |
+| 2026-11-03 | One webhook that **reads many payload shapes** (plain JSON, Google Ads, IndiaMART) instead of a connector per tool | one small feature covers dozens of tools through Zapier/Make/Pabbly; field names matched like the CSV import |
 | 2026-11-03 | Email over **SMTP via Nodemailer**, from **one Gmail account** with Reply-To = the sender | free with no domain, lands in inboxes; switching to Resend/Brevo is only .env; per-user Gmail sign-in (OAuth) needs Google's app review |
 | 2026-11-03 | Emails are **queued** (BullMQ), placeholders filled **in the browser** | sending never makes anyone wait and retries itself; the sender sees and can edit the exact text before it goes |
 | 2026-11-03 | **View, filters and the open record live in the URL**, not page memory or browser storage | they survive a refresh, Back works, links can be shared, and the server sees them too (no flash of the wrong view) |

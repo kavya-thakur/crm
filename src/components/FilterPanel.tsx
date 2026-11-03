@@ -45,6 +45,8 @@ export interface ColumnDef {
     label: string;
     /** starting pixel width for a resizable table column; ignored elsewhere */
     width?: number;
+    /** off until someone turns it on in Options: a column that's empty for most records */
+    hiddenByDefault?: boolean;
 }
 
 interface StoredColumnPrefs {
@@ -52,9 +54,9 @@ interface StoredColumnPrefs {
     hidden: string[];
 }
 
-export function useColumnPrefs(storageKey: string, defaultOrder: string[]) {
+export function useColumnPrefs(storageKey: string, defaultOrder: string[], defaultHidden: string[] = []) {
     const [order, setOrder] = useState(defaultOrder);
-    const [hidden, setHidden] = useState<Set<string>>(new Set());
+    const [hidden, setHidden] = useState<Set<string>>(new Set(defaultHidden));
 
     // Re-reads whenever the *set* of known keys changes (sorted+joined so the
     // array's reference changing every render doesn't matter) — not just once
@@ -64,7 +66,7 @@ export function useColumnPrefs(storageKey: string, defaultOrder: string[]) {
 
     useEffect(() => {
         let nextOrder = defaultOrder;
-        let nextHidden = new Set<string>();
+        let nextHidden = new Set(defaultHidden);
 
         try {
             const raw = localStorage.getItem(storageKey);
@@ -75,7 +77,11 @@ export function useColumnPrefs(storageKey: string, defaultOrder: string[]) {
                 const missing = defaultOrder.filter((key) => !knownOrder.includes(key));
 
                 nextOrder = [...knownOrder, ...missing];
-                nextHidden = new Set((saved.hidden ?? []).filter((key) => defaultOrder.includes(key)));
+                // a column added since these were saved starts the way it would for anyone new
+                nextHidden = new Set([
+                    ...(saved.hidden ?? []).filter((key) => defaultOrder.includes(key)),
+                    ...missing.filter((key) => defaultHidden.includes(key)),
+                ]);
             }
         } catch {
             // corrupt or blocked storage: fall back to the defaults set above
@@ -121,7 +127,11 @@ const MIN_COLUMN_WIDTH = 80;
 // kept in a separate storage key from order/hidden so the two never clobber
 // each other on write.
 export function useTableColumns<TColumn extends ColumnDef>(storageKey: string, columns: TColumn[]) {
-    const columnPrefs = useColumnPrefs(storageKey, columns.map((column) => column.key));
+    const columnPrefs = useColumnPrefs(
+        storageKey,
+        columns.map((column) => column.key),
+        columns.filter((column) => column.hiddenByDefault).map((column) => column.key),
+    );
     const widthsKey = `${storageKey}-widths`;
     const [widths, setWidths] = useState<Record<string, number>>({});
 

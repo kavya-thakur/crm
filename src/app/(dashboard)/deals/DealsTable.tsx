@@ -68,7 +68,7 @@ export const DEAL_COLUMNS: DealColumn[] = [
         key: "expectedCloseDate", label: "Expected close", icon: IconCalendar, width: 170,
         cell: (deal) => deal.expectedCloseDate ? <span className="text-muted">{formatDate(deal.expectedCloseDate)}</span> : <span className="text-light">Empty</span>,
     },
-    { key: "lostReason", label: "Lost reason", icon: IconThumbDown, width: 180, cell: (deal) => deal.pipelineStage.isLost && deal.lostReason },
+    { key: "lostReason", label: "Lost reason", icon: IconThumbDown, width: 180, hiddenByDefault: true, cell: (deal) => deal.pipelineStage.isLost && deal.lostReason },
     ...peopleColumns<Deal>(),
 ];
 

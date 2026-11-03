@@ -111,6 +111,7 @@ async function removeOldDemo() {
     // things visitors may have added since the last build
     await prisma.leadForm.deleteMany({ where: { organizationId } });
     await prisma.emailTemplate.deleteMany({ where: { organizationId } });
+    await prisma.automationRule.deleteMany({ where: { organizationId } });
     await prisma.company.deleteMany({ where: { organizationId } });
     await prisma.customFieldDefinition.deleteMany({ where: { organizationId } });
     await prisma.pipelineStage.deleteMany({ where: { organizationId } });
@@ -352,6 +353,24 @@ export async function buildDemoWorkspace() {
     // --- Email templates, and emails already sent to the newest leads: most delivered, about half
     // of those opened, so the Emails tab shows every state. (The demo never sends real email.) ---
     await prisma.emailTemplate.createMany({ data: STARTER_TEMPLATES.map((template) => ({ ...org, ...template })) });
+
+    // An automation visitors can watch work: add a lead with the Website source, and a few
+    // seconds later it has the "First reply" email (marked not delivered) and a call task
+    const firstReply = await prisma.emailTemplate.findFirstOrThrow({ where: { ...org, name: STARTER_TEMPLATES[0].name } });
+    const website = sources.find((source) => source.name === "Website") ?? sources[0];
+    await prisma.automationRule.create({
+        data: {
+            ...org,
+            name: "Website leads: reply and call",
+            trigger: "lead.created",
+            conditions: [{ field: "source", op: "is", value: String(website.id) }],
+            actions: [
+                { type: "email", templateId: firstReply.id },
+                { type: "task", title: "Call {{lead.firstName}}", dueInDays: 0, priority: "HIGH" },
+            ],
+            createdById: manager.id,
+        },
+    });
     const emailedLeads = await prisma.lead.findMany({
         where: { ...org, email: { not: null } },
         orderBy: { createdAt: "desc" },

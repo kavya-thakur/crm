@@ -3,6 +3,8 @@ import { dbIdSchema, hasAnyField, requiredText } from "./common";
 
 export const createLeadFormSchema = z.object({
     name: requiredText(100),
+    // a web form, or a lead integration (another tool posting leads to its webhook)
+    kind: z.enum(["FORM", "WEBHOOK"]).default("FORM"),
 });
 
 // How a built-in field shows on the form. Name and phone are always asked (every lead and
@@ -64,5 +66,7 @@ export const updateLeadFormSchema = z
         assigneeIds: z.array(dbIdSchema).max(50).optional(),
         // the form builder saves the whole set at once
         settings: leadFormSettingsSchema.optional(),
+        // a fresh secret key, so the old address stops working (it leaked, or a tool was removed)
+        newKey: z.literal(true).optional(),
     })
     .refine(hasAnyField, "Provide at least one field to update");

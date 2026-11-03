@@ -11,15 +11,15 @@ export const MAX_IMPORT_ROWS = 50_000;
  * custom fields can be targets too, as "cf:<key>".
  */
 export const LEAD_IMPORT_FIELDS = [
-    { id: "name", label: "Name", required: true, guesses: ["name", "fullname", "leadname", "contactname", "customer", "customername", "lead", "person"] },
-    { id: "phone", label: "Phone", required: true, guesses: ["phone", "mobile", "mobileno", "mobilenumber", "phonenumber", "phoneno", "contactnumber", "contactno", "whatsapp", "cell", "tel"] },
-    { id: "email", label: "Email", required: false, guesses: ["email", "emailaddress", "emailid", "mail"] },
-    { id: "company", label: "Company", required: false, guesses: ["company", "companyname", "organisation", "organization", "business", "firm", "account"] },
+    { id: "name", label: "Name", required: true, guesses: ["name", "fullname", "leadname", "contactname", "customer", "customername", "lead", "person", "sendername"] },
+    { id: "phone", label: "Phone", required: true, guesses: ["phone", "mobile", "mobileno", "mobilenumber", "phonenumber", "phoneno", "contactnumber", "contactno", "whatsapp", "cell", "tel", "sendermobile", "workphone"] },
+    { id: "email", label: "Email", required: false, guesses: ["email", "emailaddress", "emailid", "mail", "senderemail", "workemail"] },
+    { id: "company", label: "Company", required: false, guesses: ["company", "companyname", "organisation", "organization", "business", "firm", "account", "sendercompany"] },
     { id: "stage", label: "Stage", required: false, guesses: ["stage", "status", "leadstatus", "leadstage"] },
     { id: "source", label: "Source", required: false, guesses: ["source", "leadsource", "channel", "utmsource"] },
     { id: "campaign", label: "Campaign", required: false, guesses: ["campaign", "utmcampaign", "campaignname", "adcampaign"] },
     { id: "owner", label: "Assigned to", required: false, guesses: ["owner", "assignedto", "assignee", "agent", "salesrep", "rep", "salesperson", "leadowner"] },
-    { id: "note", label: "Note", required: false, guesses: ["note", "notes", "comment", "comments", "remark", "remarks", "message", "description"] },
+    { id: "note", label: "Note", required: false, guesses: ["note", "notes", "comment", "comments", "remark", "remarks", "message", "description", "querymessage", "enquiry", "requirement"] },
 ] as const;
 
 export type LeadImportField = (typeof LEAD_IMPORT_FIELDS)[number]["id"];

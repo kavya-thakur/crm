@@ -17,8 +17,10 @@ import { readFormSettings } from "@/lib/validations/leadForms";
 import { useCustomFields, type AgentOption, type CustomFieldDef } from "../../shared/customFields";
 import { embedHtml, FormBuilder } from "./FormBuilder";
 
-interface LeadForm {
+export interface LeadForm {
     id: number;
+    // FORM = a web form; WEBHOOK = a lead integration (Settings > Lead integrations)
+    kind: "FORM" | "WEBHOOK";
     name: string;
     key: string;
     source: { id: number; name: string; color: string } | null;
@@ -29,7 +31,7 @@ interface LeadForm {
     settings: unknown;
 }
 
-interface LeadSource {
+export interface LeadSource {
     id: number;
     name: string;
     color: string;
@@ -121,14 +123,14 @@ export default function LeadFormsView({ seeAgents }: { seeAgents: boolean }) {
                     {formsQuery.isError && (
                         <ErrorState title="Couldn't load web forms" error={formsQuery.error} onRetry={() => formsQuery.refetch()} retrying={formsQuery.isFetching} />
                     )}
-                    {formsQuery.data?.length === 0 && (
+                    {formsQuery.data?.every((form) => form.kind !== "FORM") && (
                         <p className="mt-4 rounded-xl border border-dashed border-line-strong px-4 py-10 text-center text-faint">
                             No forms yet. Create one above, then paste it into your website.
                         </p>
                     )}
 
                     <div className="mt-4 flex flex-col gap-4">
-                        {formsQuery.data?.map((form) => (
+                        {formsQuery.data?.filter((form) => form.kind === "FORM").map((form) => (
                             <FormCard key={form.id} form={form} sources={sourcesQuery.data ?? []} agents={agentsQuery.data} definitions={customFieldsQuery.data ?? []} />
                         ))}
                     </div>
@@ -145,8 +147,6 @@ function FormCard({ form, sources, agents, definitions }: { form: LeadForm; sour
     const [showHtml, setShowHtml] = useState(false);
     const settings = readFormSettings(form.settings);
     const html = embedHtml(`${window.location.origin}/api/public/forms/${form.key}`, settings, form.name, definitions);
-    // "Take turns" is picked first, then the people; shown while there's a rotation
-    const [rotating, setRotating] = useState(form.assigneeIds.length > 0);
     // shown only after the list has loaded in the browser, so window is always there
     const endpoint = `${window.location.origin}/api/public/forms/${form.key}`;
     const pageUrl = `${window.location.origin}/f/${form.key}`;
@@ -205,57 +205,7 @@ function FormCard({ form, sources, agents, definitions }: { form: LeadForm; sour
                 </button>
             </div>
 
-            <div className="mt-3 grid gap-3 px-2 sm:grid-cols-2">
-                <div>
-                    <p className="mb-1 text-sm font-medium text-muted">Tag new leads as</p>
-                    <Select
-                        value={form.source ? String(form.source.id) : "none"}
-                        onChange={(value) => update.mutate({ sourceId: value && value !== "none" ? Number(value) : null })}
-                        placeholder="No source"
-                        options={[
-                            { value: "none", label: "No source" },
-                            ...sources.map((source) => ({ value: String(source.id), label: source.name, render: <StageBadge name={source.name} color={source.color} /> })),
-                        ]}
-                    />
-                </div>
-                <div>
-                    <p className="mb-1 text-sm font-medium text-muted">Give them to</p>
-                    {agents ? (
-                        <Select
-                            value={rotating ? "rotate" : form.owner ? String(form.owner.id) : "none"}
-                            onChange={(value) => {
-                                // the people who take turns are picked just below
-                                if (value === "rotate") return setRotating(true);
-                                setRotating(false);
-                                update.mutate({ ownerId: value && value !== "none" ? Number(value) : null, assigneeIds: [] });
-                            }}
-                            placeholder="Nobody"
-                            options={[
-                                { value: "none", label: "Nobody (leave unassigned)" },
-                                { value: "rotate", label: "Take turns between people…" },
-                                ...agents.map((agent) => ({ value: String(agent.id), label: agent.name })),
-                            ]}
-                        />
-                    ) : (
-                        <p className="flex h-8 items-center text-ink">
-                            {form.assigneeIds.length > 0 ? `Shared between ${form.assigneeIds.length} people` : (form.owner?.name ?? "Nobody (unassigned)")}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {agents && rotating && (
-                <div className="mt-3 px-2">
-                    <p className="mb-1 text-sm font-medium text-muted">Taking turns</p>
-                    <MultiSelect
-                        values={form.assigneeIds.map(String)}
-                        onChange={(values) => update.mutate({ assigneeIds: values.map(Number) })}
-                        options={agents.map((agent) => ({ value: String(agent.id), label: agent.name }))}
-                        placeholder="Pick who shares the leads"
-                    />
-                    <p className="mt-1 text-sm text-faint">Each new lead goes to the next person here, in order, so everyone gets the same share.</p>
-                </div>
-            )}
+            <LeadRouting form={form} sources={sources} agents={agents} onChange={(changes) => update.mutate(changes)} />
 
             {/* the hosted page: share it anywhere, no website needed */}
             <div className="mt-4 px-2">
@@ -334,7 +284,82 @@ function FormCard({ form, sources, agents, definitions }: { form: LeadForm; sour
     );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+/**
+ * Where a form's or integration's leads go: the source they're tagged with, and who gets
+ * them (one person, nobody, or people taking turns). Shared by web forms and lead integrations.
+ */
+export function LeadRouting({
+    form,
+    sources,
+    agents,
+    onChange,
+}: {
+    form: LeadForm;
+    sources: LeadSource[];
+    agents?: AgentOption[];
+    onChange: (changes: Record<string, unknown>) => void;
+}) {
+    // "Take turns" is picked first, then the people; shown while there's a rotation
+    const [rotating, setRotating] = useState(form.assigneeIds.length > 0);
+
+    return (
+        <>
+            <div className="mt-3 grid gap-3 px-2 sm:grid-cols-2">
+                <div>
+                    <p className="mb-1 text-sm font-medium text-muted">Tag new leads as</p>
+                    <Select
+                        value={form.source ? String(form.source.id) : "none"}
+                        onChange={(value) => onChange({ sourceId: value && value !== "none" ? Number(value) : null })}
+                        placeholder="No source"
+                        options={[
+                            { value: "none", label: "No source" },
+                            ...sources.map((source) => ({ value: String(source.id), label: source.name, render: <StageBadge name={source.name} color={source.color} /> })),
+                        ]}
+                    />
+                </div>
+                <div>
+                    <p className="mb-1 text-sm font-medium text-muted">Give them to</p>
+                    {agents ? (
+                        <Select
+                            value={rotating ? "rotate" : form.owner ? String(form.owner.id) : "none"}
+                            onChange={(value) => {
+                                // the people who take turns are picked just below
+                                if (value === "rotate") return setRotating(true);
+                                setRotating(false);
+                                onChange({ ownerId: value && value !== "none" ? Number(value) : null, assigneeIds: [] });
+                            }}
+                            placeholder="Nobody"
+                            options={[
+                                { value: "none", label: "Nobody (leave unassigned)" },
+                                { value: "rotate", label: "Take turns between people…" },
+                                ...agents.map((agent) => ({ value: String(agent.id), label: agent.name })),
+                            ]}
+                        />
+                    ) : (
+                        <p className="flex h-8 items-center text-ink">
+                            {form.assigneeIds.length > 0 ? `Shared between ${form.assigneeIds.length} people` : (form.owner?.name ?? "Nobody (unassigned)")}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {agents && rotating && (
+                <div className="mt-3 px-2">
+                    <p className="mb-1 text-sm font-medium text-muted">Taking turns</p>
+                    <MultiSelect
+                        values={form.assigneeIds.map(String)}
+                        onChange={(values) => onChange({ assigneeIds: values.map(Number) })}
+                        options={agents.map((agent) => ({ value: String(agent.id), label: agent.name }))}
+                        placeholder="Pick who shares the leads"
+                    />
+                    <p className="mt-1 text-sm text-faint">Each new lead goes to the next person here, in order, so everyone gets the same share.</p>
+                </div>
+            )}
+        </>
+    );
+}
+
+export function CopyButton({ text, label }: { text: string; label: string }) {
     const [copied, setCopied] = useState(false);
 
     return (

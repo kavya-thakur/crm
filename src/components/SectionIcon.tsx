@@ -1,6 +1,7 @@
 import type { ComponentType, CSSProperties } from "react";
 import {
     IconAdjustmentsHorizontal,
+    IconBolt,
     IconBriefcase,
     IconCalendarEvent,
     IconCheckbox,
@@ -9,6 +10,7 @@ import {
     IconLayoutKanban,
     IconMail,
     IconNotes,
+    IconPlugConnected,
     IconShieldLock,
     IconTargetArrow,
     IconUser,
@@ -72,6 +74,8 @@ export const SECTIONS = {
     customFields: { icon: IconAdjustmentsHorizontal, ink: "grey" },
     leadForms: { icon: IconForms, ink: "grey" },
     emailTemplates: { icon: IconMail, ink: "grey" },
+    integrations: { icon: IconPlugConnected, ink: "grey" },
+    automations: { icon: IconBolt, ink: "grey" },
     // the bell's icon for emails opened or not sent
     emails: { icon: IconMail, ink: "blue" },
 } satisfies Record<string, { icon: Icon; ink: keyof typeof INKS }>;

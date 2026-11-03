@@ -198,6 +198,10 @@ cron `0 3 * * *` in Asia/Kolkata) adds a job to the `demo` queue every night, an
 queue; the worker's `sendEmail()` sends it over SMTP, and after 4 failed tries `failEmail()`
 marks it failed and tells the sender. See [EMAIL.md](EMAIL.md).
 
+**Automations** too: saving a lead adds `{ trigger, organizationId, leadId }` to the
+`automations` queue, and the worker runs the workspace's rules. A retry never repeats a rule
+for the same lead (a unique run row is claimed first). See [AUTOMATIONS.md](AUTOMATIONS.md).
+
 Good next candidates: **speed-to-lead alerts**
 (a delayed job: "in 2 hours, check whether this lead was contacted"), and moving meeting
 **reminders** from the 30-second loop to delayed jobs at the exact minute.

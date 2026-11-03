@@ -34,6 +34,8 @@ export interface DataColumn<TRecord> {
     cell: (record: TRecord) => ReactNode;
     /** lets this column be edited in place from the table, via a hover pencil */
     edit?: EditConfig<TRecord>;
+    /** off until someone turns it on in Options (empty for most records) */
+    hiddenByDefault?: boolean;
 }
 
 type Person = { id: number; name: string } | null | undefined;

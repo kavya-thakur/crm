@@ -10,7 +10,8 @@ type Props = { params: Promise<{ key: string }> };
 // The form, its workspace's name, and the lead custom fields it asks for (in its order)
 async function loadForm(key: string) {
     const form = await prisma.leadForm.findUnique({ where: { key }, include: { organization: { select: { name: true } } } });
-    if (!form) return null;
+    // a lead integration's key has no page of its own
+    if (!form || form.kind !== "FORM") return null;
 
     const settings = readFormSettings(form.settings);
     const definitions = await prisma.customFieldDefinition.findMany({

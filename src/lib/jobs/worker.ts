@@ -4,7 +4,19 @@ import { failImport, runImport } from "@/lib/jobs/leadImport";
 import { failBulkJob, runBulkJob } from "@/lib/jobs/bulkActions";
 import { buildDemoWorkspace } from "@/lib/demo/workspace";
 import { failEmail, sendEmail } from "@/lib/emails/send";
-import { BULK_QUEUE, DEMO_QUEUE, demoQueue, EMAILS_QUEUE, IMPORTS_QUEUE, type BulkJobData, type EmailJobData, type ImportJobData } from "./queues";
+import { runAutomations } from "@/lib/automations/engine";
+import {
+    AUTOMATIONS_QUEUE,
+    BULK_QUEUE,
+    DEMO_QUEUE,
+    demoQueue,
+    EMAILS_QUEUE,
+    IMPORTS_QUEUE,
+    type AutomationJobData,
+    type BulkJobData,
+    type EmailJobData,
+    type ImportJobData,
+} from "./queues";
 
 /**
  * The worker: takes jobs off the queue in Redis and runs them. Started by server.ts, so it
@@ -48,6 +60,14 @@ export function startWorkers() {
         if (job.attemptsMade >= (job.opts.attempts ?? 1)) void failEmail(job.data.emailId, error.message);
     });
 
+    // Automation rules, one event at a time per worker slot. A retry skips the rules that
+    // already ran for the event (see claimRun in the engine), so nothing is done twice.
+    const automations = new Worker<AutomationJobData>(AUTOMATIONS_QUEUE, (job) => runAutomations(job.data), {
+        connection: queueConnection("automations worker"),
+        concurrency: 2,
+    });
+    automations.on("failed", (job, error) => console.error(`Automations for lead ${job?.data.leadId} failed:`, error.message));
+
     // The demo workspace is rebuilt every night, undoing whatever visitors changed. A job
     // scheduler is BullMQ's cron: the schedule lives in Redis, so it survives restarts and runs
     // once a night however many servers there are. "upsert" means starting again doesn't add a second one.
@@ -57,5 +77,5 @@ export function startWorkers() {
         .upsertJobScheduler("nightly-demo-reset", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "reset" })
         .catch((error) => console.error("Couldn't schedule the nightly demo reset:", error.message));
 
-    return [imports, bulk, emails, demo];
+    return [imports, bulk, emails, automations, demo];
 }
