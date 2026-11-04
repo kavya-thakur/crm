@@ -9,14 +9,11 @@ import {
     IconBuilding,
     IconSpeakerphone,
     IconCalendar,
-    IconCalendarEvent,
     IconChecklist,
     IconChevronDown,
     IconClock,
-    IconFiles,
     IconForms,
     IconGitMerge,
-    IconLock,
     IconMail,
     IconMailFast,
     IconPhone,
@@ -451,16 +448,14 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                         </section>
                     </div>
 
-                    {/* Timeline, Notes, Tasks, Activities, Emails; Files and Calendar aren't built yet */}
+                    {/* Timeline, Notes, Tasks, Activities, Emails */}
                     <div className="flex min-w-0 flex-1 flex-col md:overflow-y-auto">
                         <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line-light px-4">
                             <TabButton active={tab === "timeline"} onClick={() => setTab("timeline")}>Timeline</TabButton>
                             <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Notes</TabButton>
                             <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")}>Tasks</TabButton>
                             <TabButton active={tab === "activities"} onClick={() => setTab("activities")}>Activities</TabButton>
-                            <LockedTabButton icon={IconFiles} label="Files" />
                             <TabButton active={tab === "emails"} onClick={() => setTab("emails")}>Emails</TabButton>
-                            <LockedTabButton icon={IconCalendarEvent} label="Calendar" />
                         </div>
 
                         {tab === "notes" ? (
@@ -604,17 +599,6 @@ function TabButton({ active, onClick, children }: { active?: boolean; onClick: (
         >
             {children}
         </button>
-    );
-}
-
-// A tab that needs functionality not built yet (Tasks/Notes/Files/Emails/Calendar)
-function LockedTabButton({ icon: Icon, label }: { icon: typeof IconMail; label: string }) {
-    return (
-        <span className="flex h-8 items-center gap-1 border-b-2 border-transparent px-2 text-sm text-light" title={`${label} isn't available yet`}>
-            <Icon size={14} />
-            {label}
-            <IconLock size={10} />
-        </span>
     );
 }
 

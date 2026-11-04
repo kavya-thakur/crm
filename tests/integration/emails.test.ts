@@ -69,6 +69,19 @@ describe("emails from the CRM", () => {
         expect(list.data.map((item: { subject: string }) => item.subject)).toEqual(["Hello"]);
     });
 
+    it("emails a contact too, logged on the contact's timeline", async () => {
+        const { organization, user } = await setUp(["contact:read", "contact:all"]);
+        const contact = await prisma.contact.create({ data: { organizationId: organization.id, name: "Asha Rao", email: "asha@rao.example", phone: "+91 90000 11111", assignedToId: user.id } });
+
+        const res = await sendEmailRoute(post({ contactId: contact.id, to: "asha@rao.example", subject: "Catching up", body: "Hi Asha" }));
+        expect(res.status).toBe(201);
+
+        const timeline = await prisma.contactTimeline.findMany({ where: { contactId: contact.id } });
+        expect(timeline.map((entry) => entry.message)).toEqual(["Emailed asha@rao.example: Catching up"]);
+        const list = await (await listEmails(new NextRequest(`http://localhost/api/emails?contactId=${contact.id}`))).json();
+        expect(list.data.map((item: { subject: string }) => item.subject)).toEqual(["Catching up"]);
+    });
+
     it("won't email a lead you can't see, or say what it's about twice", async () => {
         const { organization, lead } = await setUp(["lead:read"]);
         // without lead:all an agent sees only their own leads

@@ -459,6 +459,7 @@ model Contact {
   leads               Lead[]
   timeline            ContactTimeline[]
   notes               ContactNote[]
+  emails              Email[]
   scheduledActivities ScheduledActivity[]
   tasks               Task[]
 
@@ -828,16 +829,17 @@ model BulkJob {
   @@index([userId, status])
 }
 
-// One email sent from the CRM to a lead (or a deal's customer). The API saves it as QUEUED
+// One email sent from the CRM to a lead, a contact, or a deal's customer. The API saves it as QUEUED
 // and puts its id on the "emails" queue; the worker sends it over SMTP (src/lib/emails) and
 // marks it SENT or FAILED. SKIPPED = the demo workspace, which never sends real email.
 // Replies go to the sender's own inbox (Reply-To), so they aren't tracked here.
 model Email {
   id             Int       @id @default(autoincrement())
   organizationId Int
-  // what it's about: a lead or a deal (exactly one)
+  // what it's about: a lead, a deal or a contact (exactly one)
   leadId         Int?
   dealId         Int?
+  contactId      Int?
   sentById       Int?
   to             String
   subject        String
@@ -858,10 +860,12 @@ model Email {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   sentBy       User?        @relation(fields: [sentById], references: [id], onDelete: SetNull)
 
   @@index([leadId, createdAt])
   @@index([dealId, createdAt])
+  @@index([contactId, createdAt])
   @@index([organizationId])
 }
 

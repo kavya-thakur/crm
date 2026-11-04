@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    # A throwaway Postgres for the integration tests; the tests need a real database
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: crm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/crm_test
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/crm_test
+      JWT_SECRET: ci-only-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # The Prisma client isn't committed, so build it from the schema first
+      - run: npx prisma generate --config prisma7.config.ts
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy --config prisma7.config.ts
+
+      # Next.js generates some of its own types (like LayoutProps); without a build they must be made first
+      - name: Type check
+        run: npx next typegen && npx tsc --noEmit
+
+      - name: Tests
+        run: npm test

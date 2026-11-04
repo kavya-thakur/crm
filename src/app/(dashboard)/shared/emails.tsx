@@ -12,7 +12,7 @@ import { Select } from "@/components/Select";
 import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/utils/format";
 
-type EmailEntity = "lead" | "deal";
+type EmailEntity = "lead" | "deal" | "contact";
 type EmailStatus = "QUEUED" | "SENT" | "FAILED" | "SKIPPED";
 
 interface Email {
@@ -56,7 +56,8 @@ const inputClassName =
  */
 export function EmailsTab({ entity, recordId, to, values }: { entity: EmailEntity; recordId: number; to: string | null; values: TemplateValues }) {
     const [writing, setWriting] = useState(false);
-    const link = entity === "lead" ? { leadId: recordId } : { dealId: recordId };
+    // { leadId: 12 }, { dealId: 12 } or { contactId: 12 }
+    const link = { [`${entity}Id`]: recordId };
 
     const emailsQuery = useQuery({
         queryKey: ["emails", entity, recordId],
@@ -66,7 +67,7 @@ export function EmailsTab({ entity, recordId, to, values }: { entity: EmailEntit
     return (
         <div className="flex flex-col gap-3">
             {writing ? (
-                <Composer link={link} defaultTo={to ?? ""} values={values} onDone={() => setWriting(false)} />
+                <Composer entity={entity} link={link} defaultTo={to ?? ""} values={values} onDone={() => setWriting(false)} />
             ) : (
                 <button
                     type="button"
@@ -98,7 +99,19 @@ export function EmailsTab({ entity, recordId, to, values }: { entity: EmailEntit
 }
 
 // To, an optional template, subject and message; a template's placeholders are filled in as it's picked
-function Composer({ link, defaultTo, values, onDone }: { link: { leadId?: number; dealId?: number }; defaultTo: string; values: TemplateValues; onDone: () => void }) {
+function Composer({
+    entity,
+    link,
+    defaultTo,
+    values,
+    onDone,
+}: {
+    entity: EmailEntity;
+    link: Record<string, number>;
+    defaultTo: string;
+    values: TemplateValues;
+    onDone: () => void;
+}) {
     const queryClient = useQueryClient();
     const templatesQuery = useEmailTemplates();
     const [to, setTo] = useState(defaultTo);
@@ -114,7 +127,8 @@ function Composer({ link, defaultTo, values, onDone }: { link: { leadId?: number
         onSuccess: () => {
             toast.success("Sending your email");
             queryClient.invalidateQueries({ queryKey: ["emails"] });
-            queryClient.invalidateQueries({ queryKey: [link.leadId ? "lead" : "deal"] });
+            // the record's timeline shows "Emailed …" too
+            queryClient.invalidateQueries({ queryKey: [entity] });
             onDone();
         },
     });

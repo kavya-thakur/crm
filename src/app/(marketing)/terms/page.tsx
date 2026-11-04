@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LegalPage } from "../components/LegalPage";
+import { pageMetadata } from "../metadata";
 
-export const metadata: Metadata = {
-    title: "Terms of service",
-    description: "The rules for using Flash, in plain words.",
-    robots: { index: true, follow: true },
-};
+export const metadata = pageMetadata("/terms", "Terms of service", "The rules for using Flash, in plain words.");
 
 export default function TermsPage() {
     return (

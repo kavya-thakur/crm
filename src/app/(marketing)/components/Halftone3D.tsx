@@ -2,59 +2,80 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 type Part = (geometry: THREE.BufferGeometry, x?: number, y?: number, z?: number, rotateX?: number, rotateY?: number, rotateZ?: number) => THREE.Mesh;
 
 // A turned shape (like on a lathe) from a side profile: [distance from the middle, height]
 const lathe = (profile: [number, number][]) => new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 64);
 
-// A flat outline pushed out into a thin slab with softly bevelled edges
-function slab(outline: [number, number][], depth: number) {
-    const shape = new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x, y)));
-    return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 4 }).translate(0, 0, -depth / 2);
+// A little person: a round head on rounded shoulders, `size` times the usual
+function person(part: Part, x: number, y: number, z: number, size: number) {
+    const shoulders: [number, number][] = [[0, -0.32], [0.22, -0.32], [0.25, -0.08], [0.2, 0.08], [0, 0.13]];
+    return [part(new THREE.SphereGeometry(0.12 * size, 32, 16), x, y + 0.3 * size, z), part(lathe(shoulders.map(([px, py]) => [px * size, py * size])), x, y, z)];
 }
 
+// Prints a part lighter (shorter dashes, `level` 0 to 1), so what's in front of it stands out
+function dim(mesh: THREE.Mesh, level: number) {
+    mesh.userData.dim = level;
+    return mesh;
+}
+
+// A box with softly rounded edges, which catch the light
+const box = (width: number, height: number, depth: number) => new RoundedBoxGeometry(width, height, depth, 4, Math.min(width, height, depth) * 0.45);
+
 // Each object is a few simple solids put together. Round ones lean a little, so the
-// slow turn shows. Sizes don't matter, every object is scaled to fit the same box.
+// slow turn shows; flat ones (a form, a board) only sway, so they never turn edge-on. Sizes don't matter, every object is scaled to fit the same box.
 const MODELS = {
-    shield: {
-        lean: 0,
-        build: (part: Part) => [part(slab([[0, 0.5], [0.42, 0.36], [0.42, 0], [0, -0.5], [-0.42, 0], [-0.42, 0.36]], 0.22))],
-    },
-    // leads dropping into a funnel
-    funnel: {
-        lean: 0.3,
-        build: (part: Part) => {
-            const lead = new THREE.SphereGeometry(0.09, 32, 16);
-            return [part(lathe([[0.07, -0.55], [0.07, -0.15], [0.5, 0.3], [0.54, 0.36]])), part(lead, -0.18, 0.55), part(lead, 0.14, 0.75), part(lead, -0.02, 0.98)];
-        },
-    },
-    // a short stack with one coin leaning against it
-    coins: {
-        lean: 0.2,
-        build: (part: Part) => {
-            const coin = new THREE.CylinderGeometry(0.4, 0.4, 0.12, 64);
-            return [part(coin, 0, -0.3), part(coin, 0.05, -0.17), part(coin, -0.03, -0.04), part(coin, 0.03, 0.09), part(coin, 0.5, -0.02, 0.1, 0, 0, 1.25)];
-        },
-    },
-    rocket: {
-        lean: 0.45,
-        build: (part: Part) => {
-            const fin = slab([[0.15, -0.2], [0.36, -0.42], [0.36, -0.58], [0.15, -0.44]], 0.03);
-            return [
-                part(lathe([[0, 0.72], [0.1, 0.56], [0.17, 0.3], [0.19, 0], [0.18, -0.3], [0.12, -0.46], [0, -0.46]])),
-                part(new THREE.TorusGeometry(0.07, 0.022, 16, 48), 0, 0.22, 0.18),
-                part(new THREE.ConeGeometry(0.1, 0.26, 32), 0, -0.6, 0, Math.PI),
-                ...[0, 1, 2].map((index) => part(fin, 0, 0, 0, 0, (index * Math.PI * 2) / 3)),
-            ];
-        },
-    },
+    // a magnet pulling leads (three little people) in towards it
     magnet: {
         lean: 0,
+        flat: true,
         build: (part: Part) => {
             const leg = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 32);
             const tip = new THREE.CylinderGeometry(0.135, 0.135, 0.14, 32);
-            return [part(new THREE.TorusGeometry(0.3, 0.12, 32, 64, Math.PI)), part(leg, -0.3, -0.2), part(leg, 0.3, -0.2), part(tip, -0.3, -0.47), part(tip, 0.3, -0.47)];
+            return [
+                part(new THREE.TorusGeometry(0.3, 0.12, 32, 64, Math.PI), 0, 0.35),
+                part(leg, -0.3, 0.15),
+                part(leg, 0.3, 0.15),
+                part(tip, -0.3, -0.12),
+                part(tip, 0.3, -0.12),
+                // nearer ones closer to the magnet, and bigger
+                ...person(part, -0.42, -0.62, 0.1, 0.6),
+                ...person(part, 0.18, -0.9, 0.05, 0.5),
+                ...person(part, 0.62, -1.14, 0, 0.42),
+            ];
+        },
+    },
+    // an arrow that has hit the middle of a target: the deal, closed
+    target: {
+        lean: 0,
+        flat: true,
+        build: (part: Part) => {
+            // from where the arrow came in (up and to the right, towards you) to the middle
+            const along = new THREE.Vector3(0.62, 0.5, 0.75).normalize();
+            const turn = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), along));
+            const at = (distance: number) => along.clone().multiplyScalar(distance);
+            const shaft = at(0.42);
+            const fletch = at(0.8);
+            return [
+                dim(part(new THREE.CylinderGeometry(0.6, 0.6, 0.06, 96), 0, 0, -0.06, Math.PI / 2), 0.35),
+                ...[0.5, 0.34, 0.18].map((radius) => part(new THREE.TorusGeometry(radius, 0.045, 24, 96))),
+                part(new THREE.SphereGeometry(0.07, 32, 16)),
+                part(new THREE.CylinderGeometry(0.022, 0.022, 0.84, 16), shaft.x, shaft.y, shaft.z, turn.x, turn.y, turn.z),
+                part(box(0.02, 0.2, 0.14), fletch.x, fletch.y, fletch.z, turn.x, turn.y, turn.z),
+                part(box(0.14, 0.2, 0.02), fletch.x, fletch.y, fletch.z, turn.x, turn.y, turn.z),
+            ];
+        },
+    },
+    // three people, the one in the middle bigger and wearing a shield badge: roles
+    team: {
+        lean: 0,
+        flat: true,
+        build: (part: Part) => {
+            const badge = new THREE.ExtrudeGeometry(new THREE.Shape(([[0, 0.5], [0.42, 0.36], [0.42, 0], [0, -0.5], [-0.42, 0], [-0.42, 0.36]] as [number, number][]).map(([px, py]) => new THREE.Vector2(px * 0.5, py * 0.5))), { depth: 0.06, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 3 });
+            const people = [...person(part, -0.8, 0, -0.2, 0.85), ...person(part, 0.8, 0, -0.2, 0.85), ...person(part, 0, 0, 0, 1.15)];
+            return [...people.map((mesh) => dim(mesh, 0.55)), part(badge, 0, -0.14, 0.34)];
         },
     },
     // a folded paper plane: two wings and a keel
@@ -106,6 +127,13 @@ function makeModel(shape: ShapeName, material: THREE.Material) {
     };
 
     const model = new THREE.Group().add(...MODELS[shape].build(part));
+    model.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.userData.dim === undefined) return;
+        const lighter = (material as THREE.ShaderMaterial).clone();
+        lighter.uniforms = { ...(material as THREE.ShaderMaterial).uniforms, uDim: { value: mesh.userData.dim } };
+        mesh.material = lighter;
+    });
     const box = new THREE.Box3().setFromObject(model);
     const scale = 1.15 / Math.max(...box.getSize(new THREE.Vector3()).toArray());
     model.scale.setScalar(scale);
@@ -135,6 +163,7 @@ const fragmentShader = `
     uniform vec3 uLight;
     uniform float uRow;
     uniform float uCell;
+    uniform float uDim;
     varying vec3 vNormal;
     varying vec3 vPosition;
     void main() {
@@ -142,7 +171,7 @@ const fragmentShader = `
         vec3 normal = normalize(vNormal) * (gl_FrontFacing ? 1.0 : -1.0);
         float diffuse = max(dot(normal, normalize(uLight - vPosition)), 0.0);
         float rim = pow(1.0 - max(dot(normal, normalize(-vPosition)), 0.0), 2.0);
-        float tone = clamp(0.12 + diffuse + rim * 0.35, 0.0, 1.0);
+        float tone = clamp(0.12 + diffuse + rim * 0.35, 0.0, 1.0) * uDim;
 
         if (mod(gl_FragCoord.y, uRow) > uRow * 0.5) discard;
         if (tone < 0.1) discard;
@@ -181,6 +210,7 @@ export function Halftone3D({ shape, color = "#4a38f5", row = 6, className = "" }
                 uLight: { value: new THREE.Vector3(-1.5, 1.5, 3) },
                 uRow: { value: row * dpr },
                 uCell: { value: row * dpr },
+                uDim: { value: 1 },
             },
         });
         const object = new THREE.Group().add(makeModel(shape, material));
@@ -202,6 +232,7 @@ export function Halftone3D({ shape, color = "#4a38f5", row = 6, className = "" }
         let pointerY = 0;
         let spin = still ? 0 : IDLE_SPIN;
         let dragging = false;
+        let turned = 0; // how far a drag has turned a flat object from its sway
         let lastX = 0;
 
         function onDown(event: PointerEvent) {
@@ -237,9 +268,17 @@ export function Halftone3D({ shape, color = "#4a38f5", row = 6, className = "" }
             frame = requestAnimationFrame(tick);
             time += 0.016;
 
-            // after a throw, the spin eases back down to the slow idle turn
-            if (!dragging) spin += ((still ? 0 : IDLE_SPIN) - spin) * 0.03;
-            object.rotation.y += spin;
+            if ("flat" in MODELS[shape]) {
+                // a gentle sway, facing you; a drag turns it further, and it eases back
+                if (dragging) turned += spin;
+                else turned *= 0.95;
+                spin = 0;
+                object.rotation.y = 0.15 + (still ? 0 : Math.sin(time * 0.5) * 0.3) + turned;
+            } else {
+                // after a throw, the spin eases back down to the slow idle turn
+                if (!dragging) spin += ((still ? 0 : IDLE_SPIN) - spin) * 0.03;
+                object.rotation.y += spin;
+            }
 
             const bob = still ? 0 : Math.sin(time * 0.8) * 0.12;
             object.rotation.x += (pointerY * 0.7 + bob - object.rotation.x) * 0.06;
@@ -265,7 +304,11 @@ export function Halftone3D({ shape, color = "#4a38f5", row = 6, className = "" }
             box.removeEventListener("pointercancel", onUp);
             box.removeEventListener("pointerleave", onLeave);
             object.traverse((child) => (child as THREE.Mesh).geometry?.dispose());
+            // the main material and the lighter copies of it
+            object.traverse((child) => ((child as THREE.Mesh).material as THREE.Material | undefined)?.dispose());
             material.dispose();
+            // hand the WebGL context back now; browsers only allow about 16 at once
+            renderer.forceContextLoss();
             renderer.dispose();
             renderer.domElement.remove();
         };

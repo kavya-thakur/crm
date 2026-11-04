@@ -34,8 +34,17 @@ export const emailSelect = {
  * Saves an email to a lead or deal, logs it on that record's timeline, and puts it on the
  * queue for the worker to send. Used by the Emails tab and by automations.
  */
-export async function queueEmail(email: { organizationId: number; leadId?: number; dealId?: number; sentById: number; to: string; subject: string; body: string }) {
-    const { leadId, dealId, ...fields } = email;
+export async function queueEmail(email: {
+    organizationId: number;
+    leadId?: number;
+    dealId?: number;
+    contactId?: number;
+    sentById: number;
+    to: string;
+    subject: string;
+    body: string;
+}) {
+    const { leadId, dealId, contactId, ...fields } = email;
     const timeline = { create: { userId: email.sentById, type: "EMAIL_SENT", message: `Emailed ${email.to}: ${email.subject}` } };
 
     const saved = await prisma.$transaction(async (tx) => {
@@ -44,13 +53,15 @@ export async function queueEmail(email: { organizationId: number; leadId?: numbe
                 ...fields,
                 leadId: leadId ?? null,
                 dealId: dealId ?? null,
+                contactId: contactId ?? null,
                 // the open-tracking image's address: random, so nobody can mark others' emails opened
                 trackingToken: randomBytes(18).toString("base64url"),
             },
             select: emailSelect,
         });
         if (leadId) await tx.lead.update({ where: { id: leadId }, data: { timeline } });
-        else await tx.deal.update({ where: { id: dealId }, data: { timeline } });
+        else if (dealId) await tx.deal.update({ where: { id: dealId }, data: { timeline } });
+        else await tx.contact.update({ where: { id: contactId }, data: { timeline } });
         return created;
     });
 
@@ -123,8 +134,10 @@ export async function failEmail(emailId: number, reason: string) {
 }
 
 // Where an email's lead or deal opens
-export function recordLink(email: { leadId: number | null; dealId: number | null }) {
-    return email.leadId ? `/leads?open=${email.leadId}` : `/deals?open=${email.dealId}`;
+export function recordLink(email: { leadId: number | null; dealId: number | null; contactId: number | null }) {
+    if (email.leadId) return `/leads?open=${email.leadId}`;
+    if (email.dealId) return `/deals?open=${email.dealId}`;
+    return `/contacts?open=${email.contactId}`;
 }
 
 // The typed text as simple HTML: escaped, line breaks kept, and the tiny open-tracking image

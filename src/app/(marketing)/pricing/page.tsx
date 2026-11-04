@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { IconCheck, IconMinus } from "@tabler/icons-react";
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -7,12 +6,9 @@ import { PricingSection } from "../components/PricingSection";
 import { FaqSection } from "../components/FaqSection";
 import { Footer } from "../components/Footer";
 import { CONTAINER, Eyebrow } from "../components/Eyebrow";
+import { pageMetadata } from "../metadata";
 
-export const metadata: Metadata = {
-    title: "Pricing",
-    description: "Flash is free for up to 3 users. The Team plan is ₹999 per user, per month.",
-    robots: { index: true, follow: true },
-};
+export const metadata = pageMetadata("/pricing", "Pricing", "Flash is free for up to 3 users. The Team plan is ₹999 per user, per month.");
 
 // Each row: what it is, then Free / Team / Business. true = included, false = not, text = a limit
 const GROUPS: { title: string; rows: [string, ...(boolean | string)[]][] }[] = [

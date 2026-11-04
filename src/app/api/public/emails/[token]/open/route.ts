@@ -24,7 +24,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
         if (count === 1) {
             const email = await prisma.email.findUnique({
                 where: { trackingToken: token },
-                select: { organizationId: true, sentById: true, subject: true, leadId: true, dealId: true, lead: { select: { name: true } }, deal: { select: { title: true } } },
+                select: {
+                    organizationId: true,
+                    sentById: true,
+                    subject: true,
+                    leadId: true,
+                    dealId: true,
+                    contactId: true,
+                    lead: { select: { name: true } },
+                    deal: { select: { title: true } },
+                    contact: { select: { name: true } },
+                },
             });
             if (email) {
                 broadcastChange(email.organizationId, "emails");
@@ -32,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
                     organizationId: email.organizationId,
                     actorId: null,
                     type: "EMAIL_OPENED",
-                    title: `${email.lead?.name ?? email.deal?.title ?? "Someone"} opened your email`,
+                    title: `${email.lead?.name ?? email.contact?.name ?? email.deal?.title ?? "Someone"} opened your email`,
                     body: email.subject,
                     link: recordLink(email),
                 });

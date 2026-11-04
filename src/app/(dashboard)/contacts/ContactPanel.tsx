@@ -7,12 +7,9 @@ import {
     IconAddressBook,
     IconBriefcase,
     IconCalendar,
-    IconCalendarEvent,
     IconChecklist,
     IconClock,
     IconFileDescription,
-    IconFiles,
-    IconLock,
     IconMail,
     IconMailFast,
     IconPhone,
@@ -41,6 +38,7 @@ import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
+import { EmailsTab } from "../shared/emails";
 import { refreshContacts, type Agent, type Contact, type Paginated, type Permissions } from "./shared";
 
 type ContactChanges = Partial<Pick<Contact, "name" | "email" | "phone" | "jobTitle" | "description" | "customFields">>;
@@ -62,6 +60,7 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     UNASSIGNED: IconUserMinus,
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
+    EMAIL_SENT: IconMailFast,
 };
 
 interface ContactPanelProps {
@@ -76,7 +75,7 @@ interface ContactPanelProps {
 export default function ContactPanel({ contactId, can, agents, meId, onClose }: ContactPanelProps) {
     const queryClient = useQueryClient();
     const [confirmingDelete, setConfirmingDelete] = useState(false);
-    const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities">("timeline");
+    const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities" | "emails">("timeline");
 
     const contactQuery = useQuery({
         queryKey: ["contact", contactId],
@@ -327,9 +326,7 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                             <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Notes</TabButton>
                             <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")}>Tasks</TabButton>
                             <TabButton active={tab === "activities"} onClick={() => setTab("activities")}>Activities</TabButton>
-                            <LockedTabButton icon={IconFiles} label="Files" />
-                            <LockedTabButton icon={IconMailFast} label="Emails" />
-                            <LockedTabButton icon={IconCalendarEvent} label="Calendar" />
+                            <TabButton active={tab === "emails"} onClick={() => setTab("emails")}>Emails</TabButton>
                         </div>
 
                         {tab === "notes" ? (
@@ -343,6 +340,15 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                         ) : tab === "activities" ? (
                             <section className="px-4 py-4">
                                 <ActivitiesTab entity="contact" recordId={contact.id} />
+                            </section>
+                        ) : tab === "emails" ? (
+                            <section className="px-4 py-4">
+                                <EmailsTab
+                                    entity="contact"
+                                    recordId={contact.id}
+                                    to={contact.email}
+                                    values={{ "lead.firstName": contact.name.split(" ")[0], "lead.name": contact.name }}
+                                />
                             </section>
                         ) : (
                             <section className="px-4 py-4">
@@ -449,17 +455,6 @@ function TabButton({ active, onClick, children }: { active?: boolean; onClick: (
         >
             {children}
         </button>
-    );
-}
-
-// A tab that needs functionality not built yet (Tasks/Files/Emails/Calendar)
-function LockedTabButton({ icon: Icon, label }: { icon: typeof IconMail; label: string }) {
-    return (
-        <span className="flex h-8 items-center gap-1 border-b-2 border-transparent px-2 text-sm text-light" title={`${label} isn't available yet`}>
-            <Icon size={14} />
-            {label}
-            <IconLock size={10} />
-        </span>
     );
 }
 

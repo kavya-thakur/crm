@@ -8,10 +8,11 @@ const COLUMNS = [
         title: "Product",
         links: [
             { label: "Overview", href: "/product" },
-            { label: "Leads", href: "/product#leads" },
-            { label: "Deals", href: "/product#deals" },
+            { label: "Capturing leads", href: "/product#capture" },
+            { label: "Pipeline", href: "/product#pipeline" },
             { label: "Follow-ups", href: "/product#follow-ups" },
-            { label: "Everything else", href: "/product#more" },
+            { label: "Email", href: "/product#email" },
+            { label: "Team and reports", href: "/product#team" },
         ],
     },
     {

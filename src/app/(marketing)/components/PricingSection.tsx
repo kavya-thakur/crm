@@ -8,7 +8,7 @@ import { IconCheck } from "@tabler/icons-react";
 
 import { Accent, CONTAINER, Eyebrow, Heading, Lead } from "./Eyebrow";
 import { Button } from "./Button";
-import { WaveField } from "./WaveField";
+import { Spotlight } from "./Spotlight";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -45,6 +45,8 @@ const rupees = (amount: number) => `₹${amount.toLocaleString("en-IN")}`;
 export function PricingSection({ as = "h2" }: { as?: "h1" | "h2" }) {
     const sectionRef = useRef<HTMLElement>(null);
     const [yearly, setYearly] = useState(false);
+    // which card the spotlight is on: Team (1) unless another plan is hovered
+    const [lit, setLit] = useState(1);
 
     // the three cards rise in one after another as the section comes into view
     useGSAP(
@@ -64,9 +66,9 @@ export function PricingSection({ as = "h2" }: { as?: "h1" | "h2" }) {
     );
 
     return (
-        <section ref={sectionRef} id="pricing" className={`relative overflow-clip ${as === "h1" ? "bg-[#f4f4f4]" : "bg-white pb-48 min-[921px]:pb-64"} py-24 font-(family-name:--font-host-grotesk) min-[921px]:py-30`}>
-            {/* on the landing page, violet ridge lines roll along under the plans, like a floor they stand on */}
-            {as === "h2" && <WaveField className="absolute inset-x-0 bottom-0 h-[60%]" />}
+        <section ref={sectionRef} id="pricing" className={`relative overflow-clip ${as === "h1" ? "bg-[#f4f4f4]" : "bg-white"} py-24 font-(family-name:--font-host-grotesk) min-[921px]:py-30`}>
+            {/* a stage light shines on the recommended plan, or the hovered one */}
+            <Spotlight lit={lit} className="absolute inset-0 hidden min-[921px]:block" />
 
             <div className={`${CONTAINER} relative flex flex-col items-center text-center`}>
                 <Eyebrow>Pricing</Eyebrow>
@@ -97,7 +99,7 @@ export function PricingSection({ as = "h2" }: { as?: "h1" | "h2" }) {
             </div>
 
             <div data-plans className={`${CONTAINER} relative mt-14 grid max-w-300 items-stretch gap-4 text-left min-[921px]:grid-cols-3`}>
-                {PLANS.map((plan) => {
+                {PLANS.map((plan, index) => {
                     const featured = plan.name === "Team";
                     const price = yearly ? plan.yearly : plan.monthly;
 
@@ -105,6 +107,8 @@ export function PricingSection({ as = "h2" }: { as?: "h1" | "h2" }) {
                         <article
                             key={plan.name}
                             data-plan
+                            onPointerEnter={() => setLit(index)}
+                            onPointerLeave={() => setLit(1)}
                             className={`flex flex-col rounded-3xl p-8 ${featured ? "bg-[#1c1c1c] text-white shadow-[0_24px_60px_rgb(28_28_28/0.25)]" : "border border-[#1c1c1c]/10 bg-white text-[#1c1c1c]"}`}
                         >
                             <div className="flex items-center justify-between">

@@ -214,6 +214,8 @@ export function HeroCity({ className = "" }: { className?: string }) {
             buildingMaterial.dispose();
             halftone.dispose();
             target.dispose();
+            // hand the WebGL context back now; browsers only allow about 16 at once
+            renderer.forceContextLoss();
             renderer.dispose();
             renderer.domElement.remove();
         };

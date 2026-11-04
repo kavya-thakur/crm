@@ -95,6 +95,22 @@ body {
   }
 }
 
+/* the product page's pictures: dashes flowing along a line, and a progress bar filling up */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+@keyframes job-fill {
+  from {
+    transform: scaleX(0.15);
+  }
+  80%,
+  to {
+    transform: scaleX(0.95);
+  }
+}
+
 /* Pop-up dialogs (.popup, Modal) and docked side panels (.sheet, SidePanel) open and
    close with the browser's own dialog transitions, the dimmed backdrop fading with them,
    and the same motion whether it's Cancel, a backdrop click or Esc.

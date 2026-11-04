@@ -1,6 +1,6 @@
 # Email from the CRM
 
-Send an email to a lead (or a deal's customer) from its **Emails** tab, start from a template,
+Send an email to a lead, a contact or a deal's customer from its **Emails** tab, start from a template,
 and see whether it went out and whether it was opened. Everything here is free: it sends
 through any SMTP server, and a Gmail account made for Flash is enough (500 a day).
 
