@@ -43,7 +43,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 ```
 
 - `npm run db:demo` builds a demo workspace with 18 months of activity (sign in as
-  `demo@flash-demo.dev` / `demo1234`). `DEMO_SCALE=25 npm run db:demo` makes it 25× bigger.
+  `johndoe@flash-demo.dev` / `demo1234`). `DEMO_SCALE=25 npm run db:demo` makes it 25× bigger.
 - `npm test` runs the integration tests (migrate `crm_test` first; see ARCHITECTURE §9).
 - **After changing `schema.prisma`:** create the migration, run `prisma generate`, apply it to
   `crm_test`, and **restart `npm run dev`**. The running server holds the old Prisma client.
@@ -133,7 +133,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 
 ### Live demo
 - [x] **One-click demo**: "Explore as a manager / as a sales agent" on the login page (and a link
-      under the landing page's hero): `/api/auth/demo?as=manager|agent`, no sign-up
+      under the landing page's hero): `/api/auth/demo`, no sign-up
 - [x] A card in the demo's sidebar: who you're exploring as, "resets every night", switch view,
       create your own workspace
 - [x] Locked in the demo: password, profile, members and roles (everything else is open to try)
@@ -188,7 +188,7 @@ Newest first. The reason matters more than the choice.
 | 2026-11-03 | Email over **SMTP via Nodemailer**, from **one Gmail account** with Reply-To = the sender | free with no domain, lands in inboxes; switching to Resend/Brevo is only .env; per-user Gmail sign-in (OAuth) needs Google's app review |
 | 2026-11-03 | Emails are **queued** (BullMQ), placeholders filled **in the browser** | sending never makes anyone wait and retries itself; the sender sees and can edit the exact text before it goes |
 | 2026-11-03 | **View, filters and the open record live in the URL**, not page memory or browser storage | they survive a refresh, Back works, links can be shared, and the server sees them too (no flash of the wrong view) |
-| 2026-11-03 | Demo login is a **plain link** (`GET /api/auth/demo`), into the demo workspace only | works from the landing page, the login page and a README; it can only ever sign in as the demo's two fixed people |
+| 2026-11-03 | Demo login is a **plain link** (`GET /api/auth/demo`), into the demo workspace only | works from the landing page, the login page and a README; it can only ever sign in as the demo's one fixed person (John Doe) |
 | 2026-11-03 | The demo is **rebuilt from scratch nightly** by a BullMQ job scheduler, rather than undoing changes | always the same clean demo whatever visitors did; the schedule lives in Redis, so it runs once even with several servers |
 | 2026-11-03 | In the demo, only **password, profile, members and roles** are locked | visitors should be able to try everything; only changes that would break it for the next visitor are blocked |
 | 2026-11-02 | `src/lib` **grouped into folders by purpose** (auth, db, api, realtime, jobs, leads, deals, work, settings, dashboard, utils, validations) | 30 loose files were hard to find your way around; a folder's name now says what's inside |

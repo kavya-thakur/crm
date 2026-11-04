@@ -116,14 +116,9 @@ export default function LoginPage() {
                 <p className="flex items-center gap-3 text-[13px] text-[#1c1c1c]/45 before:h-px before:flex-1 before:bg-[#1c1c1c]/10 after:h-px after:flex-1 after:bg-[#1c1c1c]/10">
                     or explore the live demo
                 </p>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                    <a href="/api/auth/demo?as=manager" className="flex h-11 flex-col items-center justify-center rounded-xl border border-[#1c1c1c]/10 text-[14px] font-medium text-[#1c1c1c] transition-colors hover:border-[#4a38f5] hover:bg-[#4a38f5]/5">
-                        As a manager
-                    </a>
-                    <a href="/api/auth/demo?as=agent" className="flex h-11 flex-col items-center justify-center rounded-xl border border-[#1c1c1c]/10 text-[14px] font-medium text-[#1c1c1c] transition-colors hover:border-[#4a38f5] hover:bg-[#4a38f5]/5">
-                        As a sales agent
-                    </a>
-                </div>
+                <a href="/api/auth/demo" className="mt-4 flex h-11 items-center justify-center rounded-xl border border-[#1c1c1c]/10 text-[14px] font-medium text-[#1c1c1c] transition-colors hover:border-[#4a38f5] hover:bg-[#4a38f5]/5">
+                    Open the demo
+                </a>
                 <Suspense>
                     <DemoNotice />
                 </Suspense>

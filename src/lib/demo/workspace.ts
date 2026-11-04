@@ -16,13 +16,9 @@ import { STARTER_TEMPLATES, fillTemplate } from "@/lib/emails/templates";
 
 // how the demo workspace is recognised, and who visitors explore it as
 export const DEMO_SLUG = "flash-demo";
-const LOGIN = { email: "demo@flash-demo.dev", password: "demo1234" };
-export const DEMO_PEOPLE = {
-    // sees the whole team: every lead, deal and the team table
-    manager: { email: LOGIN.email, label: "Manager" },
-    // a sales rep: only their own leads and deals
-    agent: { email: "priya@flash-demo.dev", label: "Sales agent" },
-} as const;
+const LOGIN = { email: "johndoe@flash-demo.dev", password: "demo1234" };
+// the one person visitors are signed in as: sees the whole team, every lead and deal
+export const DEMO_EMAIL = LOGIN.email;
 const SLUG = DEMO_SLUG;
 const DAY = 24 * 60 * 60 * 1000;
 const SCALE = Math.max(1, Number(process.env.DEMO_SCALE) || 1);
@@ -37,7 +33,7 @@ async function inChunks<T>(rows: T[], save: (chunk: T[]) => Promise<unknown>) {
 // The manager you sign in as, then the reps. `skill` makes some clearly better than others,
 // so the team table has a story to tell.
 const PEOPLE = [
-    { name: "Ananya Rao", email: LOGIN.email, skill: 0.6, manager: true },
+    { name: "John Doe", email: LOGIN.email, skill: 0.6, manager: true },
     { name: "Aarav Mehta", email: "aarav@flash-demo.dev", skill: 1.45 },
     { name: "Priya Sharma", email: "priya@flash-demo.dev", skill: 1.2 },
     { name: "Rohan Iyer", email: "rohan@flash-demo.dev", skill: 0.95 },

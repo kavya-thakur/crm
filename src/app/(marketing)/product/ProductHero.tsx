@@ -149,7 +149,7 @@ export function ProductHero({ loggedIn }: { loggedIn: boolean }) {
                     ) : (
                         <>
                             <Button href="/register">Get started</Button>
-                            <Button href="/api/auth/demo?as=manager" variant="outlined">
+                            <Button href="/api/auth/demo" variant="outlined">
                                 Explore the live demo
                             </Button>
                         </>

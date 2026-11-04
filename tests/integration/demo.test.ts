@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { verifyToken } from "@/lib/auth/jwt";
-import { buildDemoWorkspace, DEMO_PEOPLE, DEMO_SLUG } from "@/lib/demo/workspace";
+import { buildDemoWorkspace, DEMO_EMAIL, DEMO_SLUG } from "@/lib/demo/workspace";
 import { createOrgWithUser, cleanupOrg } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
@@ -11,7 +11,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { GET as exploreDemo } from "@/app/api/auth/demo/route";
 import { PATCH as changePassword } from "@/app/api/me/password/route";
 
-const explore = (as: string) => exploreDemo(new NextRequest(`http://localhost/api/auth/demo?as=${as}`));
+const explore = () => exploreDemo(new NextRequest("http://localhost/api/auth/demo"));
 const demoOrg = () => prisma.organization.findUnique({ where: { slug: DEMO_SLUG } });
 
 describe("the demo workspace", () => {
@@ -23,24 +23,20 @@ describe("the demo workspace", () => {
         if (demo) await cleanupOrg(demo.id);
     });
 
-    it("signs a visitor in with one click, as the manager or a sales agent", async () => {
+    it("signs a visitor in with one click, as John Doe the manager", async () => {
         // nothing to explore yet: back to the login page, which says so
-        const none = await explore("manager");
+        const none = await explore();
         expect(none.headers.get("location")).toBe("http://localhost/login?demo=unavailable");
 
         const { organization, user } = await createOrgWithUser(["lead:read"]);
         orgs.push(organization.id);
         await prisma.organization.update({ where: { id: organization.id }, data: { slug: DEMO_SLUG } });
-        await prisma.user.update({ where: { id: user.id }, data: { email: DEMO_PEOPLE.manager.email } });
-        const agent = await prisma.user.create({
-            data: { organizationId: organization.id, roleId: user.roleId, name: "Priya Sharma", email: DEMO_PEOPLE.agent.email, passwordHash: "x" },
-        });
-
-        const res = await explore("agent");
+        await prisma.user.update({ where: { id: user.id }, data: { email: DEMO_EMAIL } });
+        const res = await explore();
         expect(res.status).toBe(303);
         expect(res.headers.get("location")).toBe("http://localhost/dashboard");
         const token = res.headers.get("set-cookie")?.match(/access_token=([^;]+)/)?.[1];
-        expect(verifyToken(token!)).toMatchObject({ userId: agent.id, organizationId: organization.id });
+        expect(verifyToken(token!)).toMatchObject({ userId: user.id, organizationId: organization.id });
     });
 
     it("keeps passwords, members and roles as they are, but only in the demo", async () => {
@@ -77,6 +73,6 @@ describe("the demo workspace", () => {
         const second = (await demoOrg())!;
         expect(await prisma.lead.count({ where: { organizationId: second.id } })).toBe(leads);
         expect(await prisma.leadForm.count({ where: { organizationId: second.id } })).toBe(0);
-        expect(await prisma.user.findUnique({ where: { email: DEMO_PEOPLE.agent.email } })).not.toBeNull();
+        expect(await prisma.user.findUnique({ where: { email: DEMO_EMAIL } })).not.toBeNull();
     }, 60_000);
 });

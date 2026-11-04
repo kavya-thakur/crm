@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasPermission } from "@/lib/auth/requirePermission";
 import { Avatar } from "@/components/Avatar";
 import { LostReasonPrompt } from "@/components/LostReasonPrompt";
-import { DEMO_PEOPLE, isDemoWorkspace } from "@/lib/demo/workspace";
+import { isDemoWorkspace } from "@/lib/demo/workspace";
 import { LiveUpdates } from "./LiveUpdates";
 import { ActivityAlert } from "./ActivityAlert";
 import { SidebarShell } from "./SidebarShell";
@@ -106,16 +106,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
                     <div className="mt-auto rounded-lg border border-accent/20 bg-accent-faint p-2.5 text-sm">
                         <p className="font-medium text-ink">Demo workspace</p>
                         <p className="mt-0.5 text-muted">
-                            You&apos;re exploring as a {user.email === DEMO_PEOPLE.manager.email ? "manager" : "sales agent"}. Anything you change resets every night.
+                            You&apos;re exploring as John Doe, the manager. Anything you change resets every night.
                         </p>
-                        {/* an API route that signs in again, so a plain link */}
-                        <a
-                            href={`/api/auth/demo?as=${user.email === DEMO_PEOPLE.manager.email ? "agent" : "manager"}`}
-                            className="mt-2 block font-medium text-accent hover:underline"
-                        >
-                            Switch to the {user.email === DEMO_PEOPLE.manager.email ? "sales agent" : "manager"} view
-                        </a>
-                        <Link href="/register" className="mt-1 block font-medium text-accent hover:underline">
+                        <Link href="/register" className="mt-2 block font-medium text-accent hover:underline">
                             Create your own workspace →
                         </Link>
                     </div>
