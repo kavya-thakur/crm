@@ -123,7 +123,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       don't trigger them, a broken step stops with a clear reason
 
 ### Email
-- [x] **Email from a lead or deal** (its Emails tab): sent through a queue over free SMTP (Gmail),
+- [x] **Email from a lead, deal or contact** (its Emails tab): sent through a queue over free SMTP (Gmail),
       replies go to the sender's own inbox, status live (Sending → Sent / Not sent → Opened),
       logged on the timeline. See [EMAIL.md](EMAIL.md)
 - [x] **Email templates** with placeholders (`{{lead.firstName}}`, `{{me.name}}`...), filled in as
@@ -140,8 +140,15 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Nightly reset**: a BullMQ job scheduler rebuilds the demo workspace at 3:00 AM IST
 
 ### Site
-- [x] Marketing landing page (Flash), product tour (/product), pricing, /demo, privacy policy and terms (/privacy, /terms)
-- [x] 404 page in the landing look; link-preview image (`src/app/opengraph-image.tsx`, fonts in `assets/fonts`, site address from `APP_URL`)
+- [x] Marketing landing page (Flash), product page (/product), pricing, /demo, privacy policy and terms (/privacy, /terms)
+- [x] Product page: a glass Flash logo (a hand-written glass shader on the extruded logo bars) with every feature
+      orbiting it on two rings, then six feature groups (capture, pipeline, follow-ups, email, team, at scale), each
+      with real demo-workspace screenshots (`public/product`) or app-style pictures, and the app's own cards floating
+      in front in 3D
+- [x] Landing page 3D: halftone shapes, the untangling knot, a team swarm behind the quote, a spotlight on the
+      pricing plans, an orb in the FAQ; every WebGL canvas hands its context back on unmount (browsers allow ~16)
+- [x] 404 page in the landing look; link-preview image (`src/app/opengraph-image.tsx`, fonts in `assets/fonts`, site address from `APP_URL`): the real dashboard on a violet panel
+- [x] Basic SEO: `robots.txt` (keeps crawlers out of `/api/`) and `sitemap.xml` (`src/app/robots.ts`, `sitemap.ts`); every public page gets its title, description, canonical address and link preview from `pageMetadata()` in `(marketing)/metadata.ts`; the app stays noindex
 - [x] Onboarding intro
 
 ### Engineering

@@ -162,6 +162,8 @@ export function Orb({ energy, color = "#4a38f5", glow = "#8f84ff", className = "
             orb.material.dispose();
             rings.forEach((ring) => ring.geometry.dispose());
             ringMaterial.dispose();
+            // hand the WebGL context back now; browsers only allow about 16 at once
+            renderer.forceContextLoss();
             renderer.dispose();
             renderer.domElement.remove();
         };

@@ -1,12 +1,12 @@
-import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import LandingPage from "./LandingPage";
+import { pageMetadata } from "./metadata";
 
-// The root layout sets robots: noindex (every other page is a private
-// workspace behind login) — this one page is the public marketing site.
-export const metadata: Metadata = {
-    robots: { index: true, follow: true },
-};
+export const metadata = pageMetadata(
+    "/",
+    "The CRM for sales teams",
+    "Flash keeps every lead, deal and follow-up in one place: web forms and CSV import, duplicate checks, a Kanban pipeline, reminders and a live dashboard. Free for up to 3 users.",
+);
 
 export default async function Home() {
     const user = await getCurrentUser();

@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LegalPage } from "../components/LegalPage";
+import { pageMetadata } from "../metadata";
 
-export const metadata: Metadata = {
-    title: "Privacy policy",
-    description: "What Flash stores, why, and what we never do with it.",
-    robots: { index: true, follow: true },
-};
+export const metadata = pageMetadata("/privacy", "Privacy policy", "What Flash stores, why, and what we never do with it.");
 
 export default function PrivacyPage() {
     return (

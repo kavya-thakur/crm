@@ -5,19 +5,19 @@ import { ArrowTile, FolderCard } from "./FolderCard";
 const PILLARS: { title: string; shape: ShapeName; body: string; tags: [string, string] }[] = [
     {
         title: "Capture every lead",
-        shape: "funnel",
+        shape: "magnet",
         body: "Forms on your website create leads by themselves and share them out across your team in turn. If that phone number or email is already an open lead, Flash stops the duplicate.",
         tags: ["Web forms", "Duplicate check"],
     },
     {
         title: "Close deals faster",
-        shape: "coins",
+        shape: "target",
         body: "Turn a qualified lead into a deal in one click, then drag it across your own stages. When a deal is lost, the reason is recorded, so you learn why.",
         tags: ["Deals", "Pipeline"],
     },
     {
         title: "Control who sees what",
-        shape: "shield",
+        shape: "team",
         body: "Roles decide who can view, create, edit, delete and assign. Managers see the whole pipeline, while agents can be limited to their own leads, deals and tasks.",
         tags: ["Roles", "Permissions"],
     },

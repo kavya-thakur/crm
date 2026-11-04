@@ -1,5 +1,5 @@
 // 3D simplex noise (Ashima Arts / Stefan Gustavson, MIT), the usual GLSL version, pasted into
-// the shaders that need it (the orb and the wave field)
+// the shaders that need it (the orb)
 export const simplexNoise = `
     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
     vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }

@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { IconCalendarEvent, IconCircleCheckFilled, IconUserCheck } from "@tabler/icons-react";
+import { IconCircleCheckFilled } from "@tabler/icons-react";
 
 // The picture that shows up when someone shares a Flash link (WhatsApp, LinkedIn, X, Slack).
 // Built once at build time. The fonts are .ttf files because the image renderer can't read woff2.
@@ -11,20 +11,22 @@ export const contentType = "image/png";
 
 const font = (file: string) => readFile(join(process.cwd(), "assets/fonts", file));
 
-// The same cards that float beside the login form
-const CARDS = [
-    { icon: <IconUserCheck size={26} color="#3e63dd" />, tint: "#edf2fe", title: "Lead assigned", detail: "Acme Industries → Priya", shift: -36 },
-    { icon: <IconCalendarEvent size={26} color="#ab6400" />, tint: "#fff4d5", title: "Call scheduled", detail: "Contoso Ltd · Tue 11:00", shift: 36 },
-    { icon: <IconCircleCheckFilled size={26} color="#218358" />, tint: "#e6f6eb", title: "Deal won · ₹4,80,000", detail: "Hooli Cloud moved to Won", shift: -12 },
-];
+// One update card floats over the screenshot, where the two halves meet
+const CARD = { title: "Deal won · ₹4,80,000", detail: "Hooli Cloud moved to Won" };
 
 export default async function Image() {
-    const [aleo, grotesk, groteskBold] = await Promise.all([font("Aleo-Light.ttf"), font("HostGrotesk-Regular.ttf"), font("HostGrotesk-SemiBold.ttf")]);
+    const [aleo, grotesk, groteskBold, shot] = await Promise.all([
+        font("Aleo-Light.ttf"),
+        font("HostGrotesk-Regular.ttf"),
+        font("HostGrotesk-SemiBold.ttf"),
+        // the same dashboard screenshot as the product page (2880 × 1800)
+        readFile(join(process.cwd(), "public/product/dashboard.jpg")),
+    ]);
 
     return new ImageResponse(
         (
-            <div style={{ display: "flex", width: "100%", height: "100%", background: "#ffffff", padding: 24, fontFamily: "Host Grotesk", color: "#1c1c1c" }}>
-                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: 640, padding: "40px 32px 40px 48px" }}>
+            <div style={{ display: "flex", width: "100%", height: "100%", background: "#ffffff", fontFamily: "Host Grotesk", color: "#1c1c1c" }}>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: 600, padding: "64px 0 64px 72px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                         <svg width="52" height="52" viewBox="0 0 64 64">
                             <rect width="64" height="64" rx="16" fill="#1c1c1c" />
@@ -35,7 +37,7 @@ export default async function Image() {
                         <span style={{ fontWeight: 600, fontSize: 36, letterSpacing: -1.6 }}>Flash</span>
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", fontFamily: "Aleo", fontSize: 76, lineHeight: 1.05, letterSpacing: -2.2 }}>
+                    <div style={{ display: "flex", flexDirection: "column", fontFamily: "Aleo", fontSize: 74, lineHeight: 1.05, letterSpacing: -2.2 }}>
                         <span>Every lead,</span>
                         <span>every deal,</span>
                         <span style={{ fontFamily: "Host Grotesk", letterSpacing: -3.6 }}>
@@ -43,33 +45,66 @@ export default async function Image() {
                         </span>
                     </div>
 
-                    <span style={{ maxWidth: 470, fontSize: 26, lineHeight: 1.35, color: "rgba(28,28,28,0.55)", letterSpacing: -0.4 }}>The CRM that keeps up with how fast your team sells.</span>
+                    <span style={{ fontSize: 26, color: "rgba(28,28,28,0.55)", letterSpacing: -0.4 }}>The CRM for sales teams</span>
                 </div>
 
-                <div style={{ display: "flex", flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, borderRadius: 32, background: "#f4f4f4" }}>
-                    {CARDS.map((card) => (
-                        <div
-                            key={card.title}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 16,
-                                width: 380,
-                                padding: 16,
-                                borderRadius: 20,
-                                border: "1px solid #ebebeb",
-                                background: "#ffffff",
-                                boxShadow: "0 12px 40px rgba(0,0,0,0.10)",
-                                transform: `translateX(${card.shift}px)`,
-                            }}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48, borderRadius: 14, background: card.tint }}>{card.icon}</div>
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                                <span style={{ fontWeight: 600, fontSize: 21, letterSpacing: -0.4 }}>{card.title}</span>
-                                <span style={{ fontSize: 18, color: "rgba(28,28,28,0.55)" }}>{card.detail}</span>
-                            </div>
-                        </div>
-                    ))}
+                {/* violet panel, the real dashboard running off its edge */}
+                <div
+                    style={{
+                        display: "flex",
+                        position: "absolute",
+                        top: 24,
+                        right: 24,
+                        bottom: 24,
+                        left: 640,
+                        overflow: "hidden",
+                        borderRadius: 32,
+                        backgroundColor: "#4a38f5",
+                        backgroundImage: "radial-gradient(circle at 90% 0%, #8f84ff 0%, rgba(143,132,255,0) 70%)",
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            position: "absolute",
+                            top: 64,
+                            left: 56,
+                            width: 720,
+                            height: 640,
+                            overflow: "hidden",
+                            borderRadius: 18,
+                            background: "#ffffff",
+                            border: "6px solid rgba(255,255,255,0.35)",
+                            boxShadow: "0 30px 80px rgba(20,10,90,0.45)",
+                        }}
+                    >
+                        {/* shown 1100 wide and shifted left past the app's sidebar, so the numbers lead */}
+                        <img src={`data:image/jpeg;base64,${shot.toString("base64")}`} width={1100} height={688} alt="" style={{ position: "absolute", top: -6, left: -172 }} />
+                    </div>
+                </div>
+
+                <div
+                    style={{
+                        display: "flex",
+                        position: "absolute",
+                        left: 560,
+                        bottom: 64,
+                        alignItems: "center",
+                        gap: 16,
+                        padding: "16px 24px 16px 16px",
+                        borderRadius: 20,
+                        border: "1px solid #ebebeb",
+                        background: "#ffffff",
+                        boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48, borderRadius: 14, background: "#e6f6eb" }}>
+                        <IconCircleCheckFilled size={26} color="#218358" />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: 600, fontSize: 21, letterSpacing: -0.4 }}>{CARD.title}</span>
+                        <span style={{ fontSize: 18, color: "rgba(28,28,28,0.55)" }}>{CARD.detail}</span>
+                    </div>
                 </div>
             </div>
         ),

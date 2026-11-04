@@ -54,10 +54,6 @@ export default function DemoPage({ loggedIn, formKey }: { loggedIn: boolean; for
             <Nav loggedIn={loggedIn} primaryHref={loggedIn ? "/dashboard" : "/register"} primaryLabel={loggedIn ? "Go to your workspace" : "Get started"} />
 
             <main className="relative overflow-clip">
-                {/* thin rounded outlines behind the page, like ruled paper */}
-                <div aria-hidden className="pointer-events-none absolute top-10 -left-10 h-70 w-[46%] rounded-[32px] border border-[#1c1c1c]/8" />
-                <div aria-hidden className="pointer-events-none absolute top-28 right-[-6%] h-72 w-[42%] rounded-[32px] border border-[#1c1c1c]/8" />
-
                 <div className={`${CONTAINER} relative grid gap-12 pt-14 pb-24 min-[921px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[921px]:gap-20 min-[921px]:pt-24`}>
                     <div className="relative min-[921px]:pt-4">
                         <div data-rise>

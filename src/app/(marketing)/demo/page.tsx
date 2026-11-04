@@ -1,12 +1,8 @@
-import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import DemoPage from "./DemoPage";
+import { pageMetadata } from "../metadata";
 
-export const metadata: Metadata = {
-    title: "Book a demo",
-    description: "See Flash in action: a 30-minute walkthrough shaped around how your team sells.",
-    robots: { index: true, follow: true },
-};
+export const metadata = pageMetadata("/demo", "Book a demo", "See Flash in action: a 30-minute walkthrough shaped around how your team sells.");
 
 // Requests from this page become leads in Flash's own workspace, through the same web
 // form feature customers use: DEMO_FORM_KEY is the key of a form made in Settings > Web forms

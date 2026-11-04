@@ -196,6 +196,8 @@ export function Tangle({ className = "" }: { className?: string }) {
             window.removeEventListener("pointermove", onMove);
             mesh.geometry.dispose();
             mesh.material.dispose();
+            // hand the WebGL context back now; browsers only allow about 16 at once
+            renderer.forceContextLoss();
             renderer.dispose();
             renderer.domElement.remove();
         };
