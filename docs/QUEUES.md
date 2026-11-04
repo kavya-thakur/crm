@@ -178,7 +178,7 @@ redis-cli LRANGE bull:imports:wait 0 -1           # job ids waiting
 redis-cli ZRANGE bull:imports:completed 0 -1      # recently finished job ids
 redis-cli HGETALL bull:imports:import-12          # one job: its data, attempts, failure reason
 redis-cli --scan --pattern 'ratelimit:*'          # live rate-limit counters
-redis-cli TTL ratelimit:login:unknown:demo@flash-demo.dev   # seconds until that window resets
+redis-cli TTL ratelimit:login:unknown:johndoe@flash-demo.dev   # seconds until that window resets
 ```
 
 ---

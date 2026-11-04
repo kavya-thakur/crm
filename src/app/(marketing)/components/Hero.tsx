@@ -58,7 +58,7 @@ export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolea
                         <Button href={primaryHref}>{primaryLabel}</Button>
                         {/* straight into the demo workspace with sample data, no sign-up (see /api/auth/demo) */}
                         {!loggedIn && (
-                            <Button href="/api/auth/demo?as=manager" variant="outlined">
+                            <Button href="/api/auth/demo" variant="outlined">
                                 Explore the live demo
                             </Button>
                         )}

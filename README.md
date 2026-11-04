@@ -457,7 +457,7 @@ queries in parallel. Only won deals' dates and amounts come back as rows, for th
 
 ### Demo mode
 
-`/api/auth/demo?as=manager` (or `?as=agent`) signs a visitor straight into a demo workspace: 6 people,
+`/api/auth/demo` signs a visitor straight into a demo workspace: 6 people,
 about 420 leads and 300 deals over 18 months, plus tasks, meetings, notes, emails, templates and a
 sample automation. A **BullMQ job scheduler** rebuilds it every night at 03:00 IST. Demo accounts
 can't change passwords or delete the workspace, and never send real email, so it stays the same for
@@ -617,7 +617,7 @@ npm run db:demo                                        # optional: the demo work
 npm run dev                                            # http://localhost:3000
 ```
 
-Open the login page and click **Explore as a manager**, or sign in as `demo@flash-demo.dev` / `demo1234`.
+Open the login page and click **Open the demo**, or sign in as `johndoe@flash-demo.dev` / `demo1234`.
 
 > Use `npm run dev`, not `next dev`: only `server.ts` has Socket.IO and the workers.
 > On macOS, Redis is `brew install redis && brew services start redis`.

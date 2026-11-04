@@ -262,7 +262,7 @@ export function ProductPage({ loggedIn }: { loggedIn: boolean }) {
                             </Button>
                         ) : (
                             <>
-                                <Button href="/api/auth/demo?as=manager" scheme="dark">
+                                <Button href="/api/auth/demo" scheme="dark">
                                     Explore the live demo
                                 </Button>
                                 <Button href="/register" variant="outlined" scheme="dark">
