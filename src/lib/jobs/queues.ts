@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { queueConnection } from "@/lib/db/redis";
+import type { AutomationTrigger } from "@/lib/validations/automations";
 
 /*
  * The job queues (BullMQ, kept in Redis). A route *adds* a job and answers straight away;
@@ -25,13 +26,17 @@ export interface EmailJobData {
     emailId: number;
 }
 
-// "Lead 812 was created (through form 3)": the event automation rules react to
+// "Lead 812 was created (through form 3)", "Deal 55 was won": the events automation rules react to
 export interface AutomationJobData {
-    trigger: "lead.created";
+    trigger: AutomationTrigger;
     organizationId: number;
-    leadId: number;
-    // the web form or integration it came in through; null = added by hand
-    viaFormId: number | null;
+    // the lead or deal it happened to (the trigger says which)
+    leadId?: number;
+    dealId?: number;
+    // lead.created: the web form or integration it came in through; null = added by hand
+    viaFormId?: number | null;
+    // stage moves: the stage it moved into
+    stageId?: number;
 }
 
 const holder = globalThis as unknown as {

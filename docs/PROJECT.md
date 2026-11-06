@@ -121,6 +121,11 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       log of what each rule did. See [AUTOMATIONS.md](AUTOMATIONS.md)
 - [x] Safe by design: never runs twice for one lead (retries), rules can't trigger rules, imports
       don't trigger them, a broken step stops with a clear reason
+- [x] **Seven triggers** (2026-11-06): a lead is added, moves to a stage, is lost; a deal is created,
+      moves to a stage, is won, is lost. Fired by every way a record moves (board, panel, bulk,
+      background bulk job, conversion). Deal conditions (amount with "more than / less than", stage,
+      source of its lead, lost reason, deal custom fields) and two new actions: **notify** people or the
+      owner, **move to a stage**. `{{deal.amount}}` placeholder. Demo has a "Big wins" rule
 
 ### Email
 - [x] **Email from a lead, deal or contact** (its Emails tab): sent through a queue over free SMTP (Gmail),
@@ -181,6 +186,9 @@ Newest first. The reason matters more than the choice.
 | 2026-11-03 | **One run per rule per lead**, claimed with a unique row before acting | BullMQ retries a failed job; without this a retry would send a second email |
 | 2026-11-03 | **Actions don't trigger rules**; **imports don't trigger rules** (for now) | no loops between rules; a big import can't send thousands of emails by surprise |
 | 2026-11-03 | Rule conditions and actions as **JSON checked by Zod**, not tables per action | a new action type needs no migration; same approach as web form settings |
+| 2026-11-06 | Stage events are **once per record per stage** (the stage is in the run's key) | a deal dragged out of Won by mistake and back mustn't send a second thank-you email |
+| 2026-11-06 | A stage job **does nothing if the record has moved on** by the time it runs | a deal dropped on Won and straight back shouldn't be treated as won |
+| 2026-11-06 | Stage moves in bulk **do** start rules (imports still don't) | moving deals to Won is the same act however many you move; an import is old data coming in |
 | 2026-11-03 | **Campaign and Lost reason columns hidden by default** (turn on in Options) | empty for most records; the data still feeds the dashboard. A column added later starts hidden for people with saved column settings too |
 | 2026-11-03 | A new integration gets a **source of its own name**, created if missing; a new web form starts as "Website" | its leads are told apart in filters and on the source card from the first lead, with no setup step |
 | 2026-11-03 | A lead integration is a **`LeadForm` with `kind = WEBHOOK`**, not a new model | the same source, owner, rotation and capture rules for free; only the payload reader and a delivery log are new |

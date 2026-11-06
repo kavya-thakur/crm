@@ -26,7 +26,7 @@ describe("the demo workspace", () => {
     it("signs a visitor in with one click, as John Doe the manager", async () => {
         // nothing to explore yet: back to the login page, which says so
         const none = await explore();
-        expect(none.headers.get("location")).toBe("http://localhost/login?demo=unavailable");
+        expect(none.headers.get("location")).toBe("/login?demo=unavailable");
 
         const { organization, user } = await createOrgWithUser(["lead:read"]);
         orgs.push(organization.id);
@@ -34,7 +34,7 @@ describe("the demo workspace", () => {
         await prisma.user.update({ where: { id: user.id }, data: { email: DEMO_EMAIL } });
         const res = await explore();
         expect(res.status).toBe(303);
-        expect(res.headers.get("location")).toBe("http://localhost/dashboard");
+        expect(res.headers.get("location")).toBe("/dashboard");
         const token = res.headers.get("set-cookie")?.match(/access_token=([^;]+)/)?.[1];
         expect(verifyToken(token!)).toMatchObject({ userId: user.id, organizationId: organization.id });
     });

@@ -44,7 +44,7 @@ import { Avatar } from "@/components/Avatar";
 import { askLostReason, LostReasonValue } from "@/components/LostReasonPrompt";
 import { MergeDealsPanel, PossibleDuplicateDeals } from "./MergeDeals";
 import { toast } from "@/components/Toast";
-import { formatDate, timeAgo } from "@/lib/utils/format";
+import { formatDate, formatMoney, timeAgo } from "@/lib/utils/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
@@ -530,7 +530,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                             </section>
                         ) : tab === "emails" ? (
                             <section className="px-4 py-4">
-                                <EmailsTab entity="deal" recordId={deal.id} to={deal.lead?.email ?? null} values={{ "lead.firstName": deal.lead?.name.split(" ")[0], "lead.name": deal.lead?.name, "deal.title": deal.title }} />
+                                <EmailsTab entity="deal" recordId={deal.id} to={deal.lead?.email ?? null} values={{ "lead.firstName": deal.lead?.name.split(" ")[0], "lead.name": deal.lead?.name, "deal.title": deal.title, "deal.amount": formatMoney(Number(deal.amount)) }} />
                             </section>
                         ) : (
                             <section className="px-4 py-4">

@@ -15,7 +15,7 @@ import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/utils/format";
 import { useCustomFields } from "../../shared/customFields";
 import { useEmailTemplates } from "../../shared/emails";
-import { OP_LABELS, RuleBuilder, conditionFields, type AutomationRule, type Choices } from "./RuleBuilder";
+import { OP_LABELS, RuleBuilder, TRIGGER_LABELS, conditionFields, type AutomationRule, type Choices } from "./RuleBuilder";
 
 interface ListedRule extends AutomationRule {
     _count: { runs: number };
@@ -29,12 +29,14 @@ interface Run {
     summary: string;
     createdAt: string;
     lead: { id: number; name: string } | null;
+    deal: { id: number; title: string } | null;
 }
 
 type Named = { id: number; name: string };
+type Stage = Named & { isConverted?: boolean };
 const toOptions = (items: Named[] | undefined) => (items ?? []).map((item) => ({ value: String(item.id), label: item.name }));
 
-// Settings > Automations: "when a lead comes in, if…, then…" rules that work for the team
+// Settings > Automations: "when a lead comes in / a deal is won, if…, then…" rules that work for the team
 export default function AutomationsView() {
     // the rule in the side panel: an existing one, "new", or none
     const [editing, setEditing] = useState<AutomationRule | "new" | null>(null);
@@ -59,8 +61,8 @@ export default function AutomationsView() {
                         <div className="min-w-0 flex-1 pt-0.5">
                             <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em]">Automations</h2>
                             <p className="mt-0.5 text-muted">
-                                Let Flash do the routine work on every new lead: give it to the right person, send the first email, and add a task to
-                                follow up. Rules run top to bottom, a few seconds after the lead arrives.
+                                Let Flash do the routine work: give new leads to the right person, send the first email, add the follow-up task, and tell
+                                the team when a deal is won or lost. Rules run top to bottom, a few seconds after it happens.
                             </p>
                         </div>
                         <button
@@ -79,8 +81,8 @@ export default function AutomationsView() {
                     )}
                     {rulesQuery.data?.length === 0 && (
                         <p className="mt-6 rounded-xl border border-dashed border-line-strong px-4 py-10 text-center text-faint">
-                            No automations yet. For example: when a lead comes from Google Ads, give it to Priya, send the &quot;First reply&quot; email
-                            and add a task to call today.
+                            No automations yet. For example: when a lead comes from Google Ads, give it to Priya and add a task to call today. Or when
+                            a deal over ₹1,00,000 is won, tell the founder and add a task to start onboarding.
                         </p>
                     )}
 
@@ -106,6 +108,14 @@ function useChoices(): Choices {
         queryKey: ["leadSource"],
         queryFn: () => api.get<{ data: Named[] }>("/lead-sources").then((res) => res.data.data),
     });
+    const leadStages = useQuery({
+        queryKey: ["leadStage"],
+        queryFn: () => api.get<{ data: Stage[] }>("/lead-stages").then((res) => res.data.data),
+    });
+    const pipelineStages = useQuery({
+        queryKey: ["pipelineStage"],
+        queryFn: () => api.get<{ data: Stage[] }>("/pipeline-stages").then((res) => res.data.data),
+    });
     const forms = useQuery({
         queryKey: ["leadForms"],
         queryFn: () => api.get<{ data: (Named & { kind: string })[] }>("/lead-forms").then((res) => res.data.data),
@@ -117,23 +127,37 @@ function useChoices(): Choices {
         retry: false,
     });
     const templates = useEmailTemplates();
-    const customFields = useCustomFields("lead");
+    const leadFields = useCustomFields("lead");
+    const dealFields = useCustomFields("deal");
 
     return {
         sources: toOptions(sources.data),
         forms: (forms.data ?? []).map((form) => ({ value: String(form.id), label: `${form.name} (${form.kind === "WEBHOOK" ? "integration" : "web form"})` })),
         people: toOptions(people.data),
         templates: toOptions(templates.data?.data),
-        customFields: customFields.data ?? [],
+        leadStages: (leadStages.data ?? []).map((stage) => ({ value: String(stage.id), label: stage.name, isConverted: Boolean(stage.isConverted) })),
+        pipelineStages: toOptions(pipelineStages.data),
+        customFields: { lead: leadFields.data ?? [], deal: dealFields.data ?? [] },
     };
 }
 
-// "If Source is Google Ads and Campaign contains "diwali"" / "Assign to Priya, then send "First reply""
+// "A deal is won and Amount is more than "100000"" / "notify Rohan, then add task "Start onboarding""
 function describe(rule: AutomationRule, choices: Choices) {
-    const fields = conditionFields(choices);
+    const fields = conditionFields(choices, rule.trigger);
     const labelOf = (options: { value: string; label: string }[], value: string) => options.find((option) => option.value === value)?.label ?? value;
+    const kind = rule.trigger.startsWith("deal.") ? "deal" : "lead";
+    const stages = kind === "lead" ? choices.leadStages : choices.pipelineStages;
 
-    const conditions = rule.conditions.map((condition) => {
+    // "A lead moves to a stage" + "Stage is Qualified" reads as "A lead moves to Qualified"
+    let trigger = TRIGGER_LABELS[rule.trigger];
+    let rest = rule.conditions;
+    const target = rule.trigger.endsWith(".stageChanged") ? rule.conditions.find((condition) => condition.field === "stage" && condition.op === "is") : undefined;
+    if (target) {
+        trigger = `A ${kind} moves to ${labelOf(stages, target.value)}`;
+        rest = rule.conditions.filter((condition) => condition !== target);
+    }
+
+    const conditions = rest.map((condition) => {
         const field = fields.find((item) => item.key === condition.field);
         const words = `${field?.label ?? condition.field} ${OP_LABELS[condition.op]}`;
         if (condition.op === "isEmpty" || condition.op === "isSet") return words;
@@ -141,13 +165,24 @@ function describe(rule: AutomationRule, choices: Choices) {
     });
 
     const actions = rule.actions.map((action) => {
-        if (action.type === "assign") return `assign to ${action.userIds.map((id) => labelOf(choices.people, String(id))).join(" / ")}`;
-        if (action.type === "email") return `send "${labelOf(choices.templates, String(action.templateId))}"`;
-        return `add task "${action.title}"`;
+        switch (action.type) {
+            case "assign":
+                return `assign to ${action.userIds.map((id) => labelOf(choices.people, String(id))).join(" / ")}`;
+            case "email":
+                return `send "${labelOf(choices.templates, String(action.templateId))}"`;
+            case "task":
+                return `add task "${action.title}"`;
+            case "notify": {
+                const who = [...action.userIds.map((id) => labelOf(choices.people, String(id))), ...(action.toOwner ? ["the owner"] : [])];
+                return `notify ${who.join(", ")}`;
+            }
+            case "move":
+                return `move to ${labelOf(stages, String(action.stageId))}`;
+        }
     });
 
     return {
-        when: conditions.length > 0 ? `If ${conditions.join(" and ")}` : "Every new lead",
+        when: conditions.length > 0 ? `${trigger} and ${conditions.join(" and ")}` : trigger,
         then: actions.join(", then "),
     };
 }
@@ -190,7 +225,7 @@ function RuleCard({ rule, choices, onEdit }: { rule: ListedRule; choices: Choice
                     <p className="mt-1 text-sm text-faint">
                         {rule._count.runs === 0
                             ? "Hasn't run yet"
-                            : `Ran for ${rule._count.runs} lead${rule._count.runs === 1 ? "" : "s"} · last ${timeAgo(lastRun.createdAt)}${lastRun.status === "FAILED" ? " (failed)" : ""}`}
+                            : `Ran ${rule._count.runs} time${rule._count.runs === 1 ? "" : "s"} · last ${timeAgo(lastRun.createdAt)}${lastRun.status === "FAILED" ? " (failed)" : ""}`}
                     </p>
                 </div>
 
@@ -257,8 +292,12 @@ function Runs({ ruleId }: { ruleId: number }) {
                             <Link href={`/leads?open=${run.lead.id}`} className="font-medium text-ink hover:underline">
                                 {run.lead.name}
                             </Link>
+                        ) : run.deal ? (
+                            <Link href={`/deals?open=${run.deal.id}`} className="font-medium text-ink hover:underline">
+                                {run.deal.title}
+                            </Link>
                         ) : (
-                            <span className="text-faint">A deleted lead</span>
+                            <span className="text-faint">Since deleted</span>
                         )}
                         <span className="block text-sm text-muted">{run.summary}</span>
                     </span>

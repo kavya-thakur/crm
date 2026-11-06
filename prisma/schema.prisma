@@ -894,7 +894,7 @@ model AutomationRule {
   id             Int      @id @default(autoincrement())
   organizationId Int
   name           String
-  // what sets it off; only "lead.created" for now
+  // what sets it off: "lead.created", "deal.won"... (AUTOMATION_TRIGGERS)
   trigger        String
   // [{ field: "source", op: "is", value: "12" }], all of which have to match
   conditions     Json     @default("[]")
@@ -918,13 +918,15 @@ model AutomationRule {
 
 // One time a rule's conditions matched and it ran: what it did, or why it stopped. The newest
 // 50 per rule are kept. (ruleId, eventKey) is unique, so a job that's retried never runs a
-// rule twice for the same lead: no second email, no second task.
+// rule twice for the same event: no second email, no second task.
 model AutomationRun {
   id        Int      @id @default(autoincrement())
   ruleId    Int
-  // "lead.created:812"
+  // "lead.created:812", or with the stage for stage moves: "deal.won:55:9"
   eventKey  String
+  // the lead or deal it ran for
   leadId    Int?
+  dealId    Int?
   // RUNNING, DONE or FAILED
   status    String
   // "Assigned to Priya · Emailed rahul@acme.com · Task "Call Rahul""

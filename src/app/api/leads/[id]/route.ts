@@ -7,6 +7,7 @@ import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { stageMessage } from "@/lib/leads/stages";
 import { alreadyALead, findOpenCopy, isOpen } from "@/lib/leads/duplicates";
+import { stageEvents, startAutomations } from "@/lib/automations/engine";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -215,6 +216,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 source: true,
             },
         });
+
+        // the workspace's "lead moves to a stage" (and "lead is lost") rules
+        if (newStage) {
+            await startAutomations(...stageEvents("lead", user.organizationId, [updatedLead.id], { id: updatedLead.stageId, isLost: newStage.isLost }));
+        }
 
         return NextResponse.json({
             ok: true,

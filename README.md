@@ -65,7 +65,9 @@ that bring leads in by themselves.
 A lead can arrive from a **web form**, a **Google Ads lead form**, **IndiaMART**, **Zapier / Make / Pabbly**,
 a **CSV import**, or be typed in by hand. Every path follows the same rules: a duplicate check, an
 owner (or the next person in a round-robin), and a "reply today" task. Then the workspace's
-**automation rules** run: assign it, email it from a template, add a follow-up task. Managers watch
+**automation rules** run: assign it, email it from a template, add a follow-up task. Rules also fire
+when a lead or deal **moves stage, is won or is lost**, so the follow-ups after a win or a loss happen by
+themselves too. Managers watch
 it all on a live dashboard: pipeline, forecast, win rate, which source and which **ad campaign**
 brought revenue, and why deals were lost.
 
@@ -104,7 +106,8 @@ brought revenue, and why deals were lost.
 <td valign="top">
 
 ### Automation and email
-- **When → If → Then rules** on new leads: assign (taking turns), send a template, create a task
+- **When → If → Then rules** on 7 triggers: a lead is added, moves stage or is lost; a deal is created, moves stage, is won or is lost
+- **Actions:** assign (taking turns), send a template, create a task, notify people, move to a stage
 - **Email** from any lead, deal or contact, sent through a queue
 - **Templates** with placeholders (`{{lead.firstName}}`, `{{me.name}}`)
 - **Open tracking:** "Rahul opened your email" arrives live
@@ -292,7 +295,7 @@ flowchart LR
     I["CSV upload"] --> QI["imports"]
     BK["Bulk action on 5,000 rows"] --> QB["bulk"]
     E["Send email"] --> QE["emails"]
-    L["Lead created"] --> QA["automations"]
+    L["Lead / deal created,<br/>moved, won, lost"] --> QA["automations"]
     C["Cron · 03:00 IST"] --> QD["demo"]
 
     QI --> WI["import in batches,<br/>resumable, live progress"]
@@ -371,30 +374,41 @@ dashboard shows revenue per campaign.
 
 ### Automation rules
 
-Rules are set up in Settings → Automations:
+Rules are set up in Settings → Automations. Two examples:
 
 ```
 WHEN  a new lead is added (by hand, a web form or an integration)
-IF    Source is Google Ads  AND  Campaign contains "diwali"          ← all must match; none = every lead
+IF    Source is Google Ads  AND  Campaign contains "diwali"          ← all must match; none = every time
 THEN  assign to Priya / Rohan (taking turns)
       send the "First reply" email
       add a task "Call {{lead.firstName}}", due today, high priority  ← in this order
+
+WHEN  a deal is won
+IF    Amount is more than 1,00,000
+THEN  notify the founder and the deal's owner: "Deal won: {{deal.title}} ({{deal.amount}})"
+      add a task "Start onboarding", due tomorrow
 ```
 
-Conditions can look at the source, the form or integration it came through, the campaign, the owner,
-or any custom field, with *is*, *is not*, *contains*, *is empty* and *is filled in*.
+| Triggers | Conditions can look at | Actions |
+|---|---|---|
+| a lead is **added**, **moves to a stage**, is **lost** | source, campaign, the form it came through, owner, stage, lost reason, custom fields | **assign** (one person, or taking turns) |
+| a deal is **created**, **moves to a stage**, is **won**, is **lost** | source of its lead, owner, stage, **amount**, lost reason, custom fields | **send an email** template · **create a task** |
+| | with *is*, *is not*, *contains*, *is more than*, *is less than*, *is empty*, *is filled in* | **notify** people or the owner · **move** to a stage |
+
+Stage triggers fire however the record moves: dragged on the board, edited in its panel, moved in bulk
+(even a 5,000-row background job), or converted from a lead.
 
 ```mermaid
 flowchart TD
-    L["Lead saved"] --> S{"Workspace has<br/>enabled rules?"}
+    L["Lead or deal saved,<br/>moved, won or lost"] --> S{"Workspace has a rule<br/>for this trigger?"}
     S -- no --> X["nothing queued"]
     S -- yes --> Q["automations queue"]
     Q --> RULES["for each rule, top to bottom"]
-    RULES --> M{"all conditions<br/>match the lead?"}
+    RULES --> M{"all conditions<br/>match the record?"}
     M -- no --> NEXTRULE["next rule"]
-    M -- yes --> CLAIM{"claim run<br/>unique (rule, lead)"}
+    M -- yes --> CLAIM{"claim run<br/>unique (rule, event)"}
     CLAIM -- "already ran<br/>(a retry)" --> NEXTRULE
-    CLAIM -- claimed --> ACT["assign → email → task<br/>(each reports what it did)"]
+    CLAIM -- claimed --> ACT["assign → email → task → notify → move<br/>(each reports what it did)"]
     ACT --> LOG["run log: DONE or FAILED + reason"]
     LOG --> NEXTRULE
 ```
@@ -402,7 +416,10 @@ flowchart TD
 What makes it safe:
 - **No double emails on retries.** A unique `(ruleId, eventKey)` row is claimed before acting, so a
   job that fails halfway and runs again skips the rules it already ran.
-- **No loops.** Actions never trigger rules.
+- **No loops.** Actions never trigger rules: a rule that moves a deal to Won doesn't start the "won" rules.
+- **No double thank-yous.** A deal dragged out of Won by mistake and back is the same win, so its rules
+  don't run again (the run's key includes the stage). And if the deal has already moved on by the time
+  the job runs, the job does nothing.
 - **Imports don't run rules**, so a 5,000-row import can't send 5,000 emails by surprise.
 - **Failures are visible.** A broken step (a deleted template, someone who left) stops the rule with
   a clear reason, and the steps before it stay done.
@@ -459,7 +476,7 @@ queries in parallel. Only won deals' dates and amounts come back as rows, for th
 
 `/api/auth/demo` signs a visitor straight into a demo workspace: 6 people,
 about 420 leads and 300 deals over 18 months, plus tasks, meetings, notes, emails, templates and a
-sample automation. A **BullMQ job scheduler** rebuilds it every night at 03:00 IST. Demo accounts
+two sample automations (drag a deal over ₹1,00,000 to Won and the bell rings). A **BullMQ job scheduler** rebuilds it every night at 03:00 IST. Demo accounts
 can't change passwords or delete the workspace, and never send real email, so it stays the same for
 every visitor.
 
@@ -658,6 +675,7 @@ all tested, not mocked. Some of what they prove:
 - an agent can't see, email or edit another agent's leads, and nobody can reach another workspace
 - a second open lead for the same person is refused, and merging moves the duplicate's whole history over
 - a retried automation job never sends a second email, and a failing step says why
+- a deal won, reopened and won again is celebrated once; a board drag, a bulk move and a conversion all start the right rules
 - Google Ads and IndiaMART payloads become the right lead; bad ones are rejected and logged
 - a retried CSV import carries on from where it stopped and adds nobody twice
 - the open-tracking pixel marks an email opened once, and a made-up token changes nothing
@@ -707,7 +725,7 @@ both up from the repo:
 
 ## Roadmap
 
-- More automation triggers (stage changed, deal won or lost) and **"wait 2 days, then…"** steps for follow-up sequences
+- **"Wait 2 days, then…"** steps in automations, for follow-up sequences
 - **Speed-to-lead alerts:** nobody has contacted a new lead within X hours, so the manager hears about it
 - A **booking link** where a visitor picks a free slot and gets a lead and a meeting
 - **Facebook and Instagram Lead Ads**, built in
