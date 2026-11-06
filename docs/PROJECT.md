@@ -146,7 +146,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       with real demo-workspace screenshots (`public/product`) or app-style pictures, and the app's own cards floating
       in front in 3D
 - [x] Landing page 3D: halftone shapes, the untangling knot, a team swarm behind the quote, a spotlight on the
-      pricing plans, an orb in the FAQ; every WebGL canvas hands its context back on unmount (browsers allow ~16)
+      pricing plans, an orb in the FAQ; the steps section's menus slide in, float and step a highlight through their rows; every WebGL canvas hands its context back on unmount (browsers allow ~16)
 - [x] 404 page in the landing look; link-preview image (`src/app/opengraph-image.tsx`, fonts in `assets/fonts`, site address from `APP_URL`): the real dashboard on a violet panel
 - [x] Basic SEO: `robots.txt` (keeps crawlers out of `/api/`) and `sitemap.xml` (`src/app/robots.ts`, `sitemap.ts`); every public page gets its title, description, canonical address and link preview from `pageMetadata()` in `(marketing)/metadata.ts`; the app stays noindex
 - [x] Onboarding intro

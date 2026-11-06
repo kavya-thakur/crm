@@ -5,7 +5,7 @@
 services:
   # The whole app: Next.js + Socket.IO + the job workers, in one Node process (server.ts)
   - type: web
-    name: flash-crm
+    name: flash
     runtime: node
     plan: free
     region: singapore

@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import {
     IconAt,
     IconCalendarEvent,
+    IconCheck,
     IconChecklist,
     IconCircleDot,
     IconEye,
@@ -144,24 +145,49 @@ const PANEL_TOWERS = [
 // The notch in the picture's left edge, as on twenty.com
 const NOTCH = "polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 70%, 32px 66%, 32px 30%, 0 26%)";
 
-// One of the dark floating menus: a title, then rows with a coloured icon and a cut corner
-function Menu({ card }: { card: MenuCard }) {
+// One of the dark floating menus: a title, then rows with a coloured icon and a cut corner.
+// When its step comes up the rows slide in one after another, then a highlight steps down
+// them, as if someone were picking each option in turn.
+function Menu({ card, active, delay, period }: { card: MenuCard; active: boolean; delay: number; period: number }) {
+    const [lit, setLit] = useState(-1);
+
+    useEffect(() => {
+        if (!active || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const timer = setInterval(() => setLit((row) => (row + 1) % card.rows.length), period);
+        return () => {
+            clearInterval(timer);
+            setLit(-1);
+        };
+    }, [active, period, card.rows.length]);
+
     return (
-        <div className="w-77.5 rounded-xl bg-[#1c1c1c] p-2 shadow-[0_10px_40px_rgb(0_0_0/0.25)]">
+        <div
+            className={`w-77.5 rounded-xl bg-[#1c1c1c] p-2 shadow-[0_10px_40px_rgb(0_0_0/0.25)] transition-[opacity,scale] duration-700 ease-out ${active ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+            style={{ transitionDelay: `${active ? delay : 0}ms` }}
+        >
             <p className="flex items-center gap-2 px-2.5 pt-2 pb-3.5 font-(family-name:--font-host-grotesk) text-[18px] font-medium tracking-[-0.02em] text-white">
                 <card.icon size={18} />
                 {card.title}
             </p>
             <ul className="flex flex-col gap-1.5">
-                {card.rows.map((row) => (
+                {card.rows.map((row, index) => (
                     <li
                         key={row.label}
-                        className="flex h-12.5 items-center gap-3 bg-[#2a2a2a] px-3.5 font-(family-name:--font-azeret-mono) text-[14px] tracking-[0.06em] text-white uppercase"
+                        className={`relative flex h-12.5 items-center gap-3 bg-[#2a2a2a] px-3.5 font-(family-name:--font-azeret-mono) text-[14px] tracking-[0.06em] text-white uppercase transition-[opacity,translate] duration-500 ease-out ${active ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"}`}
                         // the bottom-right corner cut, matching the buttons
-                        style={{ clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%)" }}
+                        style={{
+                            clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%)",
+                            transitionDelay: `${active ? delay + 150 + index * 80 : 0}ms`,
+                        }}
                     >
-                        <row.icon size={18} className="shrink-0" style={{ color: row.color }} />
-                        {row.label}
+                        <span className={`absolute inset-0 bg-white/10 transition-opacity duration-300 ${index === lit ? "opacity-100" : "opacity-0"}`} />
+                        <row.icon size={18} className={`relative shrink-0 transition-transform duration-300 ${index === lit ? "scale-125" : ""}`} style={{ color: row.color }} />
+                        <span className="relative">{row.label}</span>
+                        <IconCheck
+                            size={16}
+                            className={`relative ml-auto transition-[opacity,scale] duration-300 ${index === lit ? "scale-100 opacity-100" : "scale-50 opacity-0"}`}
+                            style={{ color: row.color }}
+                        />
                     </li>
                 ))}
             </ul>
@@ -174,11 +200,12 @@ function Picture({ step, active = true }: { step: Step; active?: boolean }) {
         <div
             className={`absolute inset-0 transition-[opacity,translate] duration-500 ease-out ${active ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}
         >
-            <div className="absolute top-[28%] left-[5%]">
-                <Menu card={step.cards[0]} />
+            {/* the two menus drift up and down, out of step with each other */}
+            <div className="absolute top-[28%] left-[5%] motion-safe:animate-[bob_7s_ease-in-out_infinite]">
+                <Menu card={step.cards[0]} active={active} delay={0} period={1500} />
             </div>
-            <div className="absolute top-[38%] left-[54%]">
-                <Menu card={step.cards[1]} />
+            <div className="absolute top-[38%] left-[54%] motion-safe:animate-[bob_7s_ease-in-out_-3.5s_infinite]">
+                <Menu card={step.cards[1]} active={active} delay={200} period={1900} />
             </div>
         </div>
     );
@@ -201,6 +228,8 @@ function Backdrop({ children }: { children: ReactNode }) {
 export function StepsSection() {
     const pinRef = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState(0);
+    // the menus wait until the section comes into view, so the first step's menus play in too
+    const [seen, setSeen] = useState(false);
 
     // While the tall section scrolls past, the picture stays put and the step changes
     // with how far through it you are. React skips the re-render when the step is the same.
@@ -210,6 +239,12 @@ export function StepsSection() {
             start: "top 64px",
             end: "bottom bottom",
             onUpdate: ({ progress }) => setActive(Math.min(STEPS.length - 1, Math.floor(progress * STEPS.length))),
+        });
+        ScrollTrigger.create({
+            trigger: pinRef.current,
+            start: "top 60%",
+            onEnter: () => setSeen(true),
+            onLeaveBack: () => setSeen(false),
         });
     }, []);
 
@@ -252,7 +287,7 @@ export function StepsSection() {
 
                         <Backdrop>
                             {STEPS.map((step, index) => (
-                                <Picture key={index} step={step} active={index === active} />
+                                <Picture key={index} step={step} active={seen && index === active} />
                             ))}
                         </Backdrop>
                     </div>

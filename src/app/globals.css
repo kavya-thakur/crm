@@ -101,6 +101,12 @@ body {
     stroke-dashoffset: -18;
   }
 }
+/* the landing steps' menus: a slow float up and back */
+@keyframes bob {
+  50% {
+    transform: translateY(-10px);
+  }
+}
 @keyframes job-fill {
   from {
     transform: scaleX(0.15);
