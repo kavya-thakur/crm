@@ -9,6 +9,7 @@ import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/cu
 import { bulkLeadChangesSchema } from "@/lib/validations/leads";
 import { assignLeads, moveLeads } from "@/lib/jobs/bulkActions";
 import { firstName, notify } from "@/lib/realtime/notify";
+import { stageEvents, startAutomations } from "@/lib/automations/engine";
 
 const leadIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -164,6 +165,7 @@ export async function PATCH(req: NextRequest) {
             }
 
             const changed = await prisma.$transaction((tx) => moveLeads(tx, user, leads, stage, data.lostReason));
+            await startAutomations(...stageEvents("lead", user.organizationId, changed.map((lead) => lead.id), stage));
 
             return NextResponse.json({
                 ok: true,

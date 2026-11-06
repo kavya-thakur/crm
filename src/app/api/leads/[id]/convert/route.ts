@@ -6,6 +6,7 @@ import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { closedAtFor } from "@/lib/deals/stages";
 import { dealLeadSelect } from "@/lib/deals/select";
+import { stageEvents, startAutomations } from "@/lib/automations/engine";
 
 // Only what a deal needs beyond the lead itself: the lead and its current
 // assignee carry over as-is, so neither is asked for here. Deal custom fields
@@ -133,6 +134,12 @@ export async function POST(
                 },
             }),
         ]);
+
+        // a new deal, and a lead that moved to its converted stage
+        await startAutomations(
+            { trigger: "deal.created", organizationId: user.organizationId, dealId: deal.id },
+            ...stageEvents("lead", user.organizationId, [lead.id], { id: convertedStage.id, isLost: false }),
+        );
 
         return NextResponse.json(
             {

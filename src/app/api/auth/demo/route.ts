@@ -11,7 +11,9 @@ import { DEMO_EMAIL, DEMO_SLUG } from "@/lib/demo/workspace";
  * to the demo workspace, whose people are fixed; nothing here can reach a real one.
  */
 export async function GET(req: NextRequest) {
-    const back = (reason: string) => NextResponse.redirect(new URL(`/login?demo=${reason}`, req.url), 303);
+    // a relative Location: req.url's host is "localhost" on the server, not the site's address
+    const redirect = (to: string) => new NextResponse(null, { status: 303, headers: { Location: to } });
+    const back = (reason: string) => redirect(`/login?demo=${reason}`);
 
     if (await tooManyAttempts(`demo:${visitorOf(req.headers)}`, 30, 10 * 60 * 1000)) return back("busy");
 
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
     });
     if (!user) return back("unavailable");
 
-    const response = NextResponse.redirect(new URL("/dashboard", req.url), 303);
+    const response = redirect("/dashboard");
     // the same login cookie as a normal sign-in
     response.cookies.set("access_token", createToken({ userId: user.id, organizationId: user.organizationId }), {
         httpOnly: true,

@@ -198,9 +198,11 @@ cron `0 3 * * *` in Asia/Kolkata) adds a job to the `demo` queue every night, an
 queue; the worker's `sendEmail()` sends it over SMTP, and after 4 failed tries `failEmail()`
 marks it failed and tells the sender. See [EMAIL.md](EMAIL.md).
 
-**Automations** too: saving a lead adds `{ trigger, organizationId, leadId }` to the
-`automations` queue, and the worker runs the workspace's rules. A retry never repeats a rule
-for the same lead (a unique run row is claimed first). See [AUTOMATIONS.md](AUTOMATIONS.md).
+**Automations** too: saving, moving, winning or losing a lead or deal adds
+`{ trigger, organizationId, leadId | dealId, stageId? }` to the `automations` queue (only for
+triggers the workspace has a rule for), and the worker runs the rules. A retry never repeats a rule
+for the same event (a unique run row is claimed first). A bulk job queues its batch's events after
+the batch is saved, so the worker never reads the old stage. See [AUTOMATIONS.md](AUTOMATIONS.md).
 
 Good next candidates: **speed-to-lead alerts**
 (a delayed job: "in 2 hours, check whether this lead was contacted"), and moving meeting

@@ -9,6 +9,7 @@ export const TEMPLATE_VARIABLES = [
     { key: "lead.name", label: "Full name", example: "Rahul Mehta" },
     { key: "lead.company", label: "Their company", example: "Acme" },
     { key: "deal.title", label: "Deal", example: "Acme: Annual licence" },
+    { key: "deal.amount", label: "Deal amount", example: "₹2,50,000" },
     { key: "me.name", label: "Your name", example: "Priya Sharma" },
     { key: "me.email", label: "Your email", example: "priya@yourcompany.com" },
     { key: "workspace.name", label: "Your company", example: "Flash" },

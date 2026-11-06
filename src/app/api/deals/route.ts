@@ -6,6 +6,7 @@ import { createDealSchema, listDealsQuerySchema } from "@/lib/validations/deals"
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { closedAtFor } from "@/lib/deals/stages";
+import { startAutomations } from "@/lib/automations/engine";
 import { NextRequest, NextResponse } from "next/server";
 import { firstName, notify } from "@/lib/realtime/notify";
 import { dealLeadSelect } from "@/lib/deals/select";
@@ -298,6 +299,9 @@ export async function POST(req: NextRequest) {
             body: deal.title,
             link: `/deals?open=${deal.id}`,
         });
+
+        // the workspace's "when a deal is created" rules (they run in the background)
+        await startAutomations({ trigger: "deal.created", organizationId: user.organizationId, dealId: deal.id });
 
         return NextResponse.json(
             {

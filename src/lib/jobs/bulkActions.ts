@@ -3,6 +3,7 @@ import { contactScope, dealScope, hasPermission, leadScope, userForJob, type Cur
 import { broadcastChange, firstName, getSocketServer, notify, userRoom } from "@/lib/realtime/notify";
 import { stageMessage } from "@/lib/leads/stages";
 import { closedAtFor } from "@/lib/deals/stages";
+import { stageEvents, startAutomations } from "@/lib/automations/engine";
 import type { Prisma } from "@/generated/prisma/client";
 
 /*
@@ -134,26 +135,28 @@ export function mayDo(user: CurrentUser, entity: BulkEntity, action: BulkAction)
 type Plan = { stage: Awaited<ReturnType<typeof findStage>>; agent: Agent; lostReason?: string | null };
 
 // One batch of a job: only among the records this person may still touch (the same scope as the
-// lists); anything already gone or now out of reach is skipped. Returns how many it changed.
+// lists); anything already gone or now out of reach is skipped. Returns how many it changed, and
+// which ones it moved to a new stage (their automations start once the batch is saved)
 async function runBatch(tx: Tx, user: CurrentUser, entity: BulkEntity, action: BulkAction, ids: number[], plan: Plan) {
     const where = { id: { in: ids } };
+    const changed = (records: { id: number }[]) => ({ affected: records.length, moved: action === "stage" ? records.map((record) => record.id) : [] });
 
     if (action === "delete") {
-        if (entity === "lead") return (await tx.lead.deleteMany({ where: { ...where, ...leadScope(user) } })).count;
-        if (entity === "deal") return (await tx.deal.deleteMany({ where: { ...where, ...dealScope(user) } })).count;
-        return (await tx.contact.deleteMany({ where: { ...where, ...contactScope(user) } })).count;
+        if (entity === "lead") return { affected: (await tx.lead.deleteMany({ where: { ...where, ...leadScope(user) } })).count, moved: [] };
+        if (entity === "deal") return { affected: (await tx.deal.deleteMany({ where: { ...where, ...dealScope(user) } })).count, moved: [] };
+        return { affected: (await tx.contact.deleteMany({ where: { ...where, ...contactScope(user) } })).count, moved: [] };
     }
 
     if (entity === "lead") {
         const leads = await tx.lead.findMany({ where: { ...where, ...leadScope(user) }, select: { id: true, stageId: true, assignedToId: true } });
-        return (action === "stage" ? await moveLeads(tx, user, leads, plan.stage!, plan.lostReason) : await assignLeads(tx, user, leads, plan.agent)).length;
+        return changed(action === "stage" ? await moveLeads(tx, user, leads, plan.stage!, plan.lostReason) : await assignLeads(tx, user, leads, plan.agent));
     }
     if (entity === "deal") {
         const deals = await tx.deal.findMany({ where: { ...where, ...dealScope(user) }, select: { id: true, pipelineStageId: true, assignedToId: true } });
-        return (action === "stage" ? await moveDeals(tx, user, deals, plan.stage!, plan.lostReason) : await assignDeals(tx, user, deals, plan.agent)).length;
+        return changed(action === "stage" ? await moveDeals(tx, user, deals, plan.stage!, plan.lostReason) : await assignDeals(tx, user, deals, plan.agent));
     }
     const contacts = await tx.contact.findMany({ where: { ...where, ...contactScope(user) }, select: { id: true, assignedToId: true } });
-    return (await assignContacts(tx, user, contacts, plan.agent)).length;
+    return changed(await assignContacts(tx, user, contacts, plan.agent));
 }
 
 // What the live progress carries
@@ -185,18 +188,22 @@ export async function runBulkJob(bulkJobId: number) {
     for (let start = job.processed; start < job.ids.length; start += BATCH) {
         const batch = job.ids.slice(start, start + BATCH);
 
-        const progress = await prisma.$transaction(
+        const { progress, moved } = await prisma.$transaction(
             async (tx) => {
-                const count = await runBatch(tx, user, entity, action, batch, { stage, agent, lostReason: params.lostReason });
-                return tx.bulkJob.update({
+                const { affected, moved } = await runBatch(tx, user, entity, action, batch, { stage, agent, lostReason: params.lostReason });
+                const progress = await tx.bulkJob.update({
                     where: { id: job.id },
-                    data: { processed: { increment: batch.length }, affected: { increment: count } },
+                    data: { processed: { increment: batch.length }, affected: { increment: affected } },
                     select: progressSelect,
                 });
+                return { progress, moved };
             },
             // deleting 500 leads also removes their timelines, notes, tasks and activities
             { timeout: 120_000, maxWait: 10_000 },
         );
+
+        // the "moves to a stage" rules, the same as for a drag on the board
+        if (stage && entity !== "contact") await startAutomations(...stageEvents(entity, job.organizationId, moved, stage));
 
         report(user.id, progress);
         // everyone's lists change as it goes

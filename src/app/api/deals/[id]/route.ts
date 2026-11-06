@@ -8,6 +8,7 @@ import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { closedAtFor } from "@/lib/deals/stages";
 import { NextRequest, NextResponse } from "next/server";
 import { dealLeadSelect } from "@/lib/deals/select";
+import { stageEvents, startAutomations } from "@/lib/automations/engine";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -94,6 +95,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         // when the stage changes: the moment the deal closed, or null if it's open again
         let closedAt: Date | null = null;
         let lost = false;
+        let newStage: { id: number; isWon: boolean; isLost: boolean } | undefined;
 
         // Verify that the pipeline stage belongs to this organization, if changing it.
         if (pipelineStageId !== undefined) {
@@ -117,6 +119,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
             closedAt = closedAtFor(stage);
             lost = stage.isLost;
+            newStage = stage;
         }
 
         // Verify that the lead belongs to this organization, if changing it.
@@ -201,6 +204,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 pipelineStage: true,
             },
         });
+
+        // the workspace's "deal moves to a stage", "won" and "lost" rules
+        if (stageChanged && newStage) {
+            await startAutomations(...stageEvents("deal", user.organizationId, [updatedDeal.id], newStage));
+        }
 
         return NextResponse.json({
             ok: true,

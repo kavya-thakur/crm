@@ -367,6 +367,21 @@ export async function buildDemoWorkspace() {
             createdById: manager.id,
         },
     });
+    // and one for deals: drag a big deal to Won and the bell rings, with an onboarding task
+    await prisma.automationRule.create({
+        data: {
+            ...org,
+            name: "Big wins: tell the team",
+            trigger: "deal.won",
+            order: 1,
+            conditions: [{ field: "amount", op: "gt", value: "100000" }],
+            actions: [
+                { type: "notify", userIds: [manager.id], toOwner: true, message: "Deal won: {{deal.title}} ({{deal.amount}})" },
+                { type: "task", title: "Start onboarding for {{deal.title}}", dueInDays: 1, priority: "HIGH" },
+            ],
+            createdById: manager.id,
+        },
+    });
     const emailedLeads = await prisma.lead.findMany({
         where: { ...org, email: { not: null } },
         orderBy: { createdAt: "desc" },
