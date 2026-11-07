@@ -163,28 +163,44 @@ export function Pagination({
 // ---------------------------------------------------------------------------
 
 // Same two names on every page, so people learn them once
-export function ViewSwitcher({ view, onChange }: { view: "table" | "board"; onChange: (view: "table" | "board") => void }) {
+// The ways a list page can lay its records out; each page offers the ones it has
+const VIEWS = {
+    table: { label: "List", icon: IconLayoutList },
+    board: { label: "Kanban", icon: IconLayoutKanban },
+    calendar: { label: "Calendar", icon: IconCalendar },
+};
+
+export function ViewSwitcher<V extends keyof typeof VIEWS = "table" | "board">({
+    view,
+    onChange,
+    views = ["table", "board"] as V[],
+}: {
+    view: V;
+    onChange: (view: V) => void;
+    views?: V[];
+}) {
+    const Current = VIEWS[view].icon;
     return (
         <Dropdown
             buttonClassName="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
             label={
                 <>
-                    {view === "table" ? <IconLayoutList size={16} /> : <IconLayoutKanban size={16} />}
-                    {view === "table" ? "List" : "Kanban"}
+                    <Current size={16} />
+                    {VIEWS[view].label}
                     <IconChevronDown size={14} className="text-faint" />
                 </>
             }
         >
-            {(close) => (
-                <>
-                    <MenuItem selected={view === "table"} onClick={() => { onChange("table"); close(); }}>
-                        <IconLayoutList size={16} /> List
-                    </MenuItem>
-                    <MenuItem selected={view === "board"} onClick={() => { onChange("board"); close(); }}>
-                        <IconLayoutKanban size={16} /> Kanban
-                    </MenuItem>
-                </>
-            )}
+            {(close) =>
+                views.map((option) => {
+                    const Icon = VIEWS[option].icon;
+                    return (
+                        <MenuItem key={option} selected={view === option} onClick={() => { onChange(option); close(); }}>
+                            <Icon size={16} /> {VIEWS[option].label}
+                        </MenuItem>
+                    );
+                })
+            }
         </Dropdown>
     );
 }
@@ -391,6 +407,8 @@ export interface BulkField {
     clearable?: boolean;
     /** the picked value ("" = empty) as the bulk API's changes, e.g. { sourceId: 4 } */
     toChanges: (value: string) => Record<string, unknown>;
+    /** the page's own way to give the value (a company search), in place of the text box */
+    input?: (value: string, onChange: (value: string) => void) => ReactNode;
 }
 
 const TYPE_ICONS = { text: IconLetterCase, number: IconHash, date: IconCalendar, select: IconList };
@@ -567,6 +585,11 @@ function BulkEditForm({
                                     );
                                 })}
                             </ul>
+                        ) : field.input ? (
+                            <div className="mt-3">
+                                {value && <p className="mb-2 rounded-lg bg-accent-faint px-2.5 py-1.5 text-ink ring-1 ring-accent/30 ring-inset">{value}</p>}
+                                {field.input(value ?? "", setValue)}
+                            </div>
                         ) : (
                             <input
                                 autoFocus

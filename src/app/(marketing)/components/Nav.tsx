@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { IconMenu2, IconX } from "@tabler/icons-react";
 
 import { LogoMark } from "@/components/Logo";
 import { Button } from "./Button";
@@ -25,6 +26,8 @@ export function Nav({ loggedIn, primaryHref, primaryLabel, resting = "grey" }: {
     // page's hero, the FAQ and footer), like twenty.com's bar. React skips the re-render when nothing changed.
     const [scrolled, setScrolled] = useState(false);
     const [dark, setDark] = useState(false);
+    // the phone menu, below 921px where the links don't fit in the bar
+    const [open, setOpen] = useState(false);
 
     useEffect(() => {
         const darkSections = [...document.querySelectorAll("[data-scheme=dark]")];
@@ -84,8 +87,37 @@ export function Nav({ loggedIn, primaryHref, primaryLabel, resting = "grey" }: {
                     <Button href={primaryHref} size="small" scheme={dark ? "dark" : "light"}>
                         {primaryLabel}
                     </Button>
+                    <button
+                        type="button"
+                        aria-label={open ? "Close menu" : "Open menu"}
+                        aria-expanded={open}
+                        onClick={() => setOpen(!open)}
+                        className="grid size-9 place-items-center min-[921px]:hidden"
+                    >
+                        {open ? <IconX size={22} /> : <IconMenu2 size={22} />}
+                    </button>
                 </div>
             </div>
+
+            {/* the phone menu drops down from under the bar */}
+            <nav
+                aria-label="Menu"
+                inert={!open}
+                className={`absolute inset-x-0 top-full flex flex-col gap-1 px-4 pt-2 pb-5 shadow-[0_12px_24px_-12px_rgb(28_28_28/0.25)] transition-[opacity,translate] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] min-[921px]:hidden ${
+                    dark ? "bg-[#1c1c1c]" : "bg-white"
+                } ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
+            >
+                {[...LINKS, ...(loggedIn ? [] : [{ href: "/login", label: "Log in" }])].map((link) => (
+                    <a
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setOpen(false)}
+                        className="border-b border-current/10 py-3.5 font-(family-name:--font-azeret-mono) text-[13px] font-medium uppercase transition-colors duration-200 hover:text-[#4a38f5]"
+                    >
+                        {link.label}
+                    </a>
+                ))}
+            </nav>
         </header>
     );
 }

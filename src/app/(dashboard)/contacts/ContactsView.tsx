@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconBriefcase } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconBriefcase, IconBuilding } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { toast } from "@/components/Toast";
@@ -45,6 +45,7 @@ import { PAGE_SIZES } from "../shared/useUrlState";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
 import { useUrlState } from "../shared/useUrlState";
+import { CompanyOptions } from "../shared/CompanyPicker";
 
 
 const SORT_FIELDS: { field: ContactFilters["sortBy"]; label: string }[] = [
@@ -327,6 +328,15 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                         pending={bulk.isPending}
                         onApply={(changes) => bulk.mutate({ action: "update", changes })}
                         fields={[
+                            {
+                                key: "company",
+                                label: "Company",
+                                icon: IconBuilding,
+                                type: "text",
+                                clearable: true,
+                                toChanges: (value) => ({ companyName: value || null }),
+                                input: (value, onChange) => <CompanyOptions value={value || null} onPick={(name) => onChange(name ?? "")} />,
+                            },
                             { key: "jobTitle", label: "Job title", icon: IconBriefcase, type: "text", clearable: true, toChanges: (value) => ({ jobTitle: value || null }) },
                             ...customBulkFields(customFields, can.seeAgents ? agents.data : undefined),
                         ]}
@@ -338,7 +348,7 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
                 open={confirmingDelete}
                 count={selection.count}
                 noun="contact"
-                description={selection.big ? "It runs in the background, so you can keep working. This can't be undone." : undefined}
+                description={selection.big ? "It runs in the background, so you can keep working. They can be restored from the recycle bin for 30 days." : undefined}
                 pending={bulk.isPending || bulkJob.isPending}
                 onCancel={() => setConfirmingDelete(false)}
                 onConfirm={() => runBulk({ action: "delete" })}

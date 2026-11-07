@@ -1,4 +1,5 @@
 import { leadScope, requirePermission } from "@/lib/auth/requirePermission";
+import { deleteToBin } from "@/lib/recycleBin";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { updateLeadSchema } from "@/lib/validations/leads";
@@ -8,6 +9,7 @@ import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { stageMessage } from "@/lib/leads/stages";
 import { alreadyALead, findOpenCopy, isOpen } from "@/lib/leads/duplicates";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
+import { moveToCompany } from "@/lib/companies";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -217,6 +219,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
             },
         });
 
+        // its contact moves to the company it now names (or out of its company, when cleared)
+        if (fields.companyName !== undefined) await moveToCompany(prisma, user.organizationId, [updatedLead.id], fields.companyName);
+
         // the workspace's "lead moves to a stage" (and "lead is lost") rules
         if (newStage) {
             await startAutomations(...stageEvents("lead", user.organizationId, [updatedLead.id], { id: updatedLead.stageId, isLost: newStage.isLost }));
@@ -241,13 +246,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             return validationError(id.error);
         }
 
-        // One query that checks the scope and deletes, so there's no gap for a race
-        const { count } = await prisma.lead.deleteMany({
-            where: {
-                id: id.data,
-                ...leadScope(user),
-            },
-        });
+        // Into the recycle bin (a copy, with its history), then deleted, in one transaction;
+        // the scope is in the where, so someone else's lead is a 404
+        const count = await prisma.$transaction((tx) => deleteToBin(tx, user, "lead", { id: id.data, ...leadScope(user) }));
 
         if (count === 0) {
             return leadNotFound();
@@ -255,7 +256,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
         return NextResponse.json({
             ok: true,
-            message: "Lead deleted successfully",
+            message: "Lead moved to the recycle bin",
         });
     } catch (error) {
         return handleRouteError(error, "Delete lead");

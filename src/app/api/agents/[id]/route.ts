@@ -17,6 +17,9 @@ const agentSelect = {
     createdAt: true,
     updatedAt: true,
     role: { select: { id: true, name: true } },
+    // Members shows the owner, and who the owner lets "Log in as" teammates
+    isOwner: true,
+    canLogInAs: true,
 } satisfies Prisma.UserSelect;
 
 function agentNotFound() {

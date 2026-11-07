@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { hasPermission } from "@/lib/auth/requirePermission";
 import MembersView from "./MembersView";
+import { isDemoWorkspace } from "@/lib/demo/workspace";
 
 export const metadata: Metadata = {
     title: "Members",
@@ -24,6 +25,9 @@ export default async function MembersPage() {
         <MembersView
             me={{
                 id: user.id,
+                isOwner: user.isOwner,
+                // the owner always can; others only if the owner allowed them (and not while logged in as someone)
+                canLogInAs: !user.actingAsId && !isDemoWorkspace(user) && (user.isOwner || user.canLogInAs),
                 permissions: user.role.permissions.map(({ permission }) => permission.name),
             }}
             can={{

@@ -46,7 +46,10 @@ export const getCurrentUser = cache(async () => {
             return null;
         }
 
-        return user;
+        // while someone is logged in as this person ("Log in as"): who that really is
+        const actingAsId = "actingAs" in payload && typeof payload.actingAs === "number" ? payload.actingAs : null;
+
+        return { ...user, actingAsId };
     } catch {
         return null;
     }

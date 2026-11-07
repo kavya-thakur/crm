@@ -53,4 +53,6 @@ export const listScheduledActivitiesQuerySchema = paginationSchema.extend({
     contactId: idParamSchema.optional(),
     // only ones at or after this moment (the start-time alert asks for the last few minutes onwards)
     from: z.coerce.date().optional(),
+    // and before this one: with both, a date range (the calendar's month or week), all of it at once
+    to: z.coerce.date().optional(),
 });

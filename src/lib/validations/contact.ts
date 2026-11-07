@@ -8,6 +8,8 @@ export const createContactSchema = z.object({
     jobTitle: optionalText(150).transform(capitalizeIfPresent),
     description: optionalText(5000),
     companyId: dbIdSchema.nullable().optional(),
+    // or the company by its name, as the company picker gives it: found (or made); empty = none
+    companyName: optionalText(200),
     // omitted = assign to the creator, null = create unassigned
     assignedToId: dbIdSchema.nullable().optional(),
     // keyed by CustomFieldDefinition.key; checked against the org's actual
@@ -23,7 +25,7 @@ export const updateContactSchema = createContactSchema
 
 // What bulk edit can set on many contacts at once (name, email and phone are each contact's own)
 export const bulkContactChangesSchema = createContactSchema
-    .pick({ jobTitle: true, customFields: true })
+    .pick({ jobTitle: true, companyName: true, customFields: true })
     .partial()
     .refine(hasAnyField, "Pick a field to change");
 

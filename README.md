@@ -86,6 +86,11 @@ brought revenue, and why deals were lost.
 - Leads move through stages, **convert into deals**, and end won or lost
 - **List or kanban board** for leads, deals, tasks and activities; drag a card to change its stage
 - Every lead has a **contact** (the person), shared by all their leads
+- **Companies**: each with its people, open deals and revenue won; filled in by itself from the company name on leads
+- **Products and quotes**: a product catalogue with prices and GST; add products to a deal and its amount adds itself up; a printable quote you can save as a PDF
+- A **calendar** of calls and meetings, by month or week
+- A **recycle bin**: deleted leads, deals and contacts can be restored for 30 days, with their whole history
+- The workspace's **currency** (₹, $, €, and more) in Settings, used by every amount on screen
 - **Custom fields** of any type (text, number, date, yes/no, dropdown, team member), filterable and shown in lists
 - A **timeline** of everything that happened, plus **notes with @mentions**
 - **Lost reasons** asked at the moment something is lost
@@ -108,7 +113,8 @@ brought revenue, and why deals were lost.
 ### Automation and email
 - **When → If → Then rules** on 7 triggers: a lead is added, moves stage or is lost; a deal is created, moves stage, is won or is lost
 - **Actions:** assign (taking turns), send a template, create a task, notify people, move to a stage
-- **Email** from any lead, deal or contact, sent through a queue
+- **Email** from any lead, deal or contact, sent through a queue **from each person's own Gmail** (connected in Profile)
+- **WhatsApp** button on every phone number: opens the chat with a template already typed
 - **Templates** with placeholders (`{{lead.firstName}}`, `{{me.name}}`)
 - **Open tracking:** "Rahul opened your email" arrives live
 - A run log for every rule; retries never send a second email
@@ -119,6 +125,7 @@ brought revenue, and why deals were lost.
 ### Real time and teamwork
 - Every list, board, panel and dashboard **updates live** when a teammate changes something
 - A **notification bell:** assigned to you, @mentioned, email opened, import finished
+- **My day:** each rep's morning page: overdue and today's tasks, today's calls (and missed ones), the freshest new leads with no call or task planned yet (a short list, not all of them), deals closing this week; tick done, call or WhatsApp right there
 - **Tasks**, and **calls and meetings** with attendees and reschedule
 - A **reminder 10 minutes before** a meeting, and a **popup with a chime at the start time**, on any page
 - **⌘K search** across leads, deals, contacts, tasks and activities
@@ -140,6 +147,8 @@ brought revenue, and why deals were lost.
 ### Platform
 - **Multi-tenant:** every record belongs to a workspace, every query is scoped to it
 - **Roles and permissions** an admin builds: own records or everyone's, and access to each setting
+- A **site admin** area for whoever runs Flash: every company and user on the site, and log in as anyone
+- **Log in as a teammate** for the workspace owner (and people they allow), to see exactly what they see; an hour at a time, with a banner and a notification to the teammate
 - **Bulk actions** on up to 50,000 records as background jobs with a progress bar
 - **Demo mode:** one-click logins and a nightly reset
 - Works on phones: slide-in sidebar, responsive tables and panels
@@ -162,7 +171,7 @@ brought revenue, and why deals were lost.
 | **Data fetching** | **TanStack React Query 5** and axios | Caching, paging, and one-line refetches when a live update arrives |
 | **Forms** | react-hook-form | Fast forms with the same Zod rules as the server |
 | **UI** | **Tailwind CSS 4**, Tabler icons, sonner toasts, **GSAP**, three.js | A light design system with tokens in one CSS file; smooth, transform-only motion |
-| **Email** | **Nodemailer** over SMTP | Works with any provider; free with a Gmail account |
+| **Email** | **Nodemailer** over SMTP | Each person's own mailbox (Gmail app password, stored AES-256-GCM encrypted); no Google approval needed |
 | **Files** | Papaparse | CSV import and export, with spreadsheet-formula escaping |
 | **Auth** | JWT in an httpOnly cookie, bcrypt | No third party; the same cookie signs in the WebSocket |
 | **Tests and CI** | **Vitest** against a real PostgreSQL, **GitHub Actions** | Tests the real routes, queries and constraints, on every pull request |
@@ -191,7 +200,7 @@ flowchart LR
 
     PG[("PostgreSQL<br/>Prisma 7")]
     R[("Redis<br/>queues + rate limits")]
-    SMTP["SMTP<br/>(Gmail)"]
+    SMTP["SMTP<br/>(each person's Gmail)"]
 
     B -- "HTTPS /api/*" --> NEXT
     B <-- "WebSocket: live events" --> IO
@@ -438,9 +447,14 @@ flowchart LR
     S --> O["customer opens it → pixel<br/>→ 'Opened' + live notification"]
 ```
 
-- **Sending.** Every email leaves from one SMTP address as "Priya via Acme", with **Reply-To set to
-  the sender**, so the customer's reply lands in their own inbox. A free Gmail account with an app
-  password is enough; Resend or Brevo work by changing environment variables.
+- **Sending from your own address.** Each person connects their own mailbox in Settings → Profile
+  (their address and an app password, any provider). Flash logs in to check it before saving, keeps
+  the password AES-256-GCM encrypted, and never sends it back to the browser. Emails then go out
+  from Priya's own Gmail, so replies land in her inbox and nobody sends from anyone else's account.
+  Until someone connects, their Emails tab asks them to; a revoked password fails at once with
+  "Reconnect it in Profile". (Gmail's API would need Google's app review; an app password doesn't.)
+- **WhatsApp.** A button next to every phone number opens a `wa.me` chat with a template's text
+  already typed, and notes it on the timeline. No API, no cost.
 - **Templates** fill in `{{lead.firstName}}`, `{{lead.company}}`, `{{deal.title}}`, `{{me.name}}` and
   `{{workspace.name}}` in the browser, so the sender sees and can edit the exact text.
 - **Open tracking.** Each email ends with a 1×1 image at a random token's address. The first load
@@ -493,12 +507,16 @@ erDiagram
     Role ||--o{ RolePermission : grants
     Permission ||--o{ RolePermission : "is granted by"
     User }o--|| Role : has
+    User ||--o| EmailAccount : "sends through"
 
     Organization ||--o{ Lead : owns
     Organization ||--o{ Contact : owns
     Organization ||--o{ Deal : owns
     Contact ||--o{ Lead : "a person's leads"
+    Company ||--o{ Contact : "works here"
     Lead ||--o{ Deal : "converts into"
+    Deal ||--o{ DealProduct : "quote lines"
+    Product |o--o{ DealProduct : "copied from"
     Lead ||--o{ LeadTimeline : "automatic log"
     Lead ||--o{ LeadNote : "written by people"
     Lead ||--o{ Task : "to-dos"
@@ -510,6 +528,7 @@ erDiagram
     Organization ||--o{ AutomationRule : "sets up"
     AutomationRule ||--o{ AutomationRun : "what it did"
     Organization ||--o{ CustomFieldDefinition : "values in JSONB"
+    Organization ||--o{ DeletedRecord : "recycle bin (30 days)"
 ```
 
 - **Custom fields** are defined per workspace and stored in a `customFields` JSONB column on each
@@ -524,19 +543,19 @@ erDiagram
 
 ## API
 
-76 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
+94 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |
 |---|---|
-| **Records** | `leads`, `deals`, `contacts`: list (filters, paging, `?format=csv`), create, read, update, delete, `assign`, `bulkUpdate`, `notes`, `timeline`; leads also `convert`, `merge`, `duplicates`; deals `merge`, `duplicates` |
+| **Records** | `leads`, `deals`, `contacts`: list (filters, paging, `?format=csv`), create, read, update, delete, `assign`, `bulkUpdate`, `notes`, `timeline`; leads also `convert`, `merge`, `duplicates`; deals `merge`, `duplicates`; `companies` (with their deal totals); `recycle-bin` (list, restore, delete forever, and `bulk`: many at once or the whole bin); `products` (the catalogue) and `deals/[id]/products` (a deal's quote lines) |
 | **Work** | `tasks`, `activities` (calls and meetings), `notes` (the notes feed) |
-| **Email** | `emails` (list and send), `email-templates` |
+| **Email** | `emails` (list and send), `email-templates`, `whatsapp` (note an opened chat) |
 | **Automation** | `automations` (rules, on/off), `automations/:id/runs` (the run log) |
 | **Capture** | `lead-forms` (web forms and integrations), `lead-forms/:id/deliveries`, `imports` (+ `problems`, `sample`), `bulk-jobs` |
-| **Workspace** | `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
-| **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `me`, `me/password`, `notifications` |
-| **Insight** | `dashboard`, `search` |
+| **Workspace** | `workspace` (its currency), `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
+| **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `me`, `me/password`, `me/email-account` (connect your mailbox), `notifications` |
+| **Insight** | `dashboard`, `my-day`, `search` |
 | **Public (no login)** | `public/forms/:key` (web forms), `public/leads/:key` (integration webhooks), `public/emails/:token/open` (open tracking), `health` |
 
 ---
@@ -553,7 +572,7 @@ of them check sign-in, permission, input (Zod) and workspace scope.
 | **Rate limits in Redis that fail open** | Shared across servers and restarts. If Redis is down for a minute, forms keep working instead of the limiter taking the site down |
 | **One webhook that reads many payload shapes** | Plain JSON, Google Ads and IndiaMART all become one shape, with field names guessed like the CSV importer does. One feature covers dozens of tools |
 | **Integrations are web forms of another kind** (`LeadForm.kind = WEBHOOK`) | They get the source, owner, rotation and capture rules for free; only a payload reader and a log are new |
-| **Email over plain SMTP** from one address, Reply-To the sender | Free with no domain, lands in inboxes, and moving providers is only configuration |
+| **Email over SMTP from each person's own mailbox** (app password, encrypted) | Free, needs no domain or Google app review, replies go straight to the sender, and nobody shares one account |
 | **Template placeholders filled in the browser** | The sender sees and can edit the exact text before it goes |
 | **Page state in the URL** | Refresh, Back and shared links all work |
 | Rule conditions and form settings as **JSON checked by Zod** | A new action type or form option needs no migration, and old data reads back with defaults |
@@ -580,7 +599,7 @@ crm/
 ├── server.ts                 Next.js + Socket.IO + job workers, on one port
 ├── prisma/
 │   ├── schema.prisma         every model, commented
-│   ├── migrations/           43 migrations, applied in order
+│   ├── migrations/           51 migrations, applied in order
 │   ├── seed.ts               permissions and default stages
 │   └── demo.ts               builds the demo workspace (npm run db:demo)
 ├── src/
@@ -647,12 +666,10 @@ Open the login page and click **Open the demo**, or sign in as `johndoe@flash-de
 | `JWT_SECRET` | yes | signs the login cookie; a long random string (`openssl rand -base64 32`) |
 | `REDIS_URL` | yes | job queues and rate limits |
 | `APP_URL` | in production | the site's public address, for link previews and email open tracking |
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` | for email | any SMTP server. With Gmail: a dedicated account, 2-Step Verification on, and an app password from myaccount.google.com/apppasswords |
-| `SMTP_FROM` | optional | send from an address other than `SMTP_USER` |
 | `DEMO_FORM_KEY` | optional | the marketing site's "Book a demo" form sends its leads into this web form |
 | `TEST_DATABASE_URL` | optional | the database `npm test` uses (default: local `crm_test`) |
 
-Without the SMTP settings nothing breaks: emails are saved and marked "Not sent", with the reason.
+Email needs no settings: each person connects their own mailbox in Settings → Profile.
 
 ### Scripts
 
@@ -700,7 +717,7 @@ live in it. That rules out serverless-only hosting. This repo deploys **for free
 | App (Next.js + Socket.IO + workers) | **Render** free web service | sleeps after 15 idle minutes; a free uptime ping keeps it awake |
 | PostgreSQL | **Neon** free plan | doesn't expire (Render's free database is deleted after 30 days) |
 | Redis | **Render Key Value** free | inside Render, no per-command billing (BullMQ talks to Redis constantly) |
-| Email | **Gmail** SMTP | a dedicated account with an app password |
+| Email | each person's own **Gmail** (or any mailbox) | connected in Profile with an app password; nothing to set up on the server |
 
 `render.yaml` is a **Render Blueprint** that describes the app and its Redis, so Render sets them
 both up from the repo:
@@ -708,7 +725,7 @@ both up from the repo:
 1. **Neon:** create a project (region: Singapore, near the app). Copy its connection string, the
    direct one rather than the pooled one, ending in `?sslmode=require`.
 2. **Render:** New → **Blueprint** → pick this repo. When asked, paste the Neon string as
-   `DATABASE_URL`, and the Gmail address and app password as `SMTP_USER` / `SMTP_PASS`.
+   `DATABASE_URL`.
    `JWT_SECRET` is generated and `REDIS_URL` is wired to the Key Value instance automatically.
 3. **First deploy:** the build installs, generates the Prisma client, **applies the migrations** and
    builds. Then set `APP_URL` to the site's address (`https://….onrender.com`) and redeploy.

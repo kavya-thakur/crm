@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCurrencyRupee, IconGitMerge, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCoin, IconGitMerge, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
 
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
@@ -275,7 +275,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 // key: switching deals starts a fresh panel (no leftover edit state)
                 key={selectedDealId}
                 dealId={selectedDealId}
-                can={{ update: can.update, delete: can.delete, assign: can.assign, linkLead: can.readLeads }}
+                can={{ update: can.update, delete: can.delete, assign: can.assign, linkLead: can.readLeads, manageProducts: can.manageProducts }}
                 agents={can.seeAgents ? agentsQuery.data : undefined}
                 meId={meId}
                 onClose={() => setSelectedDealId(null)}
@@ -444,7 +444,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         pending={bulk.isPending}
                         onApply={(changes) => bulk.mutate({ action: "update", changes })}
                         fields={[
-                            { key: "amount", label: "Amount", icon: IconCurrencyRupee, type: "number", toChanges: (value) => ({ amount: Number(value) }) },
+                            { key: "amount", label: "Amount", icon: IconCoin, type: "number", toChanges: (value) => ({ amount: Number(value) }) },
                             { key: "probability", label: "Probability (%)", icon: IconPercentage, type: "number", toChanges: (value) => ({ probability: Math.round(Number(value)) }) },
                             {
                                 key: "expectedCloseDate",
@@ -475,7 +475,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 open={confirmingDelete}
                 count={selection.count}
                 noun="deal"
-                description={selection.big ? "It runs in the background, so you can keep working. This can't be undone." : undefined}
+                description={selection.big ? "It runs in the background, so you can keep working. They can be restored from the recycle bin for 30 days." : undefined}
                 pending={bulk.isPending || bulkJob.isPending}
                 onCancel={() => setConfirmingDelete(false)}
                 onConfirm={() => runBulk({ action: "delete" })}

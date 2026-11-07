@@ -13,6 +13,8 @@ export interface Contact {
     phone: string;
     jobTitle: string | null;
     description: string | null;
+    // where they work (the Companies page)
+    company?: { id: number; name: string } | null;
     createdAt: string;
     updatedAt: string;
     assignedTo: { id: number; name: string; email: string } | null;

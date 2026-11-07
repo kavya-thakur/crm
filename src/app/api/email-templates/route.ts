@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { emailTemplateSchema } from "@/lib/validations/emails";
+import { isDemoWorkspace } from "@/lib/demo/workspace";
 
 // Everyone can use the workspace's templates (the picker in the Emails tab); writing them needs email-templates:manage
 export async function GET() {
@@ -17,8 +18,15 @@ export async function GET() {
             orderBy: [{ name: "asc" }, { id: "asc" }],
         });
 
-        // who's sending, for the {{me.name}} / {{workspace.name}} placeholders in the compose box
-        const me = { name: user.name, email: user.email, workspace: user.organization.name };
+        // who's sending, for the {{me.name}} / {{workspace.name}} placeholders in the compose box,
+        // and the mailbox it goes out from (null: not connected yet, so the Emails tab asks for it)
+        const account = await prisma.emailAccount.findUnique({ where: { userId: user.id }, select: { email: true } });
+        const me = {
+            name: user.name,
+            email: user.email,
+            workspace: user.organization.name,
+            sendsFrom: account?.email ?? (isDemoWorkspace(user) ? user.email : null),
+        };
 
         return NextResponse.json({ ok: true, data: templates, me });
     } catch (error) {

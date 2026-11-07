@@ -2,6 +2,8 @@ import type { ComponentType, CSSProperties } from "react";
 import {
     IconAdjustmentsHorizontal,
     IconBolt,
+    IconBuilding,
+    IconBuildingSkyscraper,
     IconBriefcase,
     IconCalendarEvent,
     IconCheckbox,
@@ -10,9 +12,13 @@ import {
     IconLayoutKanban,
     IconMail,
     IconNotes,
+    IconPackage,
     IconPlugConnected,
     IconShieldLock,
+    IconShieldStar,
+    IconSun,
     IconTargetArrow,
+    IconTrash,
     IconUser,
     IconUserCircle,
     IconUsers,
@@ -60,14 +66,18 @@ function ink(section: Section) {
 // the settings pages all read from here, so a section looks the same everywhere.
 // Settings items are grey, the way twenty.com keeps its settings low-key.
 export const SECTIONS = {
+    myDay: { icon: IconSun, ink: "orange" },
     dashboard: { icon: IconLayoutDashboard, ink: "orange" },
     leads: { icon: IconTargetArrow, ink: "red" },
     deals: { icon: IconBriefcase, ink: "green" },
     contacts: { icon: IconUser, ink: "blue" },
+    companies: { icon: IconBuilding, ink: "violet" },
     activities: { icon: IconCalendarEvent, ink: "violet" },
     tasks: { icon: IconCheckbox, ink: "teal" },
     notes: { icon: IconNotes, ink: "teal" },
     profile: { icon: IconUserCircle, ink: "grey" },
+    workspace: { icon: IconBuildingSkyscraper, ink: "grey" },
+    products: { icon: IconPackage, ink: "grey" },
     members: { icon: IconUsers, ink: "grey" },
     roles: { icon: IconShieldLock, ink: "grey" },
     stages: { icon: IconLayoutKanban, ink: "grey" },
@@ -76,6 +86,8 @@ export const SECTIONS = {
     emailTemplates: { icon: IconMail, ink: "grey" },
     integrations: { icon: IconPlugConnected, ink: "grey" },
     automations: { icon: IconBolt, ink: "grey" },
+    recycleBin: { icon: IconTrash, ink: "grey" },
+    siteAdmin: { icon: IconShieldStar, ink: "red" },
     // the bell's icon for emails opened or not sent
     emails: { icon: IconMail, ink: "blue" },
 } satisfies Record<string, { icon: Icon; ink: keyof typeof INKS }>;

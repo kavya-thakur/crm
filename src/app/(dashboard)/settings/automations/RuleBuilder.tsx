@@ -366,8 +366,8 @@ function ActionFields({ action, kind, choices, onChange }: { action: AutomationA
                         placeholder="Pick a template"
                     />
                     <p className="mt-1 text-sm text-faint">
-                        Sent to {kind === "lead" ? "the lead's email" : "the email of the lead the deal came from"}, from its owner, so replies go to them. Skipped if
-                        there&apos;s no email.
+                        Sent to {kind === "lead" ? "the lead's email" : "the email of the lead the deal came from"}, from the owner&apos;s own connected email, so
+                        replies go to them. Skipped if there&apos;s no address, or the owner hasn&apos;t connected their email.
                     </p>
                 </>
             ) : (

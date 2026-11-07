@@ -19,6 +19,13 @@ model User {
   name           String
   email          String   @unique
   passwordHash   String
+  // the person who created the workspace; only they decide who may "Log in as" teammates
+  isOwner        Boolean  @default(false)
+  // allowed by the owner to log in to teammates' accounts without their password (the owner always can)
+  canLogInAs     Boolean  @default(false)
+  // runs the whole website with you: sees every workspace and user, and can log in as anyone
+  // (Settings > Site admin). Also everyone whose email is in SITE_ADMIN_EMAILS (src/lib/auth/siteAdmin.ts)
+  isSiteAdmin    Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -60,6 +67,10 @@ model User {
   bulkJobs           BulkJob[]
   // emails this person sent from the CRM
   sentEmails         Email[]
+  // their own mailbox, connected in Profile, that their emails go out through
+  emailAccount       EmailAccount?
+  // leads, deals and contacts this person deleted (the recycle bin)
+  deletedRecords     DeletedRecord[]
 
   @@index([organizationId])
   @@index([roleId])
@@ -69,11 +80,14 @@ model Organization {
   id        Int      @id @default(autoincrement())
   name      String
   slug      String   @unique
+  // how amounts are shown ("INR", "USD"...), set in Settings > Workspace; amounts aren't converted
+  currency  String   @default("INR")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   users                  User[]
   roles                  Role[]
+  deletedRecords         DeletedRecord[]
   leads                  Lead[]
   pipelineStages         PipelineStage[]
   leadStages             LeadStage[]
@@ -91,6 +105,7 @@ model Organization {
   emails                 Email[]
   emailTemplates         EmailTemplate[]
   automationRules        AutomationRule[]
+  products               Product[]
 }
 
 model Role {
@@ -372,6 +387,8 @@ model Deal {
   scheduledActivities ScheduledActivity[]
   tasks               Task[]
   emails              Email[]
+  // what's being sold: the lines of its quote; while it has any, its amount is their total
+  products            DealProduct[]
 
   @@index([organizationId])
   @@index([organizationId, createdById])
@@ -871,6 +888,50 @@ model Email {
 
 // A reusable email ("Follow-up after demo"), written in Settings > Email templates.
 // {{lead.name}}, {{me.name}} and the like are filled in when it's picked (src/lib/emails/templates.ts).
+// A person's own mailbox, connected in Settings > Profile. Their emails from the CRM go out
+// through it (SMTP), so they're sent from their own address and replies come back to them.
+// The password is an app password (Gmail: Google account > App passwords), stored encrypted
+// (src/lib/emails/account.ts) and never sent back to the browser.
+model EmailAccount {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  // "priya@gmail.com": the address emails are sent from, and the SMTP login
+  email             String
+  host              String
+  port              Int
+  passwordEncrypted String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// The recycle bin. Deleting a lead, deal or contact still deletes it for real (so every list,
+// search and count stays as it was), but first a copy of it and of everything deleted with it
+// (timeline, notes, tasks, calls and meetings, emails) is kept here, so for 30 days it can be put
+// back as it was, same id and all. See src/lib/recycleBin.ts.
+model DeletedRecord {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  // "lead", "deal" or "contact"
+  entity         String
+  // its id before it was deleted, and again after it's restored
+  recordId       Int
+  // what the bin shows: the lead's or contact's name, the deal's title
+  name           String
+  // the record and what went with it, as it was
+  data           Json
+  // its owner when it was deleted: who else can see it in the bin
+  ownerId        Int?
+  deletedById    Int?
+  deletedAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deletedBy    User?        @relation(fields: [deletedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, deletedAt])
+}
+
 model EmailTemplate {
   id             Int      @id @default(autoincrement())
   organizationId Int
@@ -937,4 +998,42 @@ model AutomationRun {
 
   @@unique([ruleId, eventKey])
   @@index([ruleId, createdAt])
+}
+
+// What the workspace sells, at its list price (Settings > Products)
+model Product {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  price          Decimal  @db.Decimal(12, 2)
+  // GST or VAT, as a percent of the price: 18 means 18%
+  taxPercent     Float    @default(0)
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dealLines    DealProduct[]
+
+  @@index([organizationId])
+}
+
+// One line of a deal's quote. Name, price and tax are copied from the product when it's added,
+// so changing the catalogue later doesn't change quotes already sent; they can be changed per deal
+model DealProduct {
+  id              Int      @id @default(autoincrement())
+  dealId          Int
+  // the catalogue product it came from; null for a one-off line, or once that product is deleted
+  productId       Int?
+  name            String
+  price           Decimal  @db.Decimal(12, 2)
+  quantity        Int      @default(1)
+  discountPercent Float    @default(0)
+  taxPercent      Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  deal    Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([dealId])
 }

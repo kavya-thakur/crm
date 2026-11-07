@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
                     name,
                     email,
                     passwordHash,
+                    // whoever creates the workspace owns it
+                    isOwner: true,
                 },
             });
             return { organization, user }

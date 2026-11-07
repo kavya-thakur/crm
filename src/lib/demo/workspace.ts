@@ -7,6 +7,7 @@
  * page stays fast with a large workspace.
  */
 import { prisma } from "@/lib/db/prisma";
+import { quoteTotals } from "@/lib/deals/quote";
 import { hashPassword } from "@/lib/auth/password";
 import { DEFAULT_PIPELINE_STAGES } from "@/lib/deals/stages";
 import { DEFAULT_LEAD_STAGES } from "@/lib/leads/stages";
@@ -199,6 +200,33 @@ export async function buildDemoWorkspace() {
         (data) => prisma.lead.createMany({ data }),
     );
 
+    // --- Companies and contacts: every lead is a person at one of the companies, in the address
+    // book with a phone number (so Call and WhatsApp work), filed under their company ---
+    await prisma.company.createMany({ data: COMPANIES.map((name) => ({ ...org, name, industry: null })) });
+    const companyIds = new Map((await prisma.company.findMany({ where: org, select: { id: true, name: true } })).map((company) => [company.name, company.id]));
+    const everyLead = await prisma.lead.findMany({ where: org, orderBy: { id: "asc" }, select: { id: true, name: true, email: true, companyName: true, assignedToId: true, createdAt: true } });
+    await inChunks(
+        everyLead.map((lead, index) => ({
+            ...org,
+            name: lead.name,
+            email: lead.email,
+            // unique per workspace, like real numbers
+            phone: `+91 9${String(800000000 + index).padStart(9, "0")}`,
+            companyId: companyIds.get(lead.companyName ?? "") ?? null,
+            assignedToId: lead.assignedToId,
+            createdById: lead.assignedToId,
+            updatedById: lead.assignedToId,
+            createdAt: lead.createdAt,
+            updatedAt: lead.createdAt,
+        })),
+        (data) => prisma.contact.createMany({ data }),
+    );
+    // each lead to its contact (matched by the email they share), with the same phone
+    await prisma.$executeRaw`
+        UPDATE "Lead" l SET "contactId" = c."id", "phone" = c."phone"
+        FROM "Contact" c
+        WHERE l."organizationId" = ${org.organizationId} AND c."organizationId" = ${org.organizationId} AND c."email" = l."email"`;
+
     // --- Deals: 300 over 18 months; most older ones closed, the rest still in the pipeline ---
     const openStages = pipeline.filter((stage) => !stage.isWon && !stage.isLost);
     const won = pipeline.find((stage) => stage.isWon)!;
@@ -345,6 +373,31 @@ export async function buildDemoWorkspace() {
     await prisma.dealNote.createMany({
         data: recentDeals.map((deal, index) => ({ dealId: deal.id, ...note(index + 1, deal.assignedToId ?? manager.id, deal.createdAt) })),
     });
+
+    // --- A product catalogue, and the newest deals quoted from it (each one's amount is its quote's total) ---
+    const catalogue = await prisma.product.createManyAndReturn({
+        data: [
+            { name: "Flash licence (per user, yearly)", price: 12000, taxPercent: 18 },
+            { name: "Onboarding and setup", price: 25000, taxPercent: 18 },
+            { name: "Data migration", price: 15000, taxPercent: 18 },
+            { name: "Priority support (yearly)", price: 30000, taxPercent: 18 },
+            { name: "Team training session", price: 8000, taxPercent: 18 },
+        ].map((product) => ({ ...org, ...product })),
+    });
+    for (const [index, deal] of recentDeals.slice(0, 6).entries()) {
+        const lines = [catalogue[0], catalogue[1 + (index % 4)]].map((product, line) => ({
+            dealId: deal.id,
+            productId: product.id,
+            name: product.name,
+            price: Number(product.price),
+            taxPercent: product.taxPercent,
+            // licences for a few people, one of everything else; every other deal got 10% off
+            quantity: line === 0 ? 3 + (index % 3) * 5 : 1,
+            discountPercent: index % 2 ? 10 : 0,
+        }));
+        await prisma.dealProduct.createMany({ data: lines });
+        await prisma.deal.update({ where: { id: deal.id }, data: { amount: quoteTotals(lines).total } });
+    }
 
     // --- Email templates, and emails already sent to the newest leads: most delivered, about half
     // of those opened, so the Emails tab shows every state. (The demo never sends real email.) ---

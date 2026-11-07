@@ -3,14 +3,14 @@ import type { AutomationRule } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { automationsQueue, type AutomationJobData } from "@/lib/jobs/queues";
-import { queueEmail } from "@/lib/emails/send";
+import { canSendEmail, queueEmail } from "@/lib/emails/send";
 import { fillTemplate, type TemplateValues } from "@/lib/emails/templates";
 import { addTaskToTimeline, startOfToday } from "@/lib/work/tasks";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
 import { stageMessage } from "@/lib/leads/stages";
 import { findOpenCopy, isOpen } from "@/lib/leads/duplicates";
 import { closedAtFor } from "@/lib/deals/stages";
-import { formatMoney } from "@/lib/utils/format";
+import { formatMoneyIn } from "@/lib/utils/format";
 import {
     actionSchema,
     conditionSchema,
@@ -235,10 +235,11 @@ function valueOf(field: string, record: RuleRecord, event: AutomationJobData) {
     return value === undefined || value === null ? "" : String(value);
 }
 
-// "1,00,000" or "₹ 5000" as a number; null when it isn't one
+// "1,00,000", "₹ 5000" or "$5,000" as a number; null when it isn't one
 function toNumber(text: string) {
-    const number = Number(text.replace(/[,\s₹]/g, ""));
-    return text === "" || !Number.isFinite(number) ? null : number;
+    const digits = text.replace(/[^\d.-]/g, "");
+    const number = Number(digits);
+    return digits === "" || !Number.isFinite(number) ? null : number;
 }
 
 // Compared as text, ignoring case and spaces at the ends; "more than" / "less than" as numbers
@@ -340,6 +341,9 @@ async function sendTemplate(templateId: number, rule: AutomationRule, event: Aut
     }
 
     const sender = record.owner ?? (await actingPerson(rule));
+    // it goes out from the sender's own mailbox
+    const workspace = await prisma.organization.findUniqueOrThrow({ where: { id: rule.organizationId }, select: { slug: true } });
+    if (!(await canSendEmail({ id: sender.id, organization: workspace }))) return `No email sent: ${sender.name} hasn't connected an email account`;
     const values = await templateValues(record, sender);
 
     await queueEmail({
@@ -467,13 +471,13 @@ async function actingPerson(rule: AutomationRule) {
 
 // The {{placeholders}} for a template, task title or notification, for this record and whoever acts on it
 async function templateValues(record: RuleRecord, me: { name: string; email: string }): Promise<TemplateValues> {
-    const workspace = await prisma.organization.findUniqueOrThrow({ where: { id: record.organizationId }, select: { name: true } });
+    const workspace = await prisma.organization.findUniqueOrThrow({ where: { id: record.organizationId }, select: { name: true, currency: true } });
     return {
         "lead.firstName": record.person?.name.split(" ")[0],
         "lead.name": record.person?.name,
         "lead.company": record.person?.company,
         "deal.title": record.deal?.title,
-        "deal.amount": record.deal && formatMoney(record.deal.amount),
+        "deal.amount": record.deal && formatMoneyIn(record.deal.amount, workspace.currency),
         "me.name": me.name,
         "me.email": me.email,
         "workspace.name": workspace.name,

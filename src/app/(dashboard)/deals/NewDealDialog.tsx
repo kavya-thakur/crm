@@ -1,12 +1,13 @@
 "use client";
 
+import { currencySymbol } from "@/lib/utils/format";
 import { useEffect } from "react";
 import { Controller, useForm, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     IconCalendar,
-    IconCurrencyRupee,
+    IconCoin,
     IconFileDescription,
     IconPercentage,
     IconProgress,
@@ -139,7 +140,7 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
 
     return (
         <RecordFormShell
-            icon={IconCurrencyRupee}
+            icon={IconCoin}
             entityLabel="Deals"
             noun="deal"
             formId="new-deal-form"
@@ -156,7 +157,7 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
             <FormIdentityHeader placeholder="Deal name *" error={errors.title?.message} registerProps={register("title")} />
 
             <FormSection title="Deal Details">
-                <FormFieldRow icon={IconCurrencyRupee} label="Amount (₹)">
+                <FormFieldRow icon={IconCoin} label={`Amount (${currencySymbol()})`}>
                     <input type="number" min="0" step="0.01" {...register("amount", { valueAsNumber: true })} className={inputClassName} />
                 </FormFieldRow>
 

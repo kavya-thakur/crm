@@ -63,6 +63,7 @@ const SETUP = [
     { name: "lead-forms:manage", label: "Web forms & integrations", hint: "Forms on your website, and other tools (Google Ads, IndiaMART, Zapier) that send in leads by themselves." },
     { name: "automations:manage", label: "Automations", hint: "Rules that assign, email and add tasks to new leads by themselves." },
     { name: "email-templates:manage", label: "Email templates", hint: "Ready-made emails everyone can send from a lead or deal." },
+    { name: "workspace:manage", label: "Workspace settings", hint: "Workspace-wide settings: the currency amounts are shown in, and the products deals are quoted from." },
 ];
 
 const ACTIONS = [

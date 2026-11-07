@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { companyNamed } from "@/lib/companies";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { contactScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
@@ -19,7 +20,8 @@ export async function POST(req: NextRequest) {
             return body.response;
         }
 
-        const { assignedToId: requestedAssignee, companyId, customFields: submittedCustomFields, ...fields } = body.data;
+        const { assignedToId: requestedAssignee, companyName, customFields: submittedCustomFields, ...fields } = body.data;
+        let { companyId } = body.data;
 
         // omitted = the creator owns it, null = unassigned
         const assignedToId = requestedAssignee === undefined ? user.id : requestedAssignee;
@@ -94,6 +96,9 @@ export async function POST(req: NextRequest) {
                 { status: 400 }
             );
         }
+
+        // picked or typed by name in the form: that company, made if it's new
+        if (companyName) companyId = (await companyNamed(prisma, user.organizationId, companyName)).id;
 
         const contact = await prisma.contact.create({
             data: {

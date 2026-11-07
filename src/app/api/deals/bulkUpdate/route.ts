@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
@@ -227,19 +228,12 @@ export async function PATCH(req: NextRequest) {
         /*
          * DELETE
          */
-        // a single deleteMany is already atomic, so no $transaction needed
-        const { count } = await prisma.deal.deleteMany({
-            where: {
-                id: {
-                    in: dealIds,
-                },
-                ...dealScope(user),
-            },
-        });
+        // into the recycle bin first (a copy of each, with its history), all in one transaction
+        const count = await prisma.$transaction((tx) => deleteToBin(tx, user, "deal", { id: { in: dealIds }, ...dealScope(user) }));
 
         return NextResponse.json({
             ok: true,
-            message: `${count} deals deleted successfully`,
+            message: `${count} deals moved to the recycle bin`,
             affected: count,
         });
     } catch (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { IconCircleCheckFilled, IconProgress, IconTrash, IconUserCircle } from "@tabler/icons-react";
+import { IconArrowBackUp, IconCircleCheckFilled, IconProgress, IconTrash, IconUserCircle } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
 import { Spinner } from "@/components/Loader";
@@ -9,7 +9,8 @@ import { toast } from "@/components/Toast";
 
 export interface BulkProgress {
     id: number;
-    entity: "lead" | "deal" | "contact";
+    // "record": a restore from the recycle bin, which holds all three
+    entity: "lead" | "deal" | "contact" | "record";
     action: string;
     status: "QUEUED" | "RUNNING" | "DONE" | "FAILED";
     total: number;
@@ -25,6 +26,7 @@ const WORDS: Record<string, { running: string; done: string; icon: typeof IconTr
     delete: { running: "Deleting", done: "Deleted", icon: IconTrash, tone: "text-danger" },
     stage: { running: "Moving", done: "Moved", icon: IconProgress, tone: "text-accent" },
     assign: { running: "Assigning", done: "Assigned", icon: IconUserCircle, tone: "text-accent" },
+    restore: { running: "Restoring", done: "Restored", icon: IconArrowBackUp, tone: "text-accent" },
 };
 
 /**
@@ -114,7 +116,9 @@ export function BackgroundJobs() {
                         <p className="mt-1.5 text-sm text-faint tabular-nums">
                             {done
                                 ? job.affected < job.total
-                                    ? `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" ? "gone" : "that way"} or out of reach`
+                                    ? job.action === "restore"
+                                        ? `${(job.total - job.affected).toLocaleString()} couldn't go back (a duplicate now, or already restored)`
+                                        : `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" ? "gone" : "that way"} or out of reach`
                                     : "All done"
                                 : failed
                                   ? (job.error ?? "Something went wrong")

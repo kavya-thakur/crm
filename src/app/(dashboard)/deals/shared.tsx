@@ -1,3 +1,4 @@
+import { formatMoneyExact } from "@/lib/utils/format";
 import { StageBadge } from "@/components/StageBadge";
 
 export interface Permissions {
@@ -10,6 +11,8 @@ export interface Permissions {
     readLeads: boolean;
     managePipeline: boolean;
     manageCustomFields: boolean;
+    // the product catalogue in Settings
+    manageProducts: boolean;
 }
 import type { Deal as PrismaDeal, PipelineStage as PrismaPipelineStage } from "@/generated/prisma/client";
 export interface DealUser {
@@ -45,7 +48,29 @@ export type Deal = Omit<
     createdBy?: { id: number; name: string } | null;
     updatedBy?: { id: number; name: string } | null;
     customFields: Record<string, unknown> | null;
+    // the lines of its quote (the open deal's own query has them, lists don't)
+    products?: DealLine[];
 };
+
+// One line of a deal's quote; the price is a Decimal, so it arrives as a string
+export interface DealLine {
+    id: number;
+    productId: number | null;
+    name: string;
+    price: string | number;
+    quantity: number;
+    discountPercent: number;
+    taxPercent: number;
+}
+
+// A product in the catalogue (Settings > Products)
+export interface Product {
+    id: number;
+    name: string;
+    price: string | number;
+    taxPercent: number;
+    description: string | null;
+}
 export interface DealFilters {
     search: string;
     // several stages at once; the board shows just these columns
@@ -81,11 +106,5 @@ export function refreshDeals(queryClient: {
     ]);
 }
 export function formatDealAmount(amount: number | string) {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        // "₹3,20,000", with paise only when there are any
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-    }).format(Number(amount));
+    return formatMoneyExact(Number(amount));
 }

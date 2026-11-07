@@ -18,7 +18,6 @@ import {
     IconCircle,
     IconCircleCheck,
     IconCoin,
-    IconCurrencyRupee,
     IconLayoutKanban,
     IconListCheck,
     IconTargetArrow,
@@ -368,7 +367,7 @@ function RevenueCard({ deals, range, against }: { deals: Deals; range: Dashboard
     const { won } = deals;
 
     return (
-        <Card title="Revenue won" icon={IconCurrencyRupee} tone="green" className="lg:col-span-2">
+        <Card title="Revenue won" icon={IconCoin} tone="green" className="lg:col-span-2">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <CountUp value={won.value} format={formatMoney} className="font-display text-[48px] leading-none font-semibold tracking-[-0.035em] text-ink tabular-nums" />
                 <Change current={won.value} previous={won.previousValue} against={against} />

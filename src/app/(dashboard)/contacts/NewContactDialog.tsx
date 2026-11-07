@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import {
     IconAddressBook,
+    IconBuilding,
     IconFileDescription,
     IconMail,
     IconPhone,
@@ -17,6 +18,7 @@ import { toast } from "@/components/Toast";
 import { createContactSchema } from "@/lib/validations/contact";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import { CustomFieldsFormSection, useCustomFields } from "../shared/customFields";
+import { CompanyPicker } from "../shared/CompanyPicker";
 import { type Agent, type Contact } from "./shared";
 
 const inputClassName =
@@ -75,6 +77,21 @@ function NewContactForm({ canAssign, agents, onClose, onCreated }: Omit<NewConta
 
                 <FormFieldRow icon={IconPhone} label="Phone" required>
                     <input type="tel" placeholder="+91 555 0100" aria-invalid={!!errors.phone} {...register("phone")} className={inputClassName} />
+                </FormFieldRow>
+
+                <FormFieldRow icon={IconBuilding} label="Company">
+                    <Controller
+                        name="companyName"
+                        control={control}
+                        render={({ field }) => (
+                            <CompanyPicker
+                                value={(field.value as string | null | undefined) || null}
+                                onChange={(name) => field.onChange(name ?? "")}
+                                placeholder="Pick or add a company"
+                                buttonClassName="flex h-8 w-full items-center gap-1 rounded-lg border border-line bg-surface px-2 text-left outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
+                            />
+                        )}
+                    />
                 </FormFieldRow>
 
                 <FormFieldRow icon={IconUserCircle} label="Job title">

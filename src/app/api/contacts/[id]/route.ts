@@ -1,4 +1,5 @@
 import { contactScope, requirePermission } from "@/lib/auth/requirePermission";
+import { deleteToBin } from "@/lib/recycleBin";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { updateContactSchema } from "@/lib/validations/contact";
@@ -6,6 +7,7 @@ import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { NextRequest, NextResponse } from "next/server";
+import { companyNamed } from "@/lib/companies";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -85,7 +87,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
             return contactNotFound();
         }
 
-        const { customFields: submittedCustomFields, ...fields } = body.data;
+        const { customFields: submittedCustomFields, companyName, ...fields } = body.data;
 
         // Custom fields are edited one at a time (like every other field here),
         // so only the submitted keys are validated and merged into what's there.
@@ -159,6 +161,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...fields,
                 updatedById: user.id,
                 ...(customFields && { customFields }),
+                // a company typed by name: that company, made if it's new; empty clears it
+                ...(companyName !== undefined && {
+                    companyId: companyName ? (await companyNamed(prisma, user.organizationId, companyName)).id : null,
+                }),
             },
             include: {
                 company: {
@@ -189,13 +195,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             return validationError(id.error);
         }
 
-        // One query that checks the scope and deletes, so there's no gap for a race
-        const { count } = await prisma.contact.deleteMany({
-            where: {
-                id: id.data,
-                ...contactScope(user),
-            },
-        });
+        // Into the recycle bin (a copy, with its history), then deleted, in one transaction;
+        // the scope is in the where, so someone else's contact is a 404
+        const count = await prisma.$transaction((tx) => deleteToBin(tx, user, "contact", { id: id.data, ...contactScope(user) }));
 
         if (count === 0) {
             return contactNotFound();
@@ -203,7 +205,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
         return NextResponse.json({
             ok: true,
-            message: "Contact deleted successfully",
+            message: "Contact moved to the recycle bin",
         });
     } catch (error) {
         return handleRouteError(error, "Delete contact");

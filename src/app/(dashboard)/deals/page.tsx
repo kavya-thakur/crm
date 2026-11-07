@@ -23,6 +23,7 @@ const DealPage = async () => {
                 readLeads: can("lead:read"),
                 managePipeline: can("pipeline:manage"),
                 manageCustomFields: can("custom-fields:manage"),
+                manageProducts: can("workspace:manage"),
             }}
         />
     );

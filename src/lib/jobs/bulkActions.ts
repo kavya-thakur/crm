@@ -4,6 +4,7 @@ import { broadcastChange, firstName, getSocketServer, notify, userRoom } from "@
 import { stageMessage } from "@/lib/leads/stages";
 import { closedAtFor } from "@/lib/deals/stages";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
+import { deleteToBin, restoreMany } from "@/lib/recycleBin";
 import type { Prisma } from "@/generated/prisma/client";
 
 /*
@@ -141,10 +142,10 @@ async function runBatch(tx: Tx, user: CurrentUser, entity: BulkEntity, action: B
     const where = { id: { in: ids } };
     const changed = (records: { id: number }[]) => ({ affected: records.length, moved: action === "stage" ? records.map((record) => record.id) : [] });
 
+    // into the recycle bin first, in the batch's own transaction
     if (action === "delete") {
-        if (entity === "lead") return { affected: (await tx.lead.deleteMany({ where: { ...where, ...leadScope(user) } })).count, moved: [] };
-        if (entity === "deal") return { affected: (await tx.deal.deleteMany({ where: { ...where, ...dealScope(user) } })).count, moved: [] };
-        return { affected: (await tx.contact.deleteMany({ where: { ...where, ...contactScope(user) } })).count, moved: [] };
+        const scope = entity === "lead" ? leadScope(user) : entity === "deal" ? dealScope(user) : contactScope(user);
+        return { affected: await deleteToBin(tx, user, entity, { ...where, ...scope }), moved: [] };
     }
 
     if (entity === "lead") {
@@ -169,6 +170,7 @@ function report(userId: number, progress: object) {
 export async function runBulkJob(bulkJobId: number) {
     const job = await prisma.bulkJob.findUnique({ where: { id: bulkJobId } });
     if (!job || job.status === "DONE") return;
+    if (job.action === "restore") return runRestoreJob(job);
 
     const entity = job.entity as BulkEntity;
     const action = job.action as BulkAction;
@@ -223,6 +225,34 @@ export async function runBulkJob(bulkJobId: number) {
             link: `/${entity}s`,
         });
     }
+}
+
+// items restored between progress updates (each is its own transaction, so this is only how often the card moves)
+const RESTORE_BATCH = 25;
+
+/**
+ * Restoring thousands from the recycle bin (Restore on "Select all"): the ids are bin items. Each
+ * one is rebuilt with its history; one that can't go back (the person has another open lead now)
+ * is skipped. A retried job carries on: anything already restored is no longer in the bin.
+ */
+async function runRestoreJob(job: { id: number; userId: number; organizationId: number; ids: number[]; processed: number }) {
+    const user = await userForJob(job.userId);
+    if (!user) throw new Error("The person who started this has left the workspace");
+
+    report(user.id, await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "RUNNING" }, select: progressSelect }));
+
+    for (let start = job.processed; start < job.ids.length; start += RESTORE_BATCH) {
+        const batch = job.ids.slice(start, start + RESTORE_BATCH);
+        const { restored } = await restoreMany(user, batch);
+        report(
+            user.id,
+            await prisma.bulkJob.update({ where: { id: job.id }, data: { processed: { increment: batch.length }, affected: { increment: restored } }, select: progressSelect }),
+        );
+        // the bin, and the lists they go back into, refresh for everyone as it goes
+        broadcastChange(job.organizationId, "recycle-bin");
+    }
+
+    report(user.id, await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "DONE", finishedAt: new Date() }, select: progressSelect }));
 }
 
 export async function failBulkJob(bulkJobId: number, reason: string) {

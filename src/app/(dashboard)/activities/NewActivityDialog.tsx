@@ -22,9 +22,11 @@ interface NewActivityDialogProps {
     agents?: AgentOption[];
     onClose: () => void;
     onCreated: (activity: Activity) => void;
+    // when it happens, as an ISO datetime: a day picked on the calendar; the next full hour otherwise
+    startAt?: string;
 }
 
-export default function NewActivityDialog({ agents, onClose, onCreated }: NewActivityDialogProps) {
+export default function NewActivityDialog({ agents, onClose, onCreated, startAt }: NewActivityDialogProps) {
     const {
         register,
         control,
@@ -33,7 +35,7 @@ export default function NewActivityDialog({ agents, onClose, onCreated }: NewAct
     } = useForm({
         // the same schema POST /api/activities validates with
         resolver: zodResolver(createScheduledActivitySchema),
-        defaultValues: { type: "MEETING" as const, scheduledAt: nextFullHour(), attendeeIds: [] as number[] },
+        defaultValues: { type: "MEETING" as const, scheduledAt: startAt ?? nextFullHour(), attendeeIds: [] as number[] },
     });
 
     const create = useMutation({

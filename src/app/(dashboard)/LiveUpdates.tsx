@@ -14,12 +14,16 @@ import { trackBulkJob, type BulkProgress } from "./BackgroundJobs";
 // to leads also touches contacts (every lead has one), the dashboard, the notes feed...
 const REFRESH: Record<string, string[]> = {
     // converting or merging a lead creates or moves deals, so deals refresh too
-    leads: ["leads", "lead", "lead-duplicates", "deals", "deal", "contacts", "contact", "notes-feed", "dashboard", "search"],
-    deals: ["deals", "deal", "lead", "notes-feed", "dashboard", "search"],
-    contacts: ["contacts", "contact", "lead", "notes-feed", "search"],
-    tasks: ["tasks", "task", "lead", "deal", "contact", "dashboard"],
-    activities: ["activities", "activity", "lead", "deal", "contact", "dashboard"],
-    "lead-stages": ["leadStage", "leads", "lead", "dashboard"],
+    leads: ["leads", "lead", "lead-duplicates", "deals", "deal", "contacts", "contact", "notes-feed", "dashboard", "search", "my-day", "recycle-bin", "companies", "company"],
+    deals: ["deals", "deal", "lead", "notes-feed", "dashboard", "search", "my-day", "recycle-bin", "companies", "company"],
+    contacts: ["contacts", "contact", "lead", "notes-feed", "search", "recycle-bin", "companies", "company"],
+    // a company renamed or deleted: the contacts that show its name too
+    companies: ["companies", "company", "contact"],
+    // something put back: it reappears in its list, with its tasks and calls
+    "recycle-bin": ["recycle-bin", "leads", "lead", "deals", "deal", "contacts", "contact", "notes-feed", "dashboard", "search", "my-day", "tasks", "activities"],
+    tasks: ["tasks", "task", "lead", "deal", "contact", "dashboard", "my-day"],
+    activities: ["activities", "activity", "lead", "deal", "contact", "dashboard", "my-day"],
+    "lead-stages": ["leadStage", "leads", "lead", "dashboard", "my-day"],
     "lead-sources": ["leadSource", "leads", "lead", "dashboard"],
     "pipeline-stages": ["pipelineStage", "deals", "deal", "dashboard"],
     "custom-fields": ["customFields", "leads", "deals", "contacts"],
@@ -28,6 +32,7 @@ const REFRESH: Record<string, string[]> = {
     // sent, failed, opened: the Emails tab, and the timeline entry on the lead or deal
     emails: ["emails", "lead", "deal"],
     "email-templates": ["emailTemplates"],
+    products: ["products"],
     // a rule changed, or ran (its run count and log)
     automations: ["automations"],
     agents: ["agents", "dashboard"],

@@ -2,7 +2,7 @@
 
 import {
     IconCalendar,
-    IconCurrencyRupee,
+    IconCoin,
     IconPlus,
     IconTargetArrow,
     IconMail,
@@ -29,7 +29,7 @@ import { StageLabel, formatDealAmount, type Deal, type DealUser, type PipelineSt
 export type DealColumn = DataColumn<Deal>;
 
 export const DEAL_COLUMNS: DealColumn[] = [
-    { key: "amount", label: "Amount", icon: IconCurrencyRupee, width: 150, cell: (deal) => <span className="font-medium tabular-nums">{formatDealAmount(deal.amount)}</span> },
+    { key: "amount", label: "Amount", icon: IconCoin, width: 150, cell: (deal) => <span className="font-medium tabular-nums">{formatDealAmount(deal.amount)}</span> },
     {
         key: "pipelineStage", label: "Pipeline stage", icon: IconTargetArrow, width: 180,
         cell: (deal) => <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} />,

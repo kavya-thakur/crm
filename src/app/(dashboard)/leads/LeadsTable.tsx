@@ -24,6 +24,7 @@ import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { askLostReason } from "@/components/LostReasonPrompt";
 import { formatDate } from "@/lib/utils/format";
+import { CompanyPicker } from "../shared/CompanyPicker";
 import {
     StageLabel,
     type Agent,
@@ -106,7 +107,19 @@ export function withLeadEdits(
                 if (answer) context.onUpdate(lead, { stageId: stage.id, ...answer });
             },
         },
-        company: { type: "text", getValue: (lead) => lead.companyName, onSave: (lead, value) => context.onUpdate(lead, { companyName: value }) },
+        company: {
+            type: "custom",
+            render: (lead, close) => (
+                <CompanyPicker
+                    value={lead.companyName}
+                    onChange={(name) => {
+                        context.onUpdate(lead, { companyName: name });
+                        close();
+                    }}
+                    buttonClassName="flex h-7 w-full items-center gap-1 rounded-lg border border-line-strong bg-surface px-1 text-left"
+                />
+            ),
+        },
         email: { type: "email", getValue: (lead) => lead.email, onSave: (lead, value) => context.onUpdate(lead, { email: value }) },
         phone: { type: "tel", getValue: (lead) => lead.phone, onSave: (lead, value) => value && context.onUpdate(lead, { phone: value }) },
         source: {

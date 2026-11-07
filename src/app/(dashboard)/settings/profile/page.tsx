@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { isDemoWorkspace } from "@/lib/demo/workspace";
 import ProfileView from "./ProfileView";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default async function ProfilePage() {
                 role: user.role.name,
                 workspace: user.organization.name,
                 memberSince: user.createdAt.toISOString(),
+                demo: isDemoWorkspace(user),
             }}
         />
     );

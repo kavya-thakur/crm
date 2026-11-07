@@ -101,6 +101,12 @@ async function main() {
         create: { name: "custom-fields:manage", description: "Can create, edit and delete custom field definitions" },
     });
 
+    await prisma.permission.upsert({
+        where: { name: "workspace:manage" },
+        update: {},
+        create: { name: "workspace:manage", description: "Can change the workspace's settings, like its currency" },
+    });
+
     // Admin roles only get the permissions that existed when their org registered;
     // give them any added since. ponytail: matches by name, add Role.isSystem if admins can rename it
     const [permissions, adminRoles] = await Promise.all([

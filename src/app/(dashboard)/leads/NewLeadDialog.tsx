@@ -26,6 +26,7 @@ import { toast } from "@/components/Toast";
 import { createLeadSchema } from "@/lib/validations/leads";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import { CustomFieldsFormSection, useCustomFields } from "../shared/customFields";
+import { CompanyPicker } from "../shared/CompanyPicker";
 import {
     StageLabel,
     type Agent,
@@ -149,7 +150,18 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
                 </FormFieldRow>
 
                 <FormFieldRow icon={IconTargetArrow} label="Company">
-                    <input placeholder="Acme Inc." {...register("companyName")} className={inputClassName} />
+                    <Controller
+                        name="companyName"
+                        control={control}
+                        render={({ field }) => (
+                            <CompanyPicker
+                                value={(field.value as string | null | undefined) || null}
+                                onChange={(name) => field.onChange(name ?? "")}
+                                placeholder="Pick or add a company"
+                                buttonClassName="flex h-8 w-full items-center gap-1 rounded-lg border border-line bg-surface px-2 text-left outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
+                            />
+                        )}
+                    />
                 </FormFieldRow>
             </FormSection>
 
