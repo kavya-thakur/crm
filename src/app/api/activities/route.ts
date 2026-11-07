@@ -9,6 +9,9 @@ import { searchParamsToObject } from "@/lib/validations/common";
 import { NextRequest, NextResponse } from "next/server";
 import { firstName, notify } from "@/lib/realtime/notify";
 
+// ponytail: a month of a whole team's calls and meetings, at most; page the range if a team books more
+const RANGE_MAX = 1000;
+
 export async function POST(req: NextRequest) {
     try {
         const user = await getCurrentUser()
@@ -109,7 +112,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, scope, status, assignedTo, leadId, dealId, contactId, from } = query.data;
+        const { page, limit, scope, status, assignedTo, leadId, dealId, contactId, from, to } = query.data;
 
         const now = new Date();
 
@@ -128,7 +131,7 @@ export async function GET(req: NextRequest) {
 
         const where: Prisma.ScheduledActivityWhereInput = {
             // whose activities this person may see at all; everything below only narrows it
-            AND: [activityScope(user), ...(from ? [{ scheduledAt: { gte: from } }] : [])],
+            AND: [activityScope(user), ...(from ? [{ scheduledAt: { gte: from } }] : []), ...(to ? [{ scheduledAt: { lt: to } }] : [])],
             ...scopeFilter,
             ...(status && { status }),
             // an agent's schedule is what's assigned to them plus what they're tagged on
@@ -151,8 +154,9 @@ export async function GET(req: NextRequest) {
             prisma.scheduledActivity.findMany({
                 where,
                 orderBy: [{ scheduledAt: sortOrder }, { id: sortOrder }],
-                skip: (page - 1) * limit,
-                take: limit,
+                // a date range comes whole (a calendar shows every day of it), pages otherwise
+                skip: to ? 0 : (page - 1) * limit,
+                take: to ? RANGE_MAX : limit,
                 include: activityInclude,
             }),
 

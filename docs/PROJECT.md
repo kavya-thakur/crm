@@ -56,11 +56,67 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 ### Core CRM
 - [x] Workspaces (sign up creates one, with an Admin role), members, invite by creating accounts
 - [x] Roles & permissions, built in Settings as checkboxes; "own records" vs "everyone's"
+- [x] **Log in as a teammate** (2026-11-07, Settings → Members → ⋯): the workspace **owner**
+      (`User.isOwner`, whoever registered it) opens anyone's account without their password, and
+      can let chosen people do it too (`User.canLogInAs`, "Let them log in as others", owner only).
+      Someone allowed can't open the owner's account or one with permissions they lack. It lasts an
+      hour (a token with `actingAs`); your own session waits in the `own_access_token` cookie for
+      **Back to my account** (`/api/auth/back`, a full reload so the live connection is yours again).
+      An orange bar shows on every page meanwhile, the teammate gets a notification, and changes
+      made are saved as theirs. Off in the demo workspace
+- [x] **Site admin** (2026-11-07, Settings → Site admin): for the people who run the website.
+      **Users** (everyone in every workspace: search by name, email or company, 50 a page) and
+      **Workspaces** (each company's owner, users, leads, deals; click one for its people). **Log in
+      as** anyone, in any workspace, the same hour-long session with the orange bar; nobody is
+      notified and nothing is logged (decided by the user). Who: **root admins** by email in
+      `SITE_ADMIN_EMAILS` (server settings; nothing in the app can change them), and
+      `User.isSiteAdmin` in the database, which a root switches on with "Make site admin" (or set it
+      in the database directly). Only a root can open another site admin's account or make more.
+      Closed while logged in as someone. `src/lib/auth/siteAdmin.ts`
 - [x] **Leads**: table + kanban by stage, filters (multi-stage, source, owner, created/modified
       by and date, custom fields, possible duplicates), saved filters, inline edit, bulk
       stage/assign/edit/merge/delete, side panel with timeline, notes, tasks, activities
 - [x] **Deals**: the same, with amount, probability, expected close, pipeline value per column
 - [x] **Contacts**: every lead gets one; deduplicated by phone
+- [x] **Companies** (2026-11-06, `/companies`): list (A to Z, search by name or industry, 50 a page)
+      with contacts, open deals and revenue won per company (one grouped SQL query per page); a
+      company page with its people and deals, edited in place. A deal is a company's through its
+      lead's contact. Filled in by itself: a lead with a company name (by hand, web form,
+      integration, import, or edited later) files its contact under that company, found ignoring
+      case or made; a migration did the same for existing data. Every company field (new lead,
+      lead and contact panels, the leads table, bulk edit) is a **company picker**: search the
+      workspace's companies or add one by name (`shared/CompanyPicker.tsx`). Changing or clearing a
+      lead's company by hand, one lead or in bulk, moves its contact too (`moveToCompany`)
+- [x] **Recycle bin** (2026-11-06, Settings → Recycle bin): every delete (single, bulk, background
+      bulk job) first copies the record and everything deleted with it (timeline, notes, tasks,
+      calls, emails) into `DeletedRecord`, then deletes for real, in one transaction. Restore puts it
+      all back with the same ids and relinks its deals / leads; what's gone since is let go (deleted
+      stage → first stage, removed owner → nobody). Refuses a second open lead for the same person or
+      a contact whose phone is taken. 30 days, emptied when the bin is looked at. Agents see only
+      their own. `src/lib/recycleBin.ts`. **Many at once** (2026-11-07): tick items (or "Select all
+      9,812" for the tab and search), then Restore or Delete forever; **Empty bin** (or "Delete all
+      leads" on a tab). `/api/recycle-bin/bulk`: deleting forever is one DELETE however many (10,000
+      in ~10 ms locally); restoring up to 25 happens in the request, more as a background job
+      (BulkJob action "restore", the same progress card as bulk deletes), contacts first so their
+      leads link back. One that can't go back (a duplicate open lead now) is skipped and counted
+- [x] **Products and quotes** (2026-11-07): a catalogue in Settings → Products (name, price, GST/VAT %;
+      `workspace:manage`). A deal's **Products tab** adds catalogue products or one-off lines and
+      edits quantity, price, discount % and tax % in the row; the line copies the product's name,
+      price and tax, so a later price change doesn't touch quotes already sent. While a deal has
+      lines its **amount is their total with tax** (kept in step by the API in the same transaction,
+      `src/lib/deals/dealProducts.ts`; removing the last line leaves the amount as it was). The
+      maths lives in one place for the tab, the quote and the API (`src/lib/deals/quote.ts`: discount
+      off first, then tax). **Quote** (`/quote/<dealId>`, outside the sidebar): the workspace, the
+      customer from the deal's lead, the lines and totals, number Q-<id>, valid 30 days, and a
+      "Print or save as PDF" button (the browser's own print dialog, so no PDF library). Lines go to
+      the recycle bin with their deal. The demo has a catalogue and six quoted deals
+- [x] **Activities calendar** (2026-11-07): a third view on Activities beside List and Kanban;
+      **Month** (up to 3 a day, "+2 more", a count on phones; the day number opens its week) and
+      **Week** (a column a day, stacked on phones). Today, back and forward; mine or everyone's; the
+      `+` on a day books one at 10:00 that day. Cancelled ones are left off. One request per month
+      (`/api/activities?from=&to=` returns the whole range, up to 1,000)
+- [x] **Workspace currency** (2026-11-06, Settings → Workspace, `workspace:manage`): 14 currencies;
+      every amount on screen, `{{deal.amount}}` and amount labels follow it. Amounts aren't converted
 - [x] Convert lead → deal
 - [x] **Tasks** (to-do with due date, priority, status, completion time) and **activities**
       (calls/meetings at a time, with attendees), both with list + kanban, linked to a record
@@ -71,6 +127,15 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] Profile (name, password)
 
 ### Selling better
+- [x] **My day** (2026-11-06, `/my-day`, first in the sidebar): one request (`/api/my-day`, the
+      browser's own midnight) for the signed-in person's overdue and today's tasks, today's calls and
+      meetings plus missed ones from the past week, leads of theirs still in the first stage with
+      **no call or task planned** ("waiting for first contact": the freshest 5, then "+95 more
+      waiting" linking to the filtered Leads list, so 100 bulk-assigned leads can't flood it), and their open deals closing within 7 days (or past their date).
+      Every card shows its **top 5 and a total** ("+995 more overdue tasks" → the filtered list), so
+      it's one screen with 10 tasks or 1,000; overdue is most important first, missed calls are a
+      count with a link. Tick tasks and calls done, call or WhatsApp a lead, or open anything. Works
+      at phone width. Live: refreshes when leads, deals, tasks or activities change
 - [x] **Dashboard**: revenue won and trend, win rate, weighted pipeline, closing soon, lead
       funnel, **team performance table** (who's doing well), **source performance**
       (leads → conversion → revenue), **campaign performance** (the same per ad campaign), **lost reasons**, my tasks and upcoming calls, filters by
@@ -128,9 +193,14 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       owner, **move to a stage**. `{{deal.amount}}` placeholder. Demo has a "Big wins" rule
 
 ### Email
-- [x] **Email from a lead, deal or contact** (its Emails tab): sent through a queue over free SMTP (Gmail),
-      replies go to the sender's own inbox, status live (Sending → Sent / Not sent → Opened),
-      logged on the timeline. See [EMAIL.md](EMAIL.md)
+- [x] **Email from a lead, deal or contact** (its Emails tab): sent through a queue over free SMTP,
+      status live (Sending → Sent / Not sent → Opened), logged on the timeline. See [EMAIL.md](EMAIL.md)
+- [x] **Connect your email** (2026-11-06, Settings → Profile): each person's own mailbox (address +
+      app password, any provider), checked by logging in before it's saved, password AES-256-GCM
+      encrypted. Emails go out from their own address; no connected mailbox = no sending (the Emails
+      tab says so; automations skip with a reason). The shared `SMTP_*` settings are gone
+- [x] **WhatsApp button** (2026-11-06) next to every phone number (lead, deal, contact): opens a
+      `wa.me` chat, empty or with a template's text filled in, and notes it on the timeline
 - [x] **Email templates** with placeholders (`{{lead.firstName}}`, `{{me.name}}`...), filled in as
       you pick one; three starters for a new workspace
 - [x] **Open tracking**: "Rahul opened your email" in the bell, live
@@ -153,6 +223,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] Landing page 3D: halftone shapes, the untangling knot, a team swarm behind the quote, a spotlight on the
       pricing plans, an orb in the FAQ; the steps section's menus slide in, float and step a highlight through their rows; every WebGL canvas hands its context back on unmount (browsers allow ~16)
 - [x] 404 page in the landing look; link-preview image (`src/app/opengraph-image.tsx`, fonts in `assets/fonts`, site address from `APP_URL`): the real dashboard on a violet panel
+- [x] Top bar: links and Log in on wide screens; below 921px a menu button drops them down from under the bar
 - [x] Basic SEO: `robots.txt` (keeps crawlers out of `/api/`) and `sitemap.xml` (`src/app/robots.ts`, `sitemap.ts`); every public page gets its title, description, canonical address and link preview from `pageMetadata()` in `(marketing)/metadata.ts`; the app stays noindex
 - [x] Onboarding intro
 
@@ -166,7 +237,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 
 1. **Speed-to-lead rule**: alert the owner (then their manager) if a new lead isn't contacted in X hours (a delayed job)
 2. **Booking link**: a public page where a visitor picks a free slot → lead + meeting
-3. Products & quotes on deals
+3. Drag on the calendar to reschedule; a calendar feed (ICS) for Google Calendar
 4. README for the repo, and deployment (Railway/Render, since the custom server needs a long-running Node process)
 5. Presence ("Priya is viewing this lead"), email for missed notifications
 
@@ -194,6 +265,15 @@ Newest first. The reason matters more than the choice.
 | 2026-11-03 | A lead integration is a **`LeadForm` with `kind = WEBHOOK`**, not a new model | the same source, owner, rotation and capture rules for free; only the payload reader and a delivery log are new |
 | 2026-11-03 | One webhook that **reads many payload shapes** (plain JSON, Google Ads, IndiaMART) instead of a connector per tool | one small feature covers dozens of tools through Zapier/Make/Pabbly; field names matched like the CSV import |
 | 2026-11-03 | Email over **SMTP via Nodemailer**, from **one Gmail account** with Reply-To = the sender | free with no domain, lands in inboxes; switching to Resend/Brevo is only .env; per-user Gmail sign-in (OAuth) needs Google's app review |
+| 2026-11-06 | Email from **each person's own mailbox** (app password), replacing the one shared Gmail | one shared account meant everyone's mail went out from the owner's personal Gmail; app passwords need no Google review (OAuth would cap us at 100 test users until verified) |
+| 2026-11-06 | The mailbox password is **encrypted, key derived from JWT_SECRET**, never returned to the browser | it must be read back to send, so it can't be hashed; deriving the key means no new secret to set up on Render |
+| 2026-11-06 | Recycle bin as a **copy before a real delete**, not a `deletedAt` column | soft delete would mean a `deletedAt: null` filter on every query, search, count, raw SQL and relation in the app, and one miss shows deleted data; a copy leaves all of that untouched |
+| 2026-11-07 | Quote lines **copy** the product's name, price and tax | a quote already sent must not change when the catalogue's price does; the copy can also be changed for one deal |
+| 2026-11-07 | "Log in as" decided **per person by the owner**, not a role permission | the user wants it held by the owner and handed to individuals; a role checkbox would let any role editor give it out |
+| 2026-11-07 | Quote PDF through the **browser's print dialog**, not a PDF library | every browser can "Save as PDF"; no dependency, no server rendering, and the page is the same HTML as on screen |
+| 2026-11-06 | Company of a deal = the **company of its lead's contact**; companies made from lead company names | no new link to keep in step; the company name leads already carry fills the Companies page by itself |
+| 2026-11-06 | Currency is **display only**, set in the browser by the dashboard layout | amounts are numbers; converting would need exchange rates. The server formats with the workspace's currency explicitly (no shared module state across workspaces) |
+| 2026-11-06 | WhatsApp through **wa.me links**, not the Business API | free, no Meta approval; the person still presses send, so the timeline says "opened", not "sent" |
 | 2026-11-03 | Emails are **queued** (BullMQ), placeholders filled **in the browser** | sending never makes anyone wait and retries itself; the sender sees and can edit the exact text before it goes |
 | 2026-11-03 | **View, filters and the open record live in the URL**, not page memory or browser storage | they survive a refresh, Back works, links can be shared, and the server sees them too (no flash of the wrong view) |
 | 2026-11-03 | Demo login is a **plain link** (`GET /api/auth/demo`), into the demo workspace only | works from the landing page, the login page and a README; it can only ever sign in as the demo's one fixed person (John Doe) |

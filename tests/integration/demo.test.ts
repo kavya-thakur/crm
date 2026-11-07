@@ -64,6 +64,10 @@ describe("the demo workspace", () => {
         const first = (await demoOrg())!;
         const leads = await prisma.lead.count({ where: { organizationId: first.id } });
         expect(leads).toBeGreaterThan(100);
+        // every lead is a contact with a phone, filed under its company
+        expect(await prisma.lead.count({ where: { organizationId: first.id, OR: [{ contactId: null }, { phone: null }] } })).toBe(0);
+        expect(await prisma.contact.count({ where: { organizationId: first.id, companyId: null } })).toBe(0);
+        expect(await prisma.company.count({ where: { organizationId: first.id } })).toBeGreaterThan(10);
 
         // a visitor adds a web form and deletes some leads
         await prisma.leadForm.create({ data: { organizationId: first.id, name: "Visitor's form", key: `visitor-${Date.now()}` } });

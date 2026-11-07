@@ -177,10 +177,10 @@ All under `/api`, JSON in and out (`{ ok, data, message }`), most needing a logi
 |---|---|
 | Auth | `auth/login`, `auth/register`, `auth/logout`, `auth/demo` (one-click demo sign-in), `me`, `me/password` |
 | Leads | `leads` (list with filters, create), `leads/[id]` (get, edit, delete), `.../assign`, `.../convert` (→ deal), `.../merge`, `.../notes`, `.../timeline`, `leads/bulkUpdate`, `leads/duplicates` |
-| Deals | the same shape, plus `deals/[id]/duplicates` |
+| Deals | the same shape, plus `deals/[id]/duplicates`, and `deals/[id]/products` (+ `/[lineId]`): the quote's lines |
 | Contacts | the same shape (no convert or merge) |
 | Work | `tasks`, `tasks/[id]`, `activities`, `activities/[id]`, `notes` (the feed) |
-| Settings | `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `lead-forms`, `agents`, `roles`, `permissions`, `saved-filters` |
+| Settings | `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `lead-forms`, `agents`, `roles`, `permissions`, `saved-filters`, `products` (the catalogue) |
 | Other | `dashboard`, `search`, `notifications` |
 | Public | `public/forms/[key]`: web form submissions (no login; CORS, honeypot, rate limit) |
 

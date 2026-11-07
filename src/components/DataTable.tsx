@@ -24,6 +24,11 @@ export type EditConfig<TRecord> =
           getValue: (record: TRecord) => string | undefined;
           options: SelectOption[];
           onSave: (record: TRecord, value: string | undefined) => void;
+      }
+    | {
+          // an editor of the page's own (a company picker): shown in the cell, `close` when done
+          type: "custom";
+          render: (record: TRecord, close: () => void) => ReactNode;
       };
 
 export interface DataColumn<TRecord> {
@@ -171,6 +176,8 @@ export function DataCell<TRecord>({
 
 // The in-place editor for one field; also used on board cards
 export function renderEditor<TRecord>(edit: EditConfig<TRecord>, record: TRecord, close: () => void) {
+    if (edit.type === "custom") return edit.render(record, close);
+
     if (edit.type === "select") {
         return (
             <Select

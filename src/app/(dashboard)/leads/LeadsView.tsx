@@ -71,6 +71,7 @@ import NewLeadDialog from "./NewLeadDialog";
 import { useListQuery } from "../shared/useListQuery";
 import { createCustomColumn, createCustomFilterField, customBulkFields, useCustomFields } from "../shared/customFields";
 import { useUrlState } from "../shared/useUrlState";
+import { CompanyOptions } from "../shared/CompanyPicker";
 
 
 const SORT_FIELDS: { field: LeadFilters["sortBy"]; label: string }[] = [
@@ -527,7 +528,15 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                                       },
                                   ]
                                 : []),
-                            { key: "company", label: "Company", icon: IconBuilding, type: "text", clearable: true, toChanges: (value) => ({ companyName: value || null }) },
+                            {
+                                key: "company",
+                                label: "Company",
+                                icon: IconBuilding,
+                                type: "text",
+                                clearable: true,
+                                toChanges: (value) => ({ companyName: value || null }),
+                                input: (value, onChange) => <CompanyOptions value={value || null} onPick={(name) => onChange(name ?? "")} />,
+                            },
                             ...customBulkFields(customFields, can.seeAgents ? agents.data : undefined),
                         ]}
                     />
@@ -550,8 +559,8 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                 noun="lead"
                 description={
                     selection.big
-                        ? "Their timelines, notes, tasks and activities go too. It runs in the background, so you can keep working. This can't be undone."
-                        : "Their timeline history is deleted too. This can't be undone."
+                        ? "Their timelines, notes, tasks and activities go too. It runs in the background, so you can keep working. They can be restored from the recycle bin for 30 days."
+                        : "Their timeline history is deleted too. They can be restored from the recycle bin for 30 days."
                 }
                 pending={bulk.isPending || bulkJob.isPending}
                 onCancel={() => setConfirmingDelete(false)}

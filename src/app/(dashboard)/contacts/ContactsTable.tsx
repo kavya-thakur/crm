@@ -3,6 +3,7 @@
 import {
     IconAddressBook,
     IconBriefcase,
+    IconBuilding,
     IconCalendar,
     IconMail,
     IconPhone,
@@ -18,6 +19,8 @@ import { DataCell, ResizableHeaderCell, type DataColumn, type EditConfig, people
 import type { useTableColumns } from "@/components/FilterPanel";
 import type { SelectOption } from "@/components/Select";
 import { formatDate } from "@/lib/utils/format";
+import Link from "next/link";
+import { CompanyPicker } from "../shared/CompanyPicker";
 import type { Agent, Contact } from "./shared";
 
 // Every column but Name is optional — shown, hidden, reordered (drag the
@@ -33,6 +36,16 @@ export const CONTACT_COLUMNS: ContactColumn[] = [
     {
         key: "phone", label: "Phone", icon: IconPhone, width: 160,
         cell: (contact) => contact.phone && <a href={`tel:${contact.phone}`} className="hover:underline">{contact.phone}</a>,
+    },
+    {
+        key: "company", label: "Company", icon: IconBuilding, width: 180,
+        cell: (contact) =>
+            contact.company && (
+                // opens the company; stopPropagation so the row doesn't open the contact too
+                <Link href={`/companies?open=${contact.company.id}`} onClick={(event) => event.stopPropagation()} className="hover:underline">
+                    {contact.company.name}
+                </Link>
+            ),
     },
     { key: "jobTitle", label: "Job title", icon: IconBriefcase, width: 180, cell: (contact) => contact.jobTitle },
     {
@@ -69,6 +82,19 @@ export function withContactEdits(
         email: { type: "email", getValue: (contact) => contact.email, onSave: (contact, value) => context.onUpdate(contact, { email: value }) },
         phone: { type: "tel", getValue: (contact) => contact.phone, onSave: (contact, value) => value && context.onUpdate(contact, { phone: value }) },
         jobTitle: { type: "text", getValue: (contact) => contact.jobTitle, onSave: (contact, value) => context.onUpdate(contact, { jobTitle: value }) },
+        company: {
+            type: "custom",
+            render: (contact, close) => (
+                <CompanyPicker
+                    value={contact.company?.name ?? null}
+                    onChange={(name) => {
+                        context.onUpdate(contact, { companyName: name });
+                        close();
+                    }}
+                    buttonClassName="flex h-7 w-full items-center gap-1 rounded-lg border border-line-strong bg-surface px-1 text-left"
+                />
+            ),
+        },
         ...(context.canAssign && {
             assignedTo: {
                 type: "select",

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moveToCompany } from "@/lib/companies";
+import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
@@ -220,6 +222,11 @@ export async function PATCH(req: NextRequest) {
                 if (customFields) {
                     await tx.$executeRaw(mergeCustomFieldsSql("Lead", leadIds, user, customFields));
                 }
+
+                // their contacts move to that company too, so they show on the Companies page
+                if (fields.companyName !== undefined) {
+                    await moveToCompany(tx, user.organizationId, leadIds, fields.companyName);
+                }
             });
 
             return NextResponse.json({
@@ -232,19 +239,12 @@ export async function PATCH(req: NextRequest) {
         /*
          * DELETE
          */
-        // a single deleteMany is already atomic, so no $transaction needed
-        const { count } = await prisma.lead.deleteMany({
-            where: {
-                id: {
-                    in: leadIds,
-                },
-                ...leadScope(user),
-            },
-        });
+        // into the recycle bin first (a copy of each, with its history), all in one transaction
+        const count = await prisma.$transaction((tx) => deleteToBin(tx, user, "lead", { id: { in: leadIds }, ...leadScope(user) }));
 
         return NextResponse.json({
             ok: true,
-            message: `${count} leads deleted successfully`,
+            message: `${count} leads moved to the recycle bin`,
             affected: count,
         });
     } catch (error) {

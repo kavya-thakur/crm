@@ -8,6 +8,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     IconChevronDown,
     IconDots,
+    IconKey,
+    IconLogin2,
     IconPencil,
     IconPlus,
     IconSearch,
@@ -34,6 +36,8 @@ interface Member {
     email: string;
     createdAt: string;
     role: { id: number; name: string };
+    isOwner: boolean;
+    canLogInAs: boolean;
 }
 
 interface Role {
@@ -44,6 +48,9 @@ interface Role {
 
 interface Me {
     id: number;
+    isOwner: boolean;
+    // may "Log in as" teammates: the owner, or someone the owner allowed
+    canLogInAs: boolean;
     permissions: string[];
 }
 
@@ -96,6 +103,27 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
             toast.success("Role updated");
             refresh();
         },
+    });
+
+    // opens their account; a full page load, since the whole app is theirs now: the sidebar, the
+    // permissions, and the live connection (which has to reconnect as them)
+    const logInAs = useMutation({
+        mutationFn: (id: number) => api.post(`/agents/${id}/log-in-as`),
+        onSuccess: () => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+            window.location.href = "/my-day";
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+    });
+
+    // the owner gives someone the right to log in as teammates, or takes it back
+    const allowLogInAs = useMutation({
+        mutationFn: ({ id, allowed }: { id: number; allowed: boolean }) => api.put<{ message: string }>(`/agents/${id}/log-in-as`, { allowed }),
+        onSuccess: (res) => {
+            toast.success(res.data.message);
+            refresh();
+        },
+        onError: (error) => toast.error(errorMessage(error)),
     });
 
     const remove = useMutation({
@@ -180,6 +208,9 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                 const manageable = isManageable(member.role.id);
                                 const canEdit = can.update && manageable;
                                 const canDelete = can.delete && manageable && !isMe;
+                                // the owner can open anyone's account; someone they allowed, only weaker accounts (the API checks too)
+                                const mayLogInAs = me.canLogInAs && !isMe && (me.isOwner || (!member.isOwner && manageable));
+                                const mayAllow = me.isOwner && !isMe && !member.isOwner;
 
                                 return (
                                     <li key={member.id} className="flex h-15 items-center gap-3 border-b border-line-light px-4 transition-colors last:rounded-b-xl last:border-b-0 hover:bg-paper">
@@ -189,6 +220,12 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                             <p className="flex items-center gap-1.5 font-medium">
                                                 <span className="truncate">{member.name}</span>
                                                 {isMe && <Pill tone="indigo">You</Pill>}
+                                                {member.isOwner && <Pill tone="amber">Owner</Pill>}
+                                                {member.canLogInAs && !member.isOwner && (
+                                                    <span title="The owner allowed them to log in as teammates">
+                                                        <IconLogin2 size={14} className="text-faint" />
+                                                    </span>
+                                                )}
                                             </p>
                                             <p className="truncate text-muted">{member.email}</p>
                                         </div>
@@ -226,7 +263,7 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                         <span className="w-24 text-faint">{formatDate(member.createdAt)}</span>
 
                                         <div className="w-7">
-                                            {(canEdit || canDelete) && (
+                                            {(canEdit || canDelete || mayLogInAs || mayAllow) && (
                                                 <Dropdown
                                                     align="right"
                                                     buttonClassName="flex size-7 items-center justify-center rounded-lg text-faint hover:bg-fill hover:text-ink"
@@ -234,9 +271,19 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                                                 >
                                                     {(close) => (
                                                         <>
+                                                            {mayLogInAs && (
+                                                                <MenuItem onClick={() => { logInAs.mutate(member.id); close(); }}>
+                                                                    <IconLogin2 size={16} /> Log in as {member.name.split(" ")[0]}
+                                                                </MenuItem>
+                                                            )}
                                                             {canEdit && (
                                                                 <MenuItem onClick={() => { setEditing(member); close(); }}>
                                                                     <IconPencil size={16} /> Edit
+                                                                </MenuItem>
+                                                            )}
+                                                            {mayAllow && (
+                                                                <MenuItem onClick={() => { allowLogInAs.mutate({ id: member.id, allowed: !member.canLogInAs }); close(); }}>
+                                                                    <IconKey size={16} /> {member.canLogInAs ? "Stop letting them log in as others" : "Let them log in as others"}
                                                                 </MenuItem>
                                                             )}
                                                             {canDelete && (

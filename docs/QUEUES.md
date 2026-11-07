@@ -109,6 +109,11 @@ my filters". It works on leads, deals and contacts (contacts have no stages):
 4. **Progress anywhere.** Each batch emits `bulk-progress` to the person's room; a small card in
    the corner of every page (`BackgroundJobs.tsx`) shows *"Deleting 4,230 leads… 2,000 of 4,230"*.
    When it finishes there's a toast, and everyone's lists have been shrinking as it went.
+5. **Restoring from the recycle bin** uses the same queue and card: a BulkJob with action
+   `"restore"` and entity `"record"` (the bin holds all three kinds), started by
+   `POST /api/recycle-bin/bulk` for more than 25 items. `runRestoreJob` restores 25 at a time
+   with `restoreMany` (each record its own transaction, contacts first); a retry carries on, since
+   whatever is already back has left the bin. Deleting forever needs no job: one DELETE.
 
 ## 5. Rate limits (`src/lib/api/rateLimit.ts`)
 
@@ -195,8 +200,9 @@ cron `0 3 * * *` in Asia/Kolkata) adds a job to the `demo` queue every night, an
 `buildDemoWorkspace()`. Look at it with `redis-cli --scan --pattern 'bull:demo:*'`.
 
 **Emails** are another: `POST /api/emails` saves the email and adds `{ emailId }` to the `emails`
-queue; the worker's `sendEmail()` sends it over SMTP, and after 4 failed tries `failEmail()`
-marks it failed and tells the sender. See [EMAIL.md](EMAIL.md).
+queue; the worker's `sendEmail()` sends it through the sender's own mailbox over SMTP, and after
+4 failed tries `failEmail()` marks it failed and tells the sender (a refused password fails at once:
+retrying wouldn't help). See [EMAIL.md](EMAIL.md).
 
 **Automations** too: saving, moving, winning or losing a lead or deal adds
 `{ trigger, organizationId, leadId | dealId, stageId? }` to the `automations` queue (only for

@@ -14,9 +14,11 @@ import {
     IconChecklist,
     IconChevronDown,
     IconClock,
-    IconCurrencyRupee,
+    IconCoin,
     IconFileDescription,
     IconMailFast,
+    IconBrandWhatsapp,
+    IconArrowBackUp,
     IconPercentage,
     IconPoint,
     IconProgress,
@@ -51,6 +53,8 @@ import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
 import { EmailsTab } from "../shared/emails";
+import { WhatsAppButton } from "../shared/whatsapp";
+import { DealProducts } from "./DealProducts";
 import {
     StageLabel,
     formatDealAmount,
@@ -87,6 +91,8 @@ const TIMELINE_ICONS: Record<string, typeof IconTargetArrow> = {
     TASK_COMPLETED: IconChecklist,
     MERGED: IconGitMerge,
     EMAIL_SENT: IconMailFast,
+    WHATSAPP: IconBrandWhatsapp,
+    RESTORED: IconArrowBackUp,
 };
 
 type DealChanges = Partial<
@@ -112,6 +118,7 @@ interface DealPanelProps {
         assign: boolean;
         // picking the lead lists the leads, which needs lead:read
         linkLead: boolean;
+        manageProducts: boolean;
     };
     agents?: DealUser[];
     meId: number;
@@ -129,7 +136,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     // a duplicate being merged into this deal
     const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
-    const [tab, setTab] = useState<"timeline" | "notes" | "tasks" | "activities" | "emails">("timeline");
+    const [tab, setTab] = useState<"timeline" | "products" | "notes" | "tasks" | "activities" | "emails">("timeline");
 
     const dealQuery = useQuery({
         queryKey: ["deal", dealId],
@@ -330,7 +337,14 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                 </FieldRow>
                             )}
 
-                            <FieldRow icon={IconCurrencyRupee} label="Amount">
+                            <FieldRow icon={IconCoin} label="Amount">
+                                {deal.products?.length ? (
+                                    // the quote's total; it changes with the lines on the Products tab
+                                    <button type="button" onClick={() => setTab("products")} title="The total of its products" className="flex h-7 max-w-full items-center gap-1.5 rounded-lg px-1 hover:bg-fill">
+                                        {formatDealAmount(deal.amount)}
+                                        <span className="truncate text-sm text-faint">from products</span>
+                                    </button>
+                                ) : (
                                 <EditableText
                                     value={String(deal.amount)}
                                     placeholder="Amount"
@@ -345,6 +359,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                         }
                                     }}
                                 />
+                                )}
                             </FieldRow>
 
                             <FieldRow icon={IconPercentage} label="Probability">
@@ -469,7 +484,15 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                 <>
                                     <FieldRow icon={IconPhone} label="Phone">
                                         {deal.lead.phone ? (
-                                            <a href={`tel:${deal.lead.phone}`} className="truncate px-1 text-accent hover:underline">{deal.lead.phone}</a>
+                                            <div className="flex items-center gap-1">
+                                                <a href={`tel:${deal.lead.phone}`} className="min-w-0 flex-1 truncate px-1 text-accent hover:underline">{deal.lead.phone}</a>
+                                                <WhatsAppButton
+                                                    phone={deal.lead.phone}
+                                                    entity="deal"
+                                                    recordId={deal.id}
+                                                    values={{ "lead.firstName": deal.lead.name.split(" ")[0], "lead.name": deal.lead.name, "deal.title": deal.title, "deal.amount": formatMoney(Number(deal.amount)) }}
+                                                />
+                                            </div>
                                         ) : (
                                             <span className="px-1 text-light">Empty</span>
                                         )}
@@ -508,15 +531,20 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
 
                     {/* Timeline, Notes, Tasks, Activities, Emails */}
                     <div className="flex min-w-0 flex-1 flex-col md:overflow-y-auto">
-                        <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line-light px-4">
+                        <div className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-4 [&>*]:shrink-0">
                             <TabButton active={tab === "timeline"} onClick={() => setTab("timeline")}>Timeline</TabButton>
+                            <TabButton active={tab === "products"} onClick={() => setTab("products")}>Products</TabButton>
                             <TabButton active={tab === "notes"} onClick={() => setTab("notes")}>Notes</TabButton>
                             <TabButton active={tab === "tasks"} onClick={() => setTab("tasks")}>Tasks</TabButton>
                             <TabButton active={tab === "activities"} onClick={() => setTab("activities")}>Activities</TabButton>
                             <TabButton active={tab === "emails"} onClick={() => setTab("emails")}>Emails</TabButton>
                         </div>
 
-                        {tab === "notes" ? (
+                        {tab === "products" ? (
+                            <section className="px-4 py-4">
+                                <DealProducts dealId={deal.id} lines={deal.products ?? []} editable={can.update} canManageCatalogue={can.manageProducts} />
+                            </section>
+                        ) : tab === "notes" ? (
                             <section className="px-4 py-4">
                                 <NotesTab entity="deal" recordId={deal.id} agents={agents} meId={meId} />
                             </section>
@@ -624,7 +652,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
             <ConfirmDeleteModal
                 open={confirmingDelete}
                 title={`Delete ${deal?.title}?`}
-                description="This action cannot be undone."
+                description="It goes to the recycle bin with its history, and can be restored from Settings → Recycle bin for 30 days."
                 error={remove.isError ? errorMessage(remove.error) : undefined}
                 pending={remove.isPending}
                 onCancel={() => setConfirmingDelete(false)}
@@ -707,7 +735,7 @@ function FieldRow({
     label,
     children,
 }: {
-    icon: typeof IconCurrencyRupee;
+    icon: typeof IconCoin;
     label: string;
     children: React.ReactNode;
 }) {

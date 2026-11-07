@@ -1,21 +1,18 @@
 import { randomBytes } from "node:crypto";
-import nodemailer, { type Transporter } from "nodemailer";
 
 import { prisma } from "@/lib/db/prisma";
 import { isDemoWorkspace } from "@/lib/demo/workspace";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
 import { emailsQueue } from "@/lib/jobs/queues";
+import { decryptSecret, mailboxProblem, smtpFor } from "@/lib/emails/account";
 
 /*
- * Sending the CRM's emails, over SMTP (any provider: Gmail, Brevo, Resend...), set in .env:
- *   SMTP_HOST=smtp.gmail.com  SMTP_PORT=465  SMTP_USER=flash.crm.mail@gmail.com  SMTP_PASS=<app password>
- *   SMTP_FROM (optional, defaults to SMTP_USER)   APP_URL (the site's address, for open tracking)
- * Every email goes out from that one address as "Priya via Acme", with Reply-To set to the
- * sender's own email, so the customer's reply lands in their inbox. Run by the worker
- * (src/lib/jobs/worker.ts) for each id on the "emails" queue; see docs/EMAIL.md.
+ * Sending the CRM's emails. Each person connects their own mailbox in Settings > Profile
+ * (src/lib/emails/account.ts), and their emails go out through it: from their own address, so
+ * replies land in their own inbox, and nobody sends from anyone else's account.
+ * Run by the worker (src/lib/jobs/worker.ts) for each id on the "emails" queue; see docs/EMAIL.md.
+ * APP_URL (the site's address) turns on open tracking.
  */
-
-const holder = globalThis as unknown as { crmMailer?: Transporter };
 
 export const emailSelect = {
     id: true,
@@ -69,28 +66,18 @@ export async function queueEmail(email: {
     return saved;
 }
 
-// What's missing from .env before email can go out, said plainly; null when it's all there
-export function emailSetupProblem() {
-    const missing = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].filter((name) => !process.env[name]);
-    return missing.length > 0 ? `Email isn't set up yet: add ${missing.join(", ")} to .env` : null;
+// Whether this person can send email from the CRM: they've connected a mailbox (the demo
+// workspace always can, since it never really sends)
+export async function canSendEmail(user: { id: number; organization: { slug: string } }) {
+    return isDemoWorkspace(user) || (await prisma.emailAccount.count({ where: { userId: user.id } })) > 0;
 }
 
-// One SMTP connection setup for the whole process. Port 465 is SSL from the start; 587 upgrades with STARTTLS.
-function mailer() {
-    const port = Number(process.env.SMTP_PORT) || 465;
-    holder.crmMailer ??= nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port,
-        secure: port === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-    return holder.crmMailer;
-}
+export const NOT_CONNECTED = "Connect your email in Settings → Profile to send emails from Flash";
 
 export async function sendEmail(emailId: number) {
     const email = await prisma.email.findUnique({
         where: { id: emailId },
-        include: { sentBy: { select: { name: true, email: true } }, organization: { select: { name: true, slug: true } } },
+        include: { sentBy: { select: { name: true, emailAccount: true } }, organization: { select: { slug: true } } },
     });
     // gone (its lead was deleted), or already dealt with (a retry after it went out)
     if (!email || email.status !== "QUEUED") return;
@@ -102,18 +89,24 @@ export async function sendEmail(emailId: number) {
         return;
     }
 
-    // nothing to retry until someone fills in .env
-    const problem = emailSetupProblem();
-    if (problem) return failEmail(email.id, problem);
+    // disconnected (or the sender has left) since it was written: nothing to retry
+    const account = email.sentBy?.emailAccount;
+    if (!account) return failEmail(email.id, NOT_CONNECTED);
 
-    await mailer().sendMail({
-        from: { name: `${email.sentBy?.name ?? "Someone"} via ${email.organization.name}`, address: process.env.SMTP_FROM || process.env.SMTP_USER! },
-        ...(email.sentBy && { replyTo: { name: email.sentBy.name, address: email.sentBy.email } }),
-        to: email.to,
-        subject: email.subject,
-        text: email.body,
-        html: toHtml(email.body, email.trackingToken),
-    });
+    const login = { email: account.email, host: account.host, port: account.port, password: decryptSecret(account.passwordEncrypted) };
+    try {
+        await smtpFor(login).sendMail({
+            from: { name: email.sentBy!.name, address: account.email },
+            to: email.to,
+            subject: email.subject,
+            text: email.body,
+            html: toHtml(email.body, email.trackingToken),
+        });
+    } catch (error) {
+        // a revoked app password won't work on the next try either; anything else (a blip) is retried
+        if ((error as { code?: string }).code === "EAUTH") return failEmail(email.id, `${mailboxProblem(error)} Reconnect it in Settings → Profile.`);
+        throw error;
+    }
 
     await prisma.email.update({ where: { id: email.id }, data: { status: "SENT", sentAt: new Date(), error: null } });
     broadcastChange(email.organizationId, "emails");

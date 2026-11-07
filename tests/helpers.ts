@@ -15,6 +15,7 @@ const PERMISSIONS = [
     "custom-fields:manage",
     "email-templates:manage",
     "automations:manage",
+    "workspace:manage",
 ];
 
 let seeded = false;

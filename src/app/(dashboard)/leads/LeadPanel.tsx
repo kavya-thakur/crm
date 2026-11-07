@@ -16,6 +16,8 @@ import {
     IconGitMerge,
     IconMail,
     IconMailFast,
+    IconBrandWhatsapp,
+    IconArrowBackUp,
     IconPhone,
     IconPlus,
     IconPoint,
@@ -49,6 +51,8 @@ import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
 import { EmailsTab } from "../shared/emails";
+import { WhatsAppButton } from "../shared/whatsapp";
+import { CompanyPicker } from "../shared/CompanyPicker";
 import {
     StageLabel,
     refreshLeads,
@@ -84,6 +88,8 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     WEB_FORM: IconForms,
     MERGED: IconGitMerge,
     EMAIL_SENT: IconMailFast,
+    WHATSAPP: IconBrandWhatsapp,
+    RESTORED: IconArrowBackUp,
 };
 
 type LeadChanges = Partial<Pick<Lead, "name" | "email" | "phone" | "companyName" | "stageId" | "lostReason">> & {
@@ -325,12 +331,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                             </FieldRow>
 
                             <FieldRow icon={IconBuilding} label="Company">
-                                <EditableText
-                                    value={lead.companyName}
-                                    placeholder="Company"
-                                    disabled={!can.update}
-                                    onSave={(companyName) => update.mutate({ companyName })}
-                                />
+                                <CompanyPicker value={lead.companyName} disabled={!can.update} onChange={(companyName) => update.mutate({ companyName })} />
                             </FieldRow>
 
                             <FieldRow icon={IconMail} label="Email">
@@ -344,13 +345,23 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                             </FieldRow>
 
                             <FieldRow icon={IconPhone} label="Phone">
-                                <EditableText
-                                    type="tel"
-                                    value={lead.phone}
-                                    placeholder="Phone"
-                                    disabled={!can.update}
-                                    onSave={(phone) => update.mutate({ phone })}
-                                />
+                                <div className="flex items-center gap-1">
+                                    <div className="min-w-0 flex-1">
+                                        <EditableText
+                                            type="tel"
+                                            value={lead.phone}
+                                            placeholder="Phone"
+                                            disabled={!can.update}
+                                            onSave={(phone) => update.mutate({ phone })}
+                                        />
+                                    </div>
+                                    <WhatsAppButton
+                                        phone={lead.phone}
+                                        entity="lead"
+                                        recordId={lead.id}
+                                        values={{ "lead.firstName": lead.name.split(" ")[0], "lead.name": lead.name, "lead.company": lead.companyName }}
+                                    />
+                                </div>
                             </FieldRow>
 
                             <FieldRow icon={IconTag} label="Source">
@@ -557,7 +568,7 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
             <ConfirmDeleteModal
                 open={confirmingDelete}
                 title={`Delete ${lead?.name}?`}
-                description="Its timeline history is deleted too. This can't be undone."
+                description="It goes to the recycle bin with its history, and can be restored from Settings → Recycle bin for 30 days."
                 pending={remove.isPending}
                 onCancel={() => setConfirmingDelete(false)}
                 onConfirm={() => remove.mutate()}

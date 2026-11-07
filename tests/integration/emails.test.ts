@@ -8,14 +8,32 @@ vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 // the queue just records what it was given; the tests run the worker's sendEmail themselves
 const queued: { emailId: number }[] = [];
 vi.mock("@/lib/jobs/queues", () => ({ emailsQueue: () => ({ add: async (_name: string, data: { emailId: number }) => queued.push(data) }) }));
-// no real mail server: sendMail records each email
+// no real mail server: sendMail records each email (with the login it went through), and
+// `smtpError` makes the next login or send fail the way a real server would
 const sent: Record<string, unknown>[] = [];
+const smtp: { error: (Error & { code?: string }) | null } = { error: null };
 // whether a workspace is the public demo, switched on by the demo test
 vi.mock("@/lib/demo/workspace", async (importOriginal) => ({ ...(await importOriginal<object>()), isDemoWorkspace: vi.fn(() => false) }));
-vi.mock("nodemailer", () => ({ default: { createTransport: () => ({ sendMail: async (mail: Record<string, unknown>) => sent.push(mail) }) } }));
+vi.mock("nodemailer", () => ({
+    default: {
+        createTransport: (options: { auth: { user: string; pass: string } }) => ({
+            verify: async () => {
+                if (smtp.error) throw smtp.error;
+                return true;
+            },
+            sendMail: async (mail: Record<string, unknown>) => {
+                if (smtp.error) throw smtp.error;
+                sent.push({ ...mail, login: options.auth });
+            },
+        }),
+    },
+}));
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { GET as listEmails, POST as sendEmailRoute } from "@/app/api/emails/route";
+import { DELETE as disconnect, GET as getAccount, PUT as connect } from "@/app/api/me/email-account/route";
+import { POST as logWhatsapp } from "@/app/api/whatsapp/route";
+import { encryptSecret } from "@/lib/emails/account";
 import { GET as listTemplates, POST as createTemplate } from "@/app/api/email-templates/route";
 import { GET as openPixel } from "@/app/api/public/emails/[token]/open/route";
 import { sendEmail } from "@/lib/emails/send";
@@ -26,7 +44,11 @@ function post(body: object) {
     return new NextRequest("http://localhost/api/emails", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
-const SMTP = { SMTP_HOST: "smtp.example.com", SMTP_USER: "flash@example.com", SMTP_PASS: "secret" };
+const put = (body: object) => new NextRequest("http://localhost", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+// a connected mailbox, as if they'd filled in Settings > Profile
+const connectMailbox = (userId: number, email = "priya.sales@gmail.com") =>
+    prisma.emailAccount.create({ data: { userId, email, host: "smtp.gmail.com", port: 465, passwordEncrypted: encryptSecret("app-password") } });
 
 describe("emails from the CRM", () => {
     const organizationIds: number[] = [];
@@ -34,6 +56,7 @@ describe("emails from the CRM", () => {
     beforeEach(() => {
         queued.length = 0;
         sent.length = 0;
+        smtp.error = null;
     });
 
     afterEach(async () => {
@@ -47,8 +70,9 @@ describe("emails from the CRM", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
         const stage = await createLeadStage(organization.id, { name: "New", order: 0 });
         const lead = await prisma.lead.create({
-            data: { organizationId: organization.id, name: "Rahul Mehta", email: "rahul@acme.example", stageId: stage.id, assignedToId: user.id },
+            data: { organizationId: organization.id, name: "Rahul Mehta", email: "rahul@acme.example", phone: "98765 43210", stageId: stage.id, assignedToId: user.id },
         });
+        await connectMailbox(user.id);
         return { organization, user, lead };
     }
 
@@ -92,27 +116,100 @@ describe("emails from the CRM", () => {
         expect(await prisma.email.count({ where: { organizationId: organization.id } })).toBe(0);
     });
 
-    it("fails with a plain reason until .env has the mail server", async () => {
-        const { lead } = await setUp();
-        vi.stubEnv("SMTP_HOST", "");
-        await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
+    it("won't send until you've connected your email, and fails plainly if you disconnect", async () => {
+        const { user, lead } = await setUp();
+        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
 
+        const refused = await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
+        expect(refused.status).toBe(400);
+        expect((await refused.json()).message).toContain("Connect your email");
+
+        // queued while connected, then disconnected before the worker got to it
+        await connectMailbox(user.id);
+        await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
+        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+        await sendEmail(queued[0].emailId);
+
+        const email = await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } });
+        expect(email).toMatchObject({ status: "FAILED" });
+        expect(email.error).toContain("Connect your email");
+        expect(sent).toHaveLength(0);
+    });
+
+    it("gives up at once, with a reason, when the mailbox refuses the password", async () => {
+        const { lead } = await setUp();
+        await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
+        smtp.error = Object.assign(new Error("Invalid login: 535"), { code: "EAUTH" });
+
+        // no throw: a retry wouldn't help
         await sendEmail(queued[0].emailId);
 
         const email = await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } });
         expect(email.status).toBe("FAILED");
-        expect(email.error).toContain("SMTP_HOST");
-        expect(sent).toHaveLength(0);
+        expect(email.error).toContain("Reconnect it in Settings → Profile");
+
+        // a network blip is thrown, so the queue tries again
+        await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Again", body: "Hi" }));
+        smtp.error = Object.assign(new Error("timeout"), { code: "ETIMEDOUT" });
+        await expect(sendEmail(queued[1].emailId)).rejects.toThrow("timeout");
     });
 
-    it("sends from the workspace's address with replies to the sender, and tracks the first open", async () => {
+    it("connects a mailbox only after logging in to it, and never hands the password back", async () => {
+        const { user } = await setUp();
+        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+        const account = { email: "priya.sales@gmail.com", password: "abcd efgh ijkl mnop", host: "smtp.gmail.com", port: 465 };
+
+        // a wrong password: refused, nothing saved
+        smtp.error = Object.assign(new Error("Invalid login"), { code: "EAUTH" });
+        const wrong = await connect(put(account));
+        expect(wrong.status).toBe(400);
+        expect((await wrong.json()).message).toContain("app password");
+        expect(await prisma.emailAccount.count({ where: { userId: user.id } })).toBe(0);
+
+        // an IP address or an odd port never gets as far as a login
+        smtp.error = null;
+        expect((await connect(put({ ...account, host: "127.0.0.1" }))).status).toBe(400);
+        expect((await connect(put({ ...account, port: 22 }))).status).toBe(400);
+
+        const res = await connect(put(account));
+        expect(res.status).toBe(200);
+        const saved = await prisma.emailAccount.findUniqueOrThrow({ where: { userId: user.id } });
+        // encrypted, and Gmail's spaces taken out
+        expect(saved.passwordEncrypted).not.toContain("abcd");
+        const shown = (await (await getAccount()).json()).data;
+        expect(shown).toMatchObject({ email: "priya.sales@gmail.com", host: "smtp.gmail.com", port: 465 });
+        expect(JSON.stringify(shown)).not.toContain("password");
+
+        // and the emails go through it, with the real password
+        const lead = await prisma.lead.findFirstOrThrow({ where: { assignedToId: user.id } });
+        await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
+        await sendEmail(queued[0].emailId);
+        expect(sent[0].login).toEqual({ user: "priya.sales@gmail.com", pass: "abcdefghijklmnop" });
+
+        await disconnect();
+        expect(await prisma.emailAccount.count({ where: { userId: user.id } })).toBe(0);
+    });
+
+    it("notes a WhatsApp chat on the timeline of a lead you can see", async () => {
+        const { lead } = await setUp(["lead:read"]);
+
+        expect((await logWhatsapp(post({ leadId: lead.id, template: "First reply" }))).status).toBe(201);
+        const timeline = await prisma.leadTimeline.findMany({ where: { leadId: lead.id } });
+        expect(timeline.map((entry) => [entry.type, entry.message])).toEqual([["WHATSAPP", 'Opened WhatsApp with the "First reply" message']]);
+
+        // someone else's lead: not found
+        await prisma.lead.update({ where: { id: lead.id }, data: { assignedToId: null } });
+        expect((await logWhatsapp(post({ leadId: lead.id }))).status).toBe(404);
+    });
+
+    it("sends from the sender's own address, and tracks the first open", async () => {
         const { user, lead } = await setUp();
-        for (const [name, value] of Object.entries({ ...SMTP, APP_URL: "https://flash.example" })) vi.stubEnv(name, value);
+        vi.stubEnv("APP_URL", "https://flash.example");
         await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi <b>Rahul</b>\nThanks" }));
 
         await sendEmail(queued[0].emailId);
 
-        expect(sent[0]).toMatchObject({ to: "rahul@acme.example", replyTo: { address: user.email }, from: { address: "flash@example.com" } });
+        expect(sent[0]).toMatchObject({ to: "rahul@acme.example", from: { name: user.name, address: "priya.sales@gmail.com" } });
         // what they typed is shown as text, never as HTML
         expect(sent[0].html).toContain("Hi &#60;b&#62;Rahul&#60;/b&#62;<br>Thanks");
         const email = await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } });
@@ -133,15 +230,17 @@ describe("emails from the CRM", () => {
     });
 
     it("never really sends from the demo workspace", async () => {
-        const { lead } = await setUp();
-        for (const [name, value] of Object.entries(SMTP)) vi.stubEnv(name, value);
-        (isDemoWorkspace as Mock).mockReturnValueOnce(true);
+        const { user, lead } = await setUp();
+        // a demo visitor has no mailbox, and can still "send"
+        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+        (isDemoWorkspace as Mock).mockReturnValue(true);
         await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
 
         await sendEmail(queued[0].emailId);
 
         expect(sent).toHaveLength(0);
         expect((await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } })).status).toBe("SKIPPED");
+        (isDemoWorkspace as Mock).mockReturnValue(false);
     });
 
     it("lets everyone use templates but only managers write them, and fills in placeholders", async () => {

@@ -7,6 +7,7 @@ import { isOpen, matchKeys } from "@/lib/leads/duplicates";
 import { broadcastChange, getSocketServer, notify, userRoom } from "@/lib/realtime/notify";
 import { createLeadSchema } from "@/lib/validations/leads";
 import type { ImportDefaults } from "@/lib/validations/imports";
+import { linkToCompany } from "@/lib/companies";
 
 /*
  * The work behind a CSV import, run by the BullMQ worker (src/lib/jobs/worker.ts), never
@@ -180,6 +181,7 @@ export async function runImport(importJobId: number) {
                         ).id;
                         contactByPhone.set(phone, contactId);
                     }
+                    await linkToCompany(tx, organizationId, contactId, companyName);
 
                     const note = cell(row, "note");
                     await tx.lead.create({

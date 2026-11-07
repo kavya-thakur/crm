@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { IconAddressBook, IconCurrencyRupee, IconTargetArrow } from "@tabler/icons-react";
+import { IconAddressBook, IconCoin, IconTargetArrow } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
@@ -19,7 +19,7 @@ import NotesBoard from "./NotesBoard";
 
 const ENTITY_META: Record<NoteFeedEntity, { label: string; icon: typeof IconTargetArrow; href: string }> = {
     lead: { label: "Lead", icon: IconTargetArrow, href: "/leads" },
-    deal: { label: "Deal", icon: IconCurrencyRupee, href: "/deals" },
+    deal: { label: "Deal", icon: IconCoin, href: "/deals" },
     contact: { label: "Contact", icon: IconAddressBook, href: "/contacts" },
 };
 

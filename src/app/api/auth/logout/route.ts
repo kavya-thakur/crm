@@ -14,5 +14,8 @@ export async function POST() {
         path: "/",
     });
 
+    // and your own session, if you were logged in as a teammate
+    response.cookies.delete("own_access_token");
+
     return response;
 }

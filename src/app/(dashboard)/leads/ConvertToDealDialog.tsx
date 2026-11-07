@@ -1,4 +1,5 @@
 "use client";
+import { currencySymbol } from "@/lib/utils/format";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -135,7 +136,7 @@ function ConvertToDealForm({ open, leadId, leadName, onClose, onConverted }: Con
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                         <label htmlFor="convert-amount" className="mb-1 block text-sm font-medium text-muted">
-                            Amount (₹)
+                            Amount ({currencySymbol()})
                         </label>
                         <input
                             id="convert-amount"

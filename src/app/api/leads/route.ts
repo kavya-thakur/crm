@@ -9,6 +9,7 @@ import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { alreadyALead, duplicateLeadsWhere, findOpenCopy, withDuplicateHints } from "@/lib/leads/duplicates";
 import { firstName, notify } from "@/lib/realtime/notify";
 import { startAutomations } from "@/lib/automations/engine";
+import { linkToCompany } from "@/lib/companies";
 import { exportLeads } from "@/lib/api/csvExport";
 import { MAX_BULK } from "@/lib/jobs/bulkActions";
 
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
                     updatedById: user.id,
                 },
             })).id;
+            await linkToCompany(tx, user.organizationId, resolvedContactId, fields.companyName);
 
             return tx.lead.create({
                 data: {

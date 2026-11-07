@@ -1,4 +1,5 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { deleteToBin } from "@/lib/recycleBin";
 import { dealScope, requirePermission } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
@@ -7,7 +8,7 @@ import { updateDealSchema } from "@/lib/validations/deals";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { closedAtFor } from "@/lib/deals/stages";
 import { NextRequest, NextResponse } from "next/server";
-import { dealLeadSelect } from "@/lib/deals/select";
+import { dealLeadSelect, dealProductsInclude } from "@/lib/deals/select";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
 
 type Params = { params: Promise<{ id: string }> };
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest, { params }: Params) {
                     select: { id: true, name: true, email: true },
                 },
                 pipelineStage: true,
+                products: dealProductsInclude,
             },
         });
 
@@ -202,6 +204,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                     select: { id: true, name: true, email: true },
                 },
                 pipelineStage: true,
+                products: dealProductsInclude,
             },
         });
 
@@ -229,13 +232,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             return validationError(id.error);
         }
 
-        // One query that checks the scope and deletes, so there's no gap for a race
-        const { count } = await prisma.deal.deleteMany({
-            where: {
-                id: id.data,
-                ...dealScope(user),
-            },
-        });
+        // Into the recycle bin (a copy, with its history), then deleted, in one transaction;
+        // the scope is in the where, so someone else's deal is a 404
+        const count = await prisma.$transaction((tx) => deleteToBin(tx, user, "deal", { id: id.data, ...dealScope(user) }));
 
         if (count === 0) {
             return dealNotFound();
@@ -243,7 +242,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
         return NextResponse.json({
             ok: true,
-            message: "Deal deleted successfully",
+            message: "Deal moved to the recycle bin",
         });
     } catch (error) {
         return handleRouteError(error, "Delete deal");

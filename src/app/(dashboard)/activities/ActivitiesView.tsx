@@ -12,6 +12,7 @@ import type { AgentOption } from "../shared/customFields";
 import { toggledStatus } from "../shared/activities";
 import ActivitiesTable from "./ActivitiesTable";
 import ActivitiesBoard from "./ActivitiesBoard";
+import ActivitiesCalendar from "./ActivitiesCalendar";
 import ActivityPanel from "./ActivityPanel";
 import NewActivityDialog from "./NewActivityDialog";
 import { refreshActivities, type Activity, type ActivityScope, type Paginated } from "./shared";
@@ -32,14 +33,16 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
     // Everything you've chosen here lives in the URL, so a refresh (or a shared link) keeps it:
     // board or list, which activities, whose, and the open one (?open=12)
     const page = useUrlState();
-    const view = page.get("view") === "table" ? "table" : "board";
-    const setView = (next: "table" | "board") => page.set({ view: next === "board" ? null : next });
+    const view = oneOf(page.get("view"), ["table", "board", "calendar"] as const, "board");
+    // the calendar keeps its month or week and day in the URL too; they mean nothing elsewhere
+    const setView = (next: typeof view) => page.set({ view: next === "board" ? null : next, cal: null, date: null });
     const scope = oneOf(page.get("scope"), SCOPES.map((item) => item.value), "upcoming");
     const setScope = (next: ActivityScope) => page.set({ page: null, scope: next === "upcoming" ? null : next });
     // your own schedule (assigned to you or tagged on) is what you usually want; switch it to see the team's
     const mineOnly = page.get("whose") !== "team";
     const setMineOnly = (mine: boolean) => page.set({ page: null, whose: mine ? null : "team" });
-    const [creating, setCreating] = useState(false);
+    // booking a new one; `at` when a day was picked on the calendar
+    const [creating, setCreating] = useState<{ at?: string } | null>(null);
 
     const openActivityId = Number(page.get("open")) || null;
     const openActivity = (id: number | null) => page.set({ open: id ? String(id) : null }, "push");
@@ -89,9 +92,10 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
         return (
             <NewActivityDialog
                 agents={agents.data}
-                onClose={() => setCreating(false)}
+                startAt={creating.at}
+                onClose={() => setCreating(null)}
                 onCreated={(activity) => {
-                    setCreating(false);
+                    setCreating(null);
                     refreshActivities(queryClient);
                     openActivity(activity.id);
                 }}
@@ -113,10 +117,10 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
 
     return (
         <div className="flex h-full flex-col">
-            <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating(true)} />
+            <ListHeader section="activities" title="Activities" count={total} createLabel="New Activity" onCreate={() => setCreating({})} />
 
             <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0">
-                <ViewSwitcher view={view} onChange={setView} />
+                <ViewSwitcher view={view} onChange={setView} views={["table", "board", "calendar"]} />
 
                 {/* the board's columns already split activities by status, so these are table-only */}
                 {view === "table" && <span className="mx-1 h-4 w-px bg-line" />}
@@ -158,12 +162,14 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
             </div>
 
             <div className="relative min-h-0 flex-1 overflow-auto">
-                {view === "board" ? (
+                {view === "calendar" ? (
+                    <ActivitiesCalendar mineOnly={mineOnly} onOpen={openActivity} onCreate={(at) => setCreating({ at })} />
+                ) : view === "board" ? (
                     <ActivitiesBoard
                         mineOnly={mineOnly}
                         agents={seeAgents ? agents.data : undefined}
                         onOpen={openActivity}
-                        onCreate={() => setCreating(true)}
+                        onCreate={() => setCreating({})}
                     />
                 ) : (
                     <ActivitiesTable
@@ -177,7 +183,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
                         onToggle={(activity) => updateActivity.mutate({ id: activity.id, changes: { status: toggledStatus(activity.status) } })}
                         onUpdate={(activity, changes) => updateActivity.mutate({ id: activity.id, changes })}
                         onOpen={openActivity}
-                        onCreate={() => setCreating(true)}
+                        onCreate={() => setCreating({})}
                     />
                 )}
             </div>

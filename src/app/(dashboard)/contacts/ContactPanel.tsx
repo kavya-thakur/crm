@@ -12,6 +12,10 @@ import {
     IconFileDescription,
     IconMail,
     IconMailFast,
+    IconBrandWhatsapp,
+    IconArrowBackUp,
+    IconArrowUpRight,
+    IconBuilding,
     IconPhone,
     IconPlus,
     IconPoint,
@@ -39,9 +43,12 @@ import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
 import { EmailsTab } from "../shared/emails";
+import { WhatsAppButton } from "../shared/whatsapp";
+import { CompanyPicker } from "../shared/CompanyPicker";
 import { refreshContacts, type Agent, type Contact, type Paginated, type Permissions } from "./shared";
 
-type ContactChanges = Partial<Pick<Contact, "name" | "email" | "phone" | "jobTitle" | "description" | "customFields">>;
+// companyName: typed in the Company row; the server finds that company (or makes it)
+type ContactChanges = Partial<Pick<Contact, "name" | "email" | "phone" | "jobTitle" | "description" | "customFields">> & { companyName?: string | null };
 
 interface TimelineEntry {
     id: number;
@@ -61,6 +68,8 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
     EMAIL_SENT: IconMailFast,
+    WHATSAPP: IconBrandWhatsapp,
+    RESTORED: IconArrowBackUp,
 };
 
 interface ContactPanelProps {
@@ -250,14 +259,41 @@ export default function ContactPanel({ contactId, can, agents, meId, onClose }: 
                             </FieldRow>
 
                             <FieldRow icon={IconPhone} label="Phone">
-                                <EditableText
-                                    type="tel"
-                                    value={contact.phone}
-                                    placeholder="Phone"
-                                    disabled={!can.update}
-                                    // phone is required, so clearing it just keeps the old one
-                                    onSave={(phone) => phone && update.mutate({ phone })}
-                                />
+                                <div className="flex items-center gap-1">
+                                    <div className="min-w-0 flex-1">
+                                        <EditableText
+                                            type="tel"
+                                            value={contact.phone}
+                                            placeholder="Phone"
+                                            disabled={!can.update}
+                                            // phone is required, so clearing it just keeps the old one
+                                            onSave={(phone) => phone && update.mutate({ phone })}
+                                        />
+                                    </div>
+                                    <WhatsAppButton
+                                        phone={contact.phone}
+                                        entity="contact"
+                                        recordId={contact.id}
+                                        values={{ "lead.firstName": contact.name.split(" ")[0], "lead.name": contact.name }}
+                                    />
+                                </div>
+                            </FieldRow>
+
+                            <FieldRow icon={IconBuilding} label="Company">
+                                <div className="flex items-center gap-1">
+                                    <div className="min-w-0 flex-1">
+                                        <CompanyPicker value={contact.company?.name ?? null} disabled={!can.update} onChange={(companyName) => update.mutate({ companyName })} />
+                                    </div>
+                                    {contact.company && (
+                                        <Link
+                                            href={`/companies?open=${contact.company.id}`}
+                                            aria-label={`Open ${contact.company.name}`}
+                                            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-fill hover:text-ink"
+                                        >
+                                            <IconArrowUpRight size={16} />
+                                        </Link>
+                                    )}
+                                </div>
                             </FieldRow>
 
                             <FieldRow icon={IconBriefcase} label="Job title">

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { companyNamed } from "@/lib/companies";
+import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
@@ -122,7 +124,12 @@ export async function PATCH(req: NextRequest) {
          * UPDATE: the same value for one field (or custom field) on every selected contact
          */
         if (data.action === "update") {
-            const { customFields: submittedCustomFields, ...fields } = data.changes;
+            const { customFields: submittedCustomFields, companyName, ...plain } = data.changes;
+            // a company by its name: found (or made); empty takes them out of their company
+            const fields = {
+                ...plain,
+                ...(companyName !== undefined && { companyId: companyName ? (await companyNamed(prisma, user.organizationId, companyName)).id : null }),
+            };
 
             let customFields: Record<string, unknown> | undefined;
 
@@ -164,19 +171,12 @@ export async function PATCH(req: NextRequest) {
         /*
          * DELETE
          */
-        // a single deleteMany is already atomic, so no $transaction needed
-        const { count } = await prisma.contact.deleteMany({
-            where: {
-                id: {
-                    in: contactIds,
-                },
-                ...contactScope(user),
-            },
-        });
+        // into the recycle bin first (a copy of each, with its history), all in one transaction
+        const count = await prisma.$transaction((tx) => deleteToBin(tx, user, "contact", { id: { in: contactIds }, ...contactScope(user) }));
 
         return NextResponse.json({
             ok: true,
-            message: `${count} contacts deleted successfully`,
+            message: `${count} contacts moved to the recycle bin`,
             affected: count,
         });
     } catch (error) {

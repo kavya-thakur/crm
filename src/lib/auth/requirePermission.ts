@@ -22,10 +22,13 @@ export async function requirePermission(permissionName: string) {
 // The person behind a background job (an import, a bulk delete), loaded the way a request
 // would see them, so the job runs within what they may do *now*, not when they started it
 export function userForJob(userId: number): Promise<CurrentUser | null> {
-    return prisma.user.findUnique({
-        where: { id: userId },
-        include: { organization: true, role: { include: { permissions: { include: { permission: true } } } } },
-    });
+    return prisma.user
+        .findUnique({
+            where: { id: userId },
+            include: { organization: true, role: { include: { permissions: { include: { permission: true } } } } },
+        })
+        // a job is always the person themselves, never someone logged in as them
+        .then((user) => user && { ...user, actingAsId: null });
 }
 
 // Every leads query starts from this: lead:all sees the whole org, everyone else only
@@ -62,6 +65,21 @@ function openableRecords(user: CurrentUser) {
         ...(hasPermission(user, "deal:read") ? [{ deal: dealScope(user) }] : []),
         ...(hasPermission(user, "contact:read") ? [{ contact: contactScope(user) }] : []),
     ]
+}
+
+// The lead, deal or contact something is about (an email, a WhatsApp chat), if this person may
+// see it; null when it isn't there or isn't theirs to see
+export async function findVisibleRecord(user: CurrentUser, link: { leadId?: number; dealId?: number; contactId?: number }) {
+    if (link.leadId !== undefined) {
+        if (!hasPermission(user, "lead:read")) throw new Error("FORBIDDEN");
+        return prisma.lead.findFirst({ where: { id: link.leadId, ...leadScope(user) }, select: { id: true } });
+    }
+    if (link.dealId !== undefined) {
+        if (!hasPermission(user, "deal:read")) throw new Error("FORBIDDEN");
+        return prisma.deal.findFirst({ where: { id: link.dealId, ...dealScope(user) }, select: { id: true } });
+    }
+    if (!hasPermission(user, "contact:read")) throw new Error("FORBIDDEN");
+    return prisma.contact.findFirst({ where: { id: link.contactId, ...contactScope(user) }, select: { id: true } });
 }
 
 // Anyone can create a task, but task:all is needed to see everyone's. Without it you see

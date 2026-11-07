@@ -12,7 +12,7 @@ import {
     IconCalendarDue,
     IconClock,
     IconCornerDownLeft,
-    IconCurrencyRupee,
+    IconCoin,
     IconFlag,
     IconLink,
     IconMail,
@@ -202,7 +202,7 @@ function toItems(results: SearchResults): Item[] {
             subtitle: join(formatMoney(deal.amount), deal.lead?.name),
             trailing: <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} />,
             preview: [
-                { icon: IconCurrencyRupee, label: "Amount", value: <span className="font-medium text-ink">{formatMoney(deal.amount)}</span> },
+                { icon: IconCoin, label: "Amount", value: <span className="font-medium text-ink">{formatMoney(deal.amount)}</span> },
                 { icon: IconProgress, label: "Stage", value: <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} /> },
                 { icon: IconPercentage, label: "Probability", value: `${deal.probability}%` },
                 { icon: IconCalendarDue, label: "Closes", value: deal.expectedCloseDate && formatDay(deal.expectedCloseDate) },

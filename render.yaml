@@ -5,7 +5,7 @@
 services:
   # The whole app: Next.js + Socket.IO + the job workers, in one Node process (server.ts)
   - type: web
-    name: flash
+    name: flashhhhh
     runtime: node
     plan: free
     region: singapore
@@ -21,6 +21,9 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      # root site admins (comma-separated emails), set in the dashboard
+      - key: SITE_ADMIN_EMAILS
+        sync: false
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -28,14 +31,6 @@ services:
           property: connectionString
       # the site's own address (https://….onrender.com), for link previews and email open tracking
       - key: APP_URL
-        sync: false
-      - key: SMTP_HOST
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: "465"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
         sync: false
 
   # Redis for the job queues and rate limits. Free means no disk: if it restarts, waiting jobs

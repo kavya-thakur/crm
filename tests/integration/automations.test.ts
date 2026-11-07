@@ -53,6 +53,8 @@ describe("automation rules", () => {
         const person = (name: string) =>
             prisma.user.create({ data: { ...org, roleId: user.roleId, name, email: `${name.toLowerCase()}-${organizationId}@example.com`, passwordHash: "x" } });
         const [priya, rohan] = await Promise.all([person("Priya Sharma"), person("Rohan Iyer")]);
+        // Priya has connected her email; Rohan hasn't
+        await prisma.emailAccount.create({ data: { userId: priya.id, email: "priya@gmail.example", host: "smtp.gmail.com", port: 465, passwordEncrypted: "x" } });
         const template = await prisma.emailTemplate.create({ data: { ...org, name: "First reply", subject: "Hi {{lead.firstName}}", body: "From {{me.name}}" } });
         const lead = (name: string, extra: object = {}) =>
             prisma.lead.create({ data: { ...org, name, email: `${name.split(" ")[0].toLowerCase()}@acme.example`, phone: "+91 90000 00000", stageId: stage.id, sourceId: googleAds.id, assignedToId: user.id, ...extra } });
@@ -117,10 +119,13 @@ describe("automation rules", () => {
         expect(runs[0].status).toBe("DONE");
         expect(runs[0].summary).toBe('Assigned to Priya Sharma · Emailed rahul@acme.example ("First reply") · Task "Call Rahul" for Priya Sharma, due today');
 
-        // the next lead goes to the next person
+        // the next lead goes to the next person, who hasn't connected an email: no email, and the log says why
         const meera = await lead("Meera Iyer");
         await runAutomations(event(meera.id));
         expect((await prisma.lead.findUniqueOrThrow({ where: { id: meera.id } })).assignedToId).toBe(rohan.id);
+        expect(await prisma.email.count({ where: { leadId: meera.id } })).toBe(0);
+        const meeraRun = await prisma.automationRun.findFirstOrThrow({ where: { ruleId: automation.id, leadId: meera.id } });
+        expect(meeraRun.summary).toContain("No email sent: Rohan Iyer hasn't connected an email account");
     });
 
     it("leaves leads alone when the conditions don't match", async () => {

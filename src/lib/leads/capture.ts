@@ -8,6 +8,7 @@ import { addTaskToTimeline, startOfToday } from "@/lib/work/tasks";
 import { findOpenCopy } from "@/lib/leads/duplicates";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
 import { startAutomations } from "@/lib/automations/engine";
+import { linkToCompany } from "@/lib/companies";
 
 // What a web form sends. Name and phone always (every lead and contact needs them); the
 // form's own settings decide whether email, company and message are required (see
@@ -195,6 +196,8 @@ export async function captureLead(formKey: string, input: FormSubmission) {
             },
             select: { id: true },
         });
+        // "Acme" on the form files the contact under the company Acme
+        await linkToCompany(tx, organizationId, contact.id, input.company);
 
         // speed matters with a fresh lead: whoever got it has a task to reply today
         if (assignee) {

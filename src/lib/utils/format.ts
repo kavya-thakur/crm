@@ -30,14 +30,68 @@ export function timeAgo(date: string) {
     return "just now";
 }
 
-// "₹2,50,000": money on the dashboard, in whole rupees
-export const formatMoney = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format;
+// The currencies a workspace can pick (Settings > Workspace). Amounts are plain numbers in the
+// database: the currency only decides how they're shown
+export const CURRENCIES = [
+    { code: "INR", name: "Indian rupee" },
+    { code: "USD", name: "US dollar" },
+    { code: "EUR", name: "Euro" },
+    { code: "GBP", name: "British pound" },
+    { code: "AED", name: "UAE dirham" },
+    { code: "SAR", name: "Saudi riyal" },
+    { code: "SGD", name: "Singapore dollar" },
+    { code: "AUD", name: "Australian dollar" },
+    { code: "CAD", name: "Canadian dollar" },
+    { code: "JPY", name: "Japanese yen" },
+    { code: "NPR", name: "Nepalese rupee" },
+    { code: "BDT", name: "Bangladeshi taka" },
+    { code: "LKR", name: "Sri Lankan rupee" },
+    { code: "ZAR", name: "South African rand" },
+] as const;
 
-// "₹12.5K", "₹2.5L", "₹3.5Cr": for chart axes and other tight spots
-export const formatMoneyShort = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    notation: "compact",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-}).format;
+export type CurrencyCode = (typeof CURRENCIES)[number]["code"];
+
+// The workspace's currency, in the browser: set once by the dashboard layout (WorkspaceCurrency),
+// before any page under it renders
+let workspaceCurrency = "INR";
+export function setWorkspaceCurrency(code: string) {
+    workspaceCurrency = code;
+}
+
+// Indian grouping (₹2,50,000) for rupees, the usual (2,500,000) for everything else
+const formats = new Map<string, Intl.NumberFormat>();
+function money(currency: string, options: Intl.NumberFormatOptions) {
+    const key = `${currency}:${JSON.stringify(options)}`;
+    let format = formats.get(key);
+    if (!format) {
+        format = new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency, ...options });
+        formats.set(key, format);
+    }
+    return format;
+}
+
+// "₹2,50,000" / "$250,000": money in whole units, in a given currency (the server uses this)
+export function formatMoneyIn(value: number, currency: string) {
+    return money(currency, { maximumFractionDigits: 0 }).format(value);
+}
+
+// The same in the workspace's currency. One argument only, so it can be handed straight to a chart
+export function formatMoney(value: number) {
+    return formatMoneyIn(value, workspaceCurrency);
+}
+
+// "₹12.5K", "₹2.5L", "$3.5M": for chart axes and other tight spots
+export function formatMoneyShort(value: number) {
+    return money(workspaceCurrency, { notation: "compact", minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(value);
+}
+
+// A deal's exact amount: "₹3,20,000", with paise (or cents) only when there are any. The server
+// passes the currency (the printable quote); the browser has the workspace's already
+export function formatMoneyExact(value: number, currency = workspaceCurrency) {
+    return money(currency, { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
+}
+
+// "₹", "$": for labels like "Amount (₹)"
+export function currencySymbol() {
+    return money(workspaceCurrency, {}).formatToParts(0).find((part) => part.type === "currency")?.value ?? workspaceCurrency;
+}

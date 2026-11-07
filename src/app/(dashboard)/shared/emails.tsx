@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconAlertCircle, IconChevronDown, IconMail, IconMailOpened, IconPencil, IconSend } from "@tabler/icons-react";
 
@@ -35,13 +36,14 @@ export interface EmailTemplate {
     body: string;
 }
 
-// The templates, plus who's sending (for {{me.name}} and friends)
+// The templates, plus who's sending (for {{me.name}} and friends) and from which mailbox
+// (sendsFrom is null until they connect one in Settings > Profile)
 export function useEmailTemplates() {
     return useQuery({
         queryKey: ["emailTemplates"],
         queryFn: () =>
             api
-                .get<{ data: EmailTemplate[]; me: { name: string; email: string; workspace: string } }>("/email-templates")
+                .get<{ data: EmailTemplate[]; me: { name: string; email: string; workspace: string; sendsFrom: string | null } }>("/email-templates")
                 .then((res) => res.data),
     });
 }
@@ -56,6 +58,8 @@ const inputClassName =
  */
 export function EmailsTab({ entity, recordId, to, values }: { entity: EmailEntity; recordId: number; to: string | null; values: TemplateValues }) {
     const [writing, setWriting] = useState(false);
+    const templatesQuery = useEmailTemplates();
+    const notConnected = templatesQuery.data?.me.sendsFrom === null;
     // { leadId: 12 }, { dealId: 12 } or { contactId: 12 }
     const link = { [`${entity}Id`]: recordId };
 
@@ -66,7 +70,15 @@ export function EmailsTab({ entity, recordId, to, values }: { entity: EmailEntit
 
     return (
         <div className="flex flex-col gap-3">
-            {writing ? (
+            {notConnected ? (
+                <p className="flex flex-wrap items-center gap-x-1 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-muted">
+                    <IconMail size={15} className="text-faint" />
+                    To send emails, connect your own email first. They go out from your address, so replies come to you.
+                    <Link href="/settings/profile" className="font-medium text-accent hover:underline">
+                        Connect in Profile
+                    </Link>
+                </p>
+            ) : writing ? (
                 <Composer entity={entity} link={link} defaultTo={to ?? ""} values={values} onDone={() => setWriting(false)} />
             ) : (
                 <button
@@ -188,7 +200,7 @@ function Composer({
             {send.isError && <p role="alert" className="text-sm text-danger">{errorMessage(send.error)}</p>}
 
             <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 flex-1 text-sm text-faint">{me ? `Replies come to ${me.email}` : ""}</p>
+                <p className="min-w-0 flex-1 text-sm text-faint">{me?.sendsFrom ? `Sent from ${me.sendsFrom}` : ""}</p>
                 <button type="button" onClick={onDone} className="h-8 rounded-lg border border-line px-3 font-medium text-muted hover:bg-fill">
                     Cancel
                 </button>
