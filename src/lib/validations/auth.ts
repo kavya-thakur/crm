@@ -1,11 +1,17 @@
 import { z } from "zod";
 import { emailSchema, requiredText } from "./common";
+import { CURRENCIES } from "@/lib/utils/format";
 
+// Sign up is just the account; the workspace name, your name and currency come next, in /onboarding
 export const registerSchema = z.object({
-    organizationName: z.string().trim().min(1, "Organization name is required"),
-    name: z.string().trim().min(1, "Name is required"),
     email: emailSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const onboardingSchema = z.object({
+    workspaceName: requiredText(100),
+    name: requiredText(200),
+    currency: z.enum(CURRENCIES.map((currency) => currency.code) as [string, ...string[]], "Pick one of the listed currencies"),
 });
 
 export const loginSchema = z.object({

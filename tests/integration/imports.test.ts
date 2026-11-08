@@ -79,7 +79,7 @@ describe("CSV import", () => {
             "Already There: Already a lead: Already There",
             "Meera again: Appears earlier in this file",
             expect.stringMatching(/^No Phone: Phone/),
-            "Bad Budget: Budget must be one of the offered options",
+            "Bad Budget: Budget: \"Billions\" isn't one of its options",
         ]);
 
         // whoever started it is told it's done
@@ -180,6 +180,8 @@ describe("CSV import", () => {
         expect(rahul).toMatchObject({ stageId: meeting.id, assignedToId: priya.id, customFields: { budget: "10L+", collaborator: priya.id } });
 
         const problems = Papa.parse<Record<string, string>>((await prisma.importJob.findUniqueOrThrow({ where: { id: job.id } })).errorsCsv!, { header: true }).data;
-        expect(problems.map((row) => row.Problem)).toEqual(['Collaborator: no teammate called "Nobody Here"', 'Assigned to: no teammate called "Priyaa"']);
+        expect(problems.map((row) => row.Problem)).toEqual(['Collaborator: no teammate called "Nobody Here"']);
+        // an owner who isn't in the team: the lead still comes in, for the default owner (here the importer)
+        expect(await prisma.lead.findFirstOrThrow({ where: { ...org, name: "Kabir Rao" } })).toMatchObject({ assignedToId: user.id });
     });
 });

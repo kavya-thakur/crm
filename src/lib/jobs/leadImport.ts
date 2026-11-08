@@ -2,10 +2,9 @@ import Papa from "papaparse";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { hasPermission, userForJob } from "@/lib/auth/requirePermission";
-import { validateCustomFieldValues } from "@/lib/settings/customFields";
-import { isOpen, matchKeys } from "@/lib/leads/duplicates";
+import { matchKeys } from "@/lib/leads/duplicates";
+import { duplicateOf, rowReader } from "@/lib/imports/rows";
 import { broadcastChange, getSocketServer, notify, userRoom } from "@/lib/realtime/notify";
-import { createLeadSchema } from "@/lib/validations/leads";
 import type { ImportDefaults } from "@/lib/validations/imports";
 import { linkToCompany } from "@/lib/companies";
 
@@ -21,9 +20,6 @@ import { linkToCompany } from "@/lib/companies";
 
 const BATCH = 200;
 
-// One row's fields, from the CSV columns mapped to them
-const rowSchema = createLeadSchema.pick({ name: true, email: true, phone: true, companyName: true });
-
 type Row = Record<string, string>;
 // What the live progress carries: the counts, never the file or the problem rows
 const progressSelect = { id: true, status: true, total: true, processed: true, created: true, skipped: true, failed: true, error: true } as const;
@@ -33,8 +29,6 @@ type Progress = { id: number; status: string; total: number; processed: number; 
 function report(userId: number, progress: Progress) {
     getSocketServer()?.to(userRoom(userId)).emit("import-progress", progress);
 }
-
-const lower = (text: string | undefined) => text?.trim().toLowerCase() ?? "";
 
 export async function runImport(importJobId: number) {
     const job = await prisma.importJob.findUnique({ where: { id: importJobId } });
@@ -47,12 +41,6 @@ export async function runImport(importJobId: number) {
     const { organizationId } = job;
     const mapping = job.mapping as Record<string, string>;
     const defaults = job.defaults as ImportDefaults;
-    const columnOf = (field: string) => Object.keys(mapping).find((column) => mapping[column] === field);
-    const cell = (row: Row, field: string) => {
-        const column = columnOf(field);
-        // a ' an export put before a value so Excel wouldn't run it as a formula isn't part of it
-        return column ? (row[column] ?? "").trim().replace(/^'(?=[=+\-@])/, "") : "";
-    };
 
     await prisma.importJob.update({ where: { id: job.id }, data: { status: "RUNNING" } });
 
@@ -69,11 +57,9 @@ export async function runImport(importJobId: number) {
             where: { organizationId, entity: "lead", key: { in: Object.values(mapping).filter((field) => field.startsWith("cf:")).map((field) => field.slice(3)) } },
         }),
     ]);
-    const defaultStage = stages.find((stage) => stage.id === defaults.stageId) ?? stages.find(isOpen) ?? stages[0];
-    if (!defaultStage) throw new Error("This workspace has no lead stages");
-    const seesAll = hasPermission(user, "lead:all");
-    // a teammate written in a cell: their email or their name, any case
-    const personCalled = (text: string) => people.find((person) => lower(person.email) === lower(text) || lower(person.name) === lower(text));
+    // the rules for one row, the same as the import screen's check used (src/lib/imports/rows.ts)
+    const reader = rowReader({ mapping, defaults, stages, sources, people, definitions, seesAll: hasPermission(user, "lead:all"), userId: user.id });
+    const { cell } = reader;
 
     // rows that didn't make it, with the reason, for the "download problems" file
     const problems: Row[] = job.errorsCsv ? Papa.parse<Row>(job.errorsCsv, { header: true, skipEmptyLines: "greedy" }).data : [];
@@ -101,82 +87,30 @@ export async function runImport(importJobId: number) {
 
         await prisma.$transaction(
             async (tx) => {
-                for (const [index, row] of batch.entries()) {
+                for (const row of batch) {
                     const fail = (problem: string) => problems.push({ ...row, Problem: problem });
 
-                    // the two things every lead needs, said plainly when they're missing
-                    if (!cell(row, "name")) {
-                        fail("Name is missing");
+                    const result = reader.read(row);
+                    if (!result.ok) {
+                        fail(result.problem.message);
                         continue;
                     }
-                    if (!cell(row, "phone")) {
-                        fail("Phone is missing");
-                        continue;
-                    }
-
-                    const basics = rowSchema.safeParse({ name: cell(row, "name"), email: cell(row, "email") || null, phone: cell(row, "phone"), companyName: cell(row, "company") || null });
-                    if (!basics.success) {
-                        const issue = basics.error.issues[0];
-                        fail(`${issue.path[0] === "phone" ? "Phone" : issue.path[0] === "email" ? "Email" : "Name"}: ${issue.message}`);
-                        continue;
-                    }
-
-                    // An Agent field holds a teammate: their name or email in the file, them on the lead.
-                    // Someone the file names who isn't in the workspace is a problem, not a silent blank.
-                    const strangers = definitions.filter((definition) => definition.type === "AGENT" && cell(row, `cf:${definition.key}`) && !personCalled(cell(row, `cf:${definition.key}`)));
-                    if (strangers.length > 0) {
-                        fail(`${strangers[0].label}: no teammate called "${cell(row, `cf:${strangers[0].key}`)}"`);
-                        continue;
-                    }
-
-                    // custom fields: checked by type, never required here (an empty cell just stays empty)
-                    const submitted = Object.fromEntries(
-                        definitions.flatMap((definition): [string, unknown][] => {
-                            const value = cell(row, `cf:${definition.key}`);
-                            if (!value) return [];
-                            if (definition.type === "BOOLEAN") return [[definition.key, ["yes", "true", "1", "y"].includes(value.toLowerCase())]];
-                            if (definition.type === "AGENT") return [[definition.key, personCalled(value)!.id]];
-                            return [[definition.key, value]];
-                        }),
-                    );
-                    const custom = validateCustomFieldValues(definitions.map((definition) => ({ ...definition, required: false })), submitted, { partial: true });
-                    if (!custom.ok) {
-                        fail(Object.values(custom.errors)[0]);
-                        continue;
-                    }
-
-                    const stage = stages.find((item) => lower(item.name) === lower(cell(row, "stage"))) ?? defaultStage;
-                    const source = sources.find((item) => lower(item.name) === lower(cell(row, "source")));
-                    const sourceId = source?.id ?? defaults.sourceId ?? null;
-                    const ownerCell = cell(row, "owner");
-                    const named = ownerCell ? personCalled(ownerCell) : undefined;
-                    // a name that matches nobody would quietly go to the default owner: say so instead
-                    if (seesAll && ownerCell && !named) {
-                        fail(`Assigned to: no teammate called "${ownerCell}"`);
-                        continue;
-                    }
-                    // without lead:all, everything you import is yours (as when you add a lead by hand)
-                    const ownerId = seesAll ? (named?.id ?? (defaults.ownerId === undefined ? user.id : defaults.ownerId)) : user.id;
+                    const lead = result.lead;
 
                     // one open lead per person: someone already being worked on isn't added again
-                    const { phoneKey, emailKey } = keys[index];
-                    if (isOpen(stage)) {
-                        const already = openLeads.find((lead) => (phoneKey && lead.phoneKey === phoneKey) || (emailKey && lead.emailKey === emailKey));
-                        const twice = [phoneKey, emailKey].some((key) => key && seenInFile.has(key));
-                        if (already || twice) {
-                            skipped += 1;
-                            fail(already ? `Already a lead: ${already.name}` : "Appears earlier in this file");
-                            continue;
-                        }
-                        for (const key of [phoneKey, emailKey]) if (key) seenInFile.add(key);
+                    const duplicate = duplicateOf(lead, (keys) => openLeads.find((open) => (keys.phoneKey && open.phoneKey === keys.phoneKey) || (keys.emailKey && open.emailKey === keys.emailKey)), seenInFile);
+                    if (duplicate) {
+                        skipped += 1;
+                        fail(duplicate);
+                        continue;
                     }
 
-                    const { name, email, phone, companyName } = basics.data;
+                    const { name, email, phone, companyName, ownerId } = lead;
                     let contactId = contactByPhone.get(phone);
                     if (!contactId) {
                         contactId = (
                             await tx.contact.create({
-                                data: { organizationId, name, email: email ?? null, phone, assignedToId: ownerId, createdById: user.id, updatedById: user.id },
+                                data: { organizationId, name, email, phone, assignedToId: ownerId, createdById: user.id, updatedById: user.id },
                                 select: { id: true },
                             })
                         ).id;
@@ -184,24 +118,23 @@ export async function runImport(importJobId: number) {
                     }
                     await linkToCompany(tx, organizationId, contactId, companyName);
 
-                    const note = cell(row, "note");
                     await tx.lead.create({
                         data: {
                             organizationId,
                             name,
-                            email: email ?? null,
+                            email,
                             phone,
-                            companyName: companyName ?? null,
-                            utmCampaign: cell(row, "campaign").slice(0, 150) || null,
-                            stageId: stage.id,
-                            sourceId,
+                            companyName,
+                            utmCampaign: lead.campaign,
+                            stageId: lead.stage.id,
+                            sourceId: lead.sourceId,
                             assignedToId: ownerId,
                             contactId,
-                            customFields: custom.data as Prisma.InputJsonObject,
+                            customFields: lead.customFields as Prisma.InputJsonObject,
                             createdById: user.id,
                             updatedById: user.id,
                             timeline: { create: { userId: user.id, type: "CREATED", message: `Imported from ${job.fileName}` } },
-                            ...(note && { notes: { create: { authorId: user.id, body: note } } }),
+                            ...(lead.note && { notes: { create: { authorId: user.id, body: lead.note } } }),
                         },
                     });
                     created += 1;

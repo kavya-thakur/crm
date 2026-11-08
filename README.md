@@ -254,7 +254,8 @@ those flags to hide buttons; the API checks every request again.
 ### Workspaces, sign-in and permissions
 
 - **Workspaces.** Registering creates a workspace (an `Organization`) with an Admin role, default
-  lead stages, sources and a sales pipeline. Every business row carries `organizationId`.
+  lead stages, sources and a sales pipeline. Every business row carries `organizationId`. Sign up asks only
+  for email and password; `/onboarding` then names the workspace and its owner and sets the currency.
 - **Scoped queries.** Routes never write `where: { organizationId }` by hand. They start from a scope
   helper: `leadScope(user)` means "this workspace, and only this person's leads unless they have
   `lead:all`". A record outside it simply doesn't match, so the API answers 404 and never confirms
@@ -544,7 +545,7 @@ erDiagram
 
 ## API
 
-101 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
+102 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |

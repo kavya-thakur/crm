@@ -37,10 +37,19 @@ export function guessField(header: string, customFields: { key: string; label: s
     return custom ? `cf:${custom.key}` : null;
 }
 
+// What a value in the file that matches nothing in Flash becomes, per field ("owner", "stage",
+// "source", "cf:budget"), keyed by the value in lowercase: an id (a teammate, stage or source),
+// a dropdown option, or null (nobody / no source / leave empty). A value left out uses the default.
+const valueChoices = z
+    .record(z.string().max(70), z.record(z.string().max(200), z.union([dbIdSchema, z.string().max(200), z.null()])))
+    .refine((fields) => Object.values(fields).reduce((sum, choices) => sum + Object.keys(choices).length, 0) <= 2000, "Too many values");
+
 /**
  * What the import screen sends with the file. `mapping` says which Flash field each CSV
  * column fills ("" or a missing column = not imported); `defaults` fill in a row's stage,
- * source and owner when its own column is empty or doesn't match anything.
+ * source and owner when its own column is empty or doesn't match anything; `values` say what
+ * each value that matches nothing becomes instead; `fixes` keep rows that would otherwise fail.
+ * See src/lib/imports/rows.ts.
  */
 export const startImportSchema = z.object({
     mapping: z.record(z.string().max(200), z.string().max(60)),
@@ -48,6 +57,15 @@ export const startImportSchema = z.object({
         stageId: dbIdSchema.optional(),
         sourceId: dbIdSchema.nullable().optional(),
         ownerId: dbIdSchema.nullable().optional(),
+        values: valueChoices.optional(),
+        fixes: z
+            .object({
+                // a row without a name: its phone number becomes the name
+                nameFromPhone: z.boolean().optional(),
+                // fields whose bad values are left out, keeping the row ("email", "cf:budget")
+                leaveEmpty: z.array(z.string().max(70)).max(100).optional(),
+            })
+            .optional(),
     }),
 });
 

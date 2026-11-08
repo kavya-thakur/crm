@@ -26,6 +26,9 @@ model User {
   // runs the whole website with you: sees every workspace and user, and can log in as anyone
   // (Settings > Site admin). Also everyone whose email is in SITE_ADMIN_EMAILS (src/lib/auth/siteAdmin.ts)
   isSiteAdmin    Boolean  @default(false)
+  // signed up but hasn't finished the first-run setup yet (/onboarding: workspace name, their name,
+  // currency). Only set by sign up, so teammates added in Members skip it
+  needsOnboarding Boolean @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

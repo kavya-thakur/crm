@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { IconArrowLeft, IconChevronRight, IconDownload, IconFileSpreadsheet, IconUpload } from "@tabler/icons-react";
 
@@ -17,6 +17,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { toast } from "@/components/Toast";
 import { useCustomFields, type AgentOption } from "../../shared/customFields";
 import { StageLabel, type LeadSource, type LeadStage } from "../shared";
+import { CheckSummary, choicesForApi, ProblemCard, SkippedNote, ValueMatches, type CheckResult, type Fixes, type ValueChoices } from "./ImportCheck";
 
 type Row = Record<string, string>;
 
@@ -38,6 +39,8 @@ interface ImportSummary {
     error: string | null;
     createdAt: string;
     user: { id: number; name: string };
+    // why rows weren't added, grouped (only when one import is opened)
+    problemGroups?: { reason: string; count: number; names: string[] }[];
 }
 
 /**
@@ -208,13 +211,52 @@ function MapColumns({ parsed, canAssign, onBack, onStarted }: { parsed: ParsedFi
     const labelOf = (field: string) => fieldOptions.find((option) => option.value === field)?.label ?? field;
     const missing = LEAD_IMPORT_FIELDS.filter((field) => field.required && !Object.values(mapping).includes(field.id));
     const mapped = headers.filter((header) => mapping[header]);
+
+    // The screen's fixes: what unmatched values become, and the rows to keep rather than leave out.
+    // Every change is checked again on the server (the same rules as the import), half a second on.
+    const [valueChoices, setValueChoices] = useState<ValueChoices>({});
+    const [fixes, setFixes] = useState<Fixes>({ nameFromPhone: false, leaveEmpty: [] });
+    const settings = JSON.stringify({
+        mapping,
+        defaults: { stageId: stageId ?? firstOpenStage?.id, sourceId, ...(canAssign && { ownerId }), values: choicesForApi(valueChoices), fixes },
+    });
+    const [checkedSettings, setCheckedSettings] = useState(settings);
+    useEffect(() => {
+        const timer = setTimeout(() => setCheckedSettings(settings), 500);
+        return () => clearTimeout(timer);
+    }, [settings]);
+    const check = useQuery({
+        queryKey: ["import-check", file.name, file.size, file.lastModified, checkedSettings],
+        queryFn: () => {
+            const form = new FormData();
+            form.set("file", file);
+            form.set("settings", checkedSettings);
+            return api.post<{ data: CheckResult }>("/imports/check", form, { headers: { "Content-Type": "multipart/form-data" } }).then((res) => res.data.data);
+        },
+        enabled: missing.length === 0 && Boolean(stagesQuery.data),
+        placeholderData: keepPreviousData,
+    });
+    // what the import will do is what was last checked; while a change is being checked, wait
+    const upToDate = check.data !== undefined && !check.isFetching && checkedSettings === settings;
+    const chooseValue = (field: CheckResult["values"][number], value: string, choice: string) =>
+        setValueChoices((current) => ({ ...current, [field.field]: { kind: field.kind, choices: { ...current[field.field]?.choices, [value]: choice } } }));
+    const defaultOwner = ownerId === undefined ? "Me" : ownerId === null ? "Nobody" : (agentsQuery.data?.find((agent) => agent.id === ownerId)?.name ?? "the default");
+    const defaultFor = (field: string) =>
+        field === "owner"
+            ? `Default (${defaultOwner})`
+            : field === "stage"
+              ? `Default (${stagesQuery.data?.find((stage) => stage.id === (stageId ?? firstOpenStage?.id))?.name ?? "first stage"})`
+              : field === "source"
+                ? `Default (${sourcesQuery.data?.find((source) => source.id === sourceId)?.name ?? "no source"})`
+                : "Choose one (or the row is left out)";
+
     const example = (header: string) => rows.slice(0, 20).map((row) => row[header]?.trim()).find(Boolean) ?? "";
 
     const start = useMutation({
         mutationFn: () => {
             const form = new FormData();
             form.set("file", file);
-            form.set("settings", JSON.stringify({ mapping, defaults: { stageId: stageId ?? firstOpenStage?.id, sourceId, ...(canAssign && { ownerId }) } }));
+            form.set("settings", settings);
             // a file upload, not the JSON the API client sends by default
             return api.post<{ data: ImportSummary }>("/imports", form, { headers: { "Content-Type": "multipart/form-data" } }).then((res) => res.data.data);
         },
@@ -299,7 +341,33 @@ function MapColumns({ parsed, canAssign, onBack, onStarted }: { parsed: ParsedFi
                         )}
                     </Labelled>
                 </div>
+
+                {!canAssign && headers.some((header) => mapping[header] === "owner") && (
+                    <p className="mt-3 text-sm text-faint">You&apos;ll own every lead you import, whatever the file says.</p>
+                )}
             </Step>
+
+            {missing.length === 0 && (
+                <Step title="Check" hint="Every row, read the way the import will read it. Fix what's needed here: nothing is left out without being shown.">
+                    <div className="flex flex-col gap-3">
+                        <CheckSummary check={check.data} checking={check.isFetching} />
+                        {check.isError && <ErrorState variant="inline" title="Couldn't check the file" error={check.error} onRetry={() => check.refetch()} retrying={check.isFetching} />}
+                        {check.data?.problems.map((problem) => (
+                            <ProblemCard key={`${problem.code}|${problem.field}`} problem={problem} fixes={fixes} onFixes={setFixes} headers={headers} rows={rows} />
+                        ))}
+                        {check.data?.values.map((field) => (
+                            <ValueMatches
+                                key={field.field}
+                                field={field}
+                                chosen={valueChoices[field.field]?.choices ?? {}}
+                                onChoose={(value, choice) => chooseValue(field, value, choice)}
+                                defaultLabel={defaultFor(field.field)}
+                            />
+                        ))}
+                        {check.data && <SkippedNote check={check.data} />}
+                    </div>
+                </Step>
+            )}
 
             {mapped.length > 0 && (
                 <Step title="Preview" hint="The first rows, as they'll come in.">
@@ -339,12 +407,12 @@ function MapColumns({ parsed, canAssign, onBack, onStarted }: { parsed: ParsedFi
             <div className="mt-6 flex justify-end">
                 <button
                     type="button"
-                    disabled={missing.length > 0 || start.isPending || !stagesQuery.data}
+                    disabled={missing.length > 0 || start.isPending || !upToDate || check.data?.willAdd === 0}
                     onClick={() => start.mutate()}
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 font-medium text-on-accent hover:bg-accent-hover disabled:opacity-60"
                 >
-                    {start.isPending && <Spinner size={14} />}
-                    Import {rows.length.toLocaleString()} lead{rows.length === 1 ? "" : "s"}
+                    {(start.isPending || (missing.length === 0 && !upToDate)) && <Spinner size={14} />}
+                    {check.data ? `Import ${check.data.willAdd.toLocaleString()} lead${check.data.willAdd === 1 ? "" : "s"}` : "Checking…"}
                 </button>
             </div>
         </section>
@@ -415,8 +483,22 @@ function JobProgress({ id, onAnother }: { id: number; onAnother: () => void }) {
                     </button>
                 </div>
             )}
+            {/* why the rest weren't added, right here; the download has every one of those rows */}
+            {finished && job.problemGroups && job.problemGroups.length > 0 && (
+                <ul className="mt-5 divide-y divide-line-light overflow-hidden rounded-xl border border-line">
+                    {job.problemGroups.map((group) => (
+                        <li key={group.reason} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
+                            <span className="font-medium text-ink">{group.reason}</span>
+                            <span className="text-sm text-faint tabular-nums">
+                                {group.count.toLocaleString()} {group.count === 1 ? "row" : "rows"}
+                            </span>
+                            {group.names.length > 0 && <span className="w-full truncate text-sm text-muted">e.g. {group.names.join(", ")}</span>}
+                        </li>
+                    ))}
+                </ul>
+            )}
             {finished && notAdded > 0 && (
-                <p className="mt-2 text-sm text-faint">The download has each row with the reason in a &quot;Problem&quot; column. Fix them and import that file.</p>
+                <p className="mt-2 text-sm text-faint">The download has each of those rows with its reason in a &quot;Problem&quot; column, to fix and import again.</p>
             )}
         </section>
     );
