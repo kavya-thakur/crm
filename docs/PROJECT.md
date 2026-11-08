@@ -55,6 +55,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 
 ### Core CRM
 - [x] Workspaces (sign up creates one, with an Admin role), members, invite by creating accounts
+- [x] Sign up is just email + password; onboarding (`/onboarding`) then names the workspace and you and picks the
+      currency. `User.needsOnboarding` (set only by sign up) sends you back there until it's done, so teammates
+      added in Members skip it
 - [x] Roles & permissions, built in Settings as checkboxes; "own records" vs "everyone's"
 - [x] **Log in as a teammate** (2026-11-07, Settings → Members → ⋯): the workspace **owner**
       (`User.isOwner`, whoever registered it) opens anyone's account without their password, and
@@ -157,6 +160,18 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] Stages and sources editor (one settings page), with won/lost/converted flags
 - [x] Global **⌘K search** with previews
 - [x] Profile (name, password)
+- [x] **Import: check first, fix on screen, nothing dropped unseen** (2026-11-08). After matching
+      columns, `/api/imports/check` reads every row (10,000 in ~0.2 s locally) through the same rules
+      the import uses (`src/lib/imports/rows.ts`, shared with `leadImport.ts`), so what it says is what
+      the import does (tested). The screen shows "9,640 will be added · 300 already leads · 60 need a
+      choice", then each problem grouped with its rows (line numbers, a download of just those rows)
+      and a fix: no name → use the phone number as the name; bad email or custom value → import
+      without it; values that match nothing in Flash (Assigned to, Stage, Source, team-member and
+      dropdown custom fields) → match each to one of yours, or leave it empty. A missing or invalid
+      phone can't be fixed here (every lead needs one), so those rows are listed to fix in the file.
+      An owner name not in the team goes to the default owner instead of failing the row. Choices
+      only count for this workspace's own stages, sources, people and options. After the import the
+      results page groups why any rows weren't added, on screen as well as in the download
 - [x] **Exports carry every field** (2026-11-08): leads add UTM source/medium, created by, last
       modified by; deals add company, description, products ("2 × Licence; 1 × Setup"), last
       updated, created/modified by; contacts add job title, description, last updated,
@@ -282,7 +297,8 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] 404 page in the landing look; link-preview image (`src/app/opengraph-image.tsx`, fonts in `assets/fonts`, site address from `APP_URL`): the real dashboard on a violet panel
 - [x] Top bar: links and Log in on wide screens; below 921px a menu button drops them down from under the bar
 - [x] Basic SEO: `robots.txt` (keeps crawlers out of `/api/`) and `sitemap.xml` (`src/app/robots.ts`, `sitemap.ts`); every public page gets its title, description, canonical address and link preview from `pageMetadata()` in `(marketing)/metadata.ts`; the app stays noindex
-- [x] Onboarding intro
+- [x] Onboarding: dark 3D scene (a black-lacquer bolt, the hero's halftone dashes drawn as flowing streams), three
+      steps, then a welcome that fades into the dashboard
 
 ### Engineering
 - [x] 126 integration tests across 25 files; CI with Postgres

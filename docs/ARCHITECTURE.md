@@ -81,7 +81,7 @@ crm/
 │   │   ├── globals.css       Tailwind v4 + design tokens (colors, shadows, scrollbars)
 │   │   ├── (marketing)/      public site: landing page, /pricing, /demo (Book a demo form)
 │   │   ├── (auth)/           /login, /register
-│   │   ├── onboarding/       first-run 3D intro
+│   │   ├── onboarding/       first-run setup after sign up (workspace name, your name, currency), 3D scene
 │   │   ├── f/[key]/          a web form's own public page (shareable link, no login)
 │   │   ├── (dashboard)/      the app itself (signed in)
 │   │   │   ├── layout.tsx    sidebar, ⌘K search, bell, LiveUpdates, LostReasonPrompt
@@ -175,7 +175,7 @@ All under `/api`, JSON in and out (`{ ok, data, message }`), most needing a logi
 
 | Area | Routes |
 |---|---|
-| Auth | `auth/login`, `auth/register`, `auth/logout`, `auth/demo` (one-click demo sign-in), `me`, `me/password` |
+| Auth | `auth/login`, `auth/register` (email + password only), `onboarding` (finishes setup once), `auth/logout`, `auth/demo` (one-click demo sign-in), `me`, `me/password` |
 | Leads | `leads` (list with filters, create), `leads/[id]` (get, edit, delete), `.../assign`, `.../convert` (→ deal), `.../merge`, `.../notes`, `.../timeline`, `leads/bulkUpdate`, `leads/duplicates` |
 | Deals | the same shape, plus `deals/[id]/duplicates`, and `deals/[id]/products` (+ `/[lineId]`): the quote's lines |
 | Contacts | the same shape (no convert or merge) |

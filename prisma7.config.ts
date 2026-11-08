@@ -10,6 +10,10 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations take a Postgres advisory lock (one migration at a time), which a connection pooler
+    // (Neon's "-pooler" address, PgBouncer) can't hold properly: the lock stays stuck on a pooled
+    // connection and the next deploy times out (P1002). So the CLI uses Neon's direct address, the
+    // same one without "-pooler"; the app itself keeps the pooled one (src/lib/db/prisma.ts).
+    url: process.env["DATABASE_URL"]?.replace("-pooler.", "."),
   },
 });

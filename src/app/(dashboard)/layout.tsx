@@ -31,6 +31,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     if (!user) {
         redirect("/login");
     }
+    // just signed up: name the workspace first (a site admin "logged in as" them skips it)
+    if (user.needsOnboarding && !user.actingAsId) {
+        redirect("/onboarding");
+    }
 
     const canSeeMembers = hasPermission(user, "user:read");
     const canSeeRoles = hasPermission(user, "role:read");

@@ -6,6 +6,7 @@ import { DEFAULT_PIPELINE_STAGES } from "@/lib/deals/stages";
 import { DEFAULT_LEAD_STAGES } from "@/lib/leads/stages";
 import { DEFAULT_LEAD_SOURCES } from "@/lib/leads/sources";
 import { Prisma } from "@/generated/prisma/client";
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -27,17 +28,19 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const { organizationName, name, email, password } = parsed.data;
+        const { email, password } = parsed.data;
 
         const passwordHash = await hashPassword(password);
 
         const result = await prisma.$transaction(async (tx) => {
 
 
+            // named in /onboarding, right after this. The slug is only an internal id, so two
+            // companies can share a name
             const organization = await tx.organization.create({
                 data: {
-                    name: organizationName,
-                    slug: organizationName.toLowerCase().replace(/\s+/g, "-"),
+                    name: "",
+                    slug: `ws-${randomUUID()}`,
                 },
             });
             const adminRole = await tx.role.create({
@@ -78,11 +81,12 @@ export async function POST(req: NextRequest) {
                 data: {
                     organizationId: organization.id,
                     roleId: adminRole.id,
-                    name,
+                    name: "",
                     email,
                     passwordHash,
                     // whoever creates the workspace owns it
                     isOwner: true,
+                    needsOnboarding: true,
                 },
             });
             return { organization, user }
@@ -119,19 +123,13 @@ export async function POST(req: NextRequest) {
         return response
 
     } catch (error) {
-        // P2002 = unique constraint violation (User.email or Organization.slug)
+        // P2002 = unique constraint violation: User.email (the slug is random)
         if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
             error.code === "P2002"
         ) {
             return NextResponse.json(
-                {
-                    ok: false,
-                    message:
-                        error.meta?.modelName === "User"
-                            ? "Email is already registered"
-                            : "Organization name is already taken",
-                },
+                { ok: false, message: "Email is already registered" },
                 { status: 409 }
             );
         }
