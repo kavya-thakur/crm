@@ -7,6 +7,16 @@ export const api = axios.create({
     },
 });
 
+// The workspace's trial or plan ran out while a page was open: off to Billing, where it says so
+api.interceptors.response.use(undefined, (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 402 && error.response.data?.locked && window.location.pathname !== "/settings/billing") {
+        // a full load (no router here), so the layout renders the lock screen
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign("/settings/billing");
+    }
+    return Promise.reject(error);
+});
+
 // A list's filters as query params. Lists of ids (several stages, say) travel as "1,4,7",
 // and custom-field filters as one JSON-encoded param, the way the list routes read them.
 // Used by every list and board, so each sends its filters the same way.

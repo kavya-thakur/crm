@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bulkHistoryRows, customFieldBulkValues } from "@/lib/history";
+import { formatMoneyExact } from "@/lib/utils/format";
 import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
 
@@ -203,9 +205,21 @@ export async function PATCH(req: NextRequest) {
                 customFields = result.data;
             }
 
+            // the activity history: on each deal's timeline, what it was set to
+            const history = [
+                ...(fields.amount !== undefined ? [{ field: "amount", label: "Amount", to: formatMoneyExact(fields.amount, user.organization.currency) }] : []),
+                ...(fields.probability !== undefined ? [{ field: "probability", label: "Probability", to: `${fields.probability}%` }] : []),
+                ...(fields.expectedCloseDate !== undefined
+                    ? [{ field: "expectedCloseDate", label: "Expected close", to: fields.expectedCloseDate && new Date(fields.expectedCloseDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) }]
+                    : []),
+                ...(customFields ? await customFieldBulkValues(user.organizationId, "deal", customFields) : []),
+            ];
+
             // one statement for the plain fields and one for the custom fields, however many
             // deals are selected; together, so either all of them change or none do
             await prisma.$transaction(async (tx) => {
+                await tx.dealTimeline.createMany({ data: dealIds.flatMap((dealId) => bulkHistoryRows(history, user.id).map((row) => ({ ...row, dealId }))) });
+
                 if (Object.keys(fields).length > 0) {
                     await tx.deal.updateMany({
                         where: { id: { in: dealIds }, organizationId: user.organizationId },

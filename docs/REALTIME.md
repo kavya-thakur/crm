@@ -77,8 +77,10 @@ const io = new Server(server);             startRealtime(httpServer);   // new S
 server.listen(3000);                       httpServer.listen(3000);
 ```
 
-`npm run dev` runs `tsx server.ts` (not `next dev`), and `npm start` runs it in production
-mode. **Only one** of them can run per project folder; there's no separate socket terminal.
+`npm run dev` runs `tsx server.ts` (not `next dev`), compiling it as it goes. For production,
+`npm run build` also compiles it once into `dist/server.cjs` (esbuild, `build:server`), and
+`npm start` runs that with plain Node: on Render's free CPU it starts about twice as fast and
+uses about 90 MB less memory (measured: 320 → 229 MB) than compiling at every start. **Only one** of them can run per project folder; there's no separate socket terminal.
 
 **Trade-off we accepted:** a custom server can't be deployed to Vercel's serverless
 functions. Railway, Render, Fly.io or any VPS run it fine. At bigger scale you'd move

@@ -14,6 +14,7 @@ import {
     IconMailFast,
     IconBrandWhatsapp,
     IconArrowBackUp,
+    IconPencil,
     IconArrowUpRight,
     IconBuilding,
     IconPhone,
@@ -70,6 +71,8 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     EMAIL_SENT: IconMailFast,
     WHATSAPP: IconBrandWhatsapp,
     RESTORED: IconArrowBackUp,
+    // a field edited (the activity history)
+    UPDATED: IconPencil,
 };
 
 interface ContactPanelProps {

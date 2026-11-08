@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconDots, IconLogin2, IconSearch, IconShieldOff, IconShieldStar, IconX } from "@tabler/icons-react";
+import { IconClockPlus, IconCrown, IconDots, IconLogin2, IconSearch, IconShieldOff, IconShieldStar, IconX } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { formatDate } from "@/lib/utils/format";
+import { BILLING_CYCLES, PRO_PLANS, type BillingCycle } from "@/lib/billing/plans";
 import { Avatar } from "@/components/Avatar";
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
@@ -30,6 +31,11 @@ interface Workspace {
     id: number;
     name: string;
     createdAt: string;
+    billingCycle: string | null;
+    // the owner asked for Pro ("MONTHLY" | "YEARLY")
+    planRequest: string | null;
+    planRequestedAt: string | null;
+    access: { state: "trial" | "pro" | "ended"; endsAt: string | null; daysLeft: number };
     owner: { id: number; name: string; email: string } | null;
     counts: { users: number; leads: number; deals: number };
 }
@@ -38,6 +44,8 @@ interface Page<T> {
     data: T[];
     total: number;
     pageSize: number;
+    // workspaces whose owner asked for Pro
+    waiting?: number;
 }
 
 const count = (value: number) => value.toLocaleString("en-IN");
@@ -243,28 +251,53 @@ function UsersTab({ meId, root, workspace, onClearWorkspace }: { meId: number; r
 }
 
 function WorkspacesTab({ onOpen }: { onOpen: (workspace: { id: number; name: string }) => void }) {
-    const list = useSearchPage<Workspace>("workspaces", "/site-admin/workspaces");
+    const queryClient = useQueryClient();
+    // only the owners waiting for Pro to be switched on
+    const [waitingOnly, setWaitingOnly] = useState(false);
+    const list = useSearchPage<Workspace>("workspaces", "/site-admin/workspaces", { requested: waitingOnly ? "1" : undefined });
     const data = list.query.data;
+
+    // they've paid: Pro on (or renewed); or more days to try it
+    const changePlan = useMutation({
+        mutationFn: ({ id, ...change }: { id: number; action: "activate" | "extendTrial"; cycle?: BillingCycle }) => api.put<{ message: string }>(`/site-admin/workspaces/${id}`, change),
+        onSuccess: (res) => {
+            toast.success(res.data.message);
+            void queryClient.invalidateQueries({ queryKey: ["site-admin"] });
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+    });
 
     return (
         <>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <SearchInput value={list.typed} onChange={list.setTyped} placeholder="Search companies" />
+                <button
+                    type="button"
+                    onClick={() => setWaitingOnly(!waitingOnly)}
+                    className={`flex h-8 items-center gap-1.5 self-start rounded-lg border px-2.5 text-sm font-medium sm:self-auto ${
+                        waitingOnly ? "border-accent/40 bg-accent-faint text-ink" : "border-line text-muted hover:bg-fill"
+                    }`}
+                >
+                    Waiting for Pro
+                    {!!data?.waiting && <span className="rounded-full bg-accent px-1.5 text-xs text-on-accent tabular-nums">{data.waiting}</span>}
+                </button>
                 {data && <span className="text-sm text-faint tabular-nums sm:ml-auto">{count(data.total)} workspaces</span>}
             </div>
 
             <Results query={list.query} empty={list.search ? `No workspace matches "${list.search}".` : "No workspaces yet."}>
                 {(rows: Workspace[]) => (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[640px] text-left">
+                        <table className="w-full min-w-[820px] text-left">
                             <thead className="text-sm text-faint">
                                 <tr className="border-b border-line-light">
                                     <th className="px-3 py-2 font-medium">Company</th>
                                     <th className="px-3 py-2 font-medium">Owner</th>
+                                    <th className="px-3 py-2 font-medium">Plan</th>
                                     <th className="w-20 px-3 py-2 text-right font-medium">Users</th>
                                     <th className="w-20 px-3 py-2 text-right font-medium">Leads</th>
                                     <th className="w-20 px-3 py-2 text-right font-medium">Deals</th>
                                     <th className="w-28 px-3 py-2 font-medium">Signed up</th>
+                                    <th className="w-10" />
                                 </tr>
                             </thead>
                             <tbody>
@@ -290,10 +323,40 @@ function WorkspacesTab({ onOpen }: { onOpen: (workspace: { id: number; name: str
                                                 <span className="text-light">—</span>
                                             )}
                                         </td>
+                                        <td className="px-3 py-2.5">
+                                            <PlanCell workspace={workspace} />
+                                        </td>
                                         <td className="px-3 py-2.5 text-right tabular-nums">{count(workspace.counts.users)}</td>
                                         <td className="px-3 py-2.5 text-right tabular-nums">{count(workspace.counts.leads)}</td>
                                         <td className="px-3 py-2.5 text-right tabular-nums">{count(workspace.counts.deals)}</td>
                                         <td className="px-3 py-2.5 text-faint">{formatDate(workspace.createdAt)}</td>
+                                        {/* its own menu: clicking it doesn't open the company */}
+                                        <td className="px-1 py-2.5" onClick={(event) => event.stopPropagation()}>
+                                            <Dropdown
+                                                align="right"
+                                                buttonClassName="flex size-7 items-center justify-center rounded-lg text-faint hover:bg-fill hover:text-ink"
+                                                label={
+                                                    <>
+                                                        <IconDots size={16} />
+                                                        <span className="sr-only">Plan for {workspace.name}</span>
+                                                    </>
+                                                }
+                                            >
+                                                {(close) => (
+                                                    <>
+                                                        {BILLING_CYCLES.map((cycle) => (
+                                                            <MenuItem key={cycle} onClick={() => { changePlan.mutate({ id: workspace.id, action: "activate", cycle }); close(); }}>
+                                                                <IconCrown size={16} />
+                                                                {workspace.access.state === "pro" ? "Add" : "Activate"} Pro {PRO_PLANS[cycle].label.toLowerCase()}
+                                                            </MenuItem>
+                                                        ))}
+                                                        <MenuItem onClick={() => { changePlan.mutate({ id: workspace.id, action: "extendTrial" }); close(); }}>
+                                                            <IconClockPlus size={16} /> Extend the trial 7 days
+                                                        </MenuItem>
+                                                    </>
+                                                )}
+                                            </Dropdown>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -303,6 +366,29 @@ function WorkspacesTab({ onOpen }: { onOpen: (workspace: { id: number; name: str
             </Results>
             <Pager page={list.page} setPage={list.setPage} data={data} />
         </>
+    );
+}
+
+// Trial (days left), Pro (until when), or ended; and a waiting request
+function PlanCell({ workspace }: { workspace: Workspace }) {
+    const { state, endsAt, daysLeft } = workspace.access;
+    return (
+        <div className="flex flex-col items-start gap-0.5">
+            {state === "pro" ? (
+                <span className="text-sm">
+                    <Pill tone="green">Pro</Pill> <span className="text-faint">until {endsAt && formatDate(endsAt)}</span>
+                </span>
+            ) : state === "trial" ? (
+                <span className="text-sm">
+                    <Pill tone="blue">Trial</Pill> <span className="text-faint">{daysLeft}d left</span>
+                </span>
+            ) : (
+                <Pill tone="red">Ended</Pill>
+            )}
+            {workspace.planRequest && (
+                <span className="text-sm font-medium text-accent">Wants Pro {PRO_PLANS[workspace.planRequest as BillingCycle]?.label.toLowerCase()}</span>
+            )}
+        </div>
     );
 }
 

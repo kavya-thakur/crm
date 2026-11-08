@@ -19,6 +19,7 @@ import {
     IconMailFast,
     IconBrandWhatsapp,
     IconArrowBackUp,
+    IconPencil,
     IconPercentage,
     IconPoint,
     IconProgress,
@@ -83,7 +84,6 @@ interface TimelineEntry {
 const TIMELINE_ICONS: Record<string, typeof IconTargetArrow> = {
     CREATED: IconTargetArrow,
     STAGE_CHANGED: IconProgress,
-    UPDATED: IconFileDescription,
     ASSIGNED: IconUserCircle,
     REASSIGNED: IconUserCircle,
     UNASSIGNED: IconUserCircle,
@@ -93,6 +93,8 @@ const TIMELINE_ICONS: Record<string, typeof IconTargetArrow> = {
     EMAIL_SENT: IconMailFast,
     WHATSAPP: IconBrandWhatsapp,
     RESTORED: IconArrowBackUp,
+    // a field edited (the activity history)
+    UPDATED: IconPencil,
 };
 
 type DealChanges = Partial<

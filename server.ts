@@ -1,6 +1,7 @@
 /*
- * The app's own server: Next.js, Socket.IO and the job queue's worker, on one port. `npm run dev` / `npm start` run
- * this instead of `next dev` / `next start`, because Next.js route handlers can't keep a
+ * The app's own server: Next.js, Socket.IO and the job queue's worker, on one port. `npm run dev` runs
+ * it with tsx; `npm run build` compiles it to dist/server.cjs, which `npm start` runs. Instead of
+ * `next dev` / `next start`, because Next.js route handlers can't keep a
  * WebSocket open; a plain Node HTTP server can (the same as Express + socket.io).
  * See docs/REALTIME.md.
  */
@@ -23,8 +24,15 @@ async function main() {
     // the permission helpers), which need the request storage that app.prepare() sets up
     const { announceChange, startRealtime } = await import("./src/lib/realtime/socketServer");
     const { startWorkers } = await import("./src/lib/jobs/worker");
+    const { apiLocked } = await import("./src/lib/billing/gate");
 
-    const httpServer = createServer((req, res) => {
+    const httpServer = createServer(async (req, res) => {
+        // a workspace whose trial or plan has ended: the API refuses until Pro is on (Billing stays open)
+        if (req.url?.startsWith("/api/") && (await apiLocked(req).catch(() => false))) {
+            res.writeHead(402, { "content-type": "application/json" });
+            res.end(JSON.stringify({ ok: false, locked: true, message: "Your free trial has ended. Choose a plan in Settings → Billing to carry on; your data is safe." }));
+            return;
+        }
         // once the API has answered, tell the rest of the workspace if something changed
         if (req.url?.startsWith("/api/")) res.on("finish", () => announceChange(req, res.statusCode));
         handle(req, res);

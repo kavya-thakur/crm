@@ -92,7 +92,7 @@ brought revenue, and why deals were lost.
 - A **recycle bin**: deleted leads, deals and contacts can be restored for 30 days, with their whole history
 - The workspace's **currency** (₹, $, €, and more) in Settings, used by every amount on screen
 - **Custom fields** of any type (text, number, date, yes/no, dropdown, team member), filterable and shown in lists
-- A **timeline** of everything that happened, plus **notes with @mentions**
+- A **timeline** of everything that happened, including **who changed which field from what to what**, plus **notes with @mentions**
 - **Lost reasons** asked at the moment something is lost
 
 </td>
@@ -147,6 +147,7 @@ brought revenue, and why deals were lost.
 ### Platform
 - **Multi-tenant:** every record belongs to a workspace, every query is scoped to it
 - **Roles and permissions** an admin builds: own records or everyone's, and access to each setting
+- **Plans and billing:** a 7-day free trial, then Pro monthly or yearly paid online with **Razorpay**; when it ends the app locks (data kept) until Pro is on
 - A **site admin** area for whoever runs Flash: every company and user on the site, and log in as anyone
 - **Log in as a teammate** for the workspace owner (and people they allow), to see exactly what they see; an hour at a time, with a banner and a notification to the teammate
 - **Bulk actions** on up to 50,000 records as background jobs with a progress bar
@@ -543,7 +544,7 @@ erDiagram
 
 ## API
 
-94 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
+101 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |
@@ -599,7 +600,7 @@ crm/
 ├── server.ts                 Next.js + Socket.IO + job workers, on one port
 ├── prisma/
 │   ├── schema.prisma         every model, commented
-│   ├── migrations/           51 migrations, applied in order
+│   ├── migrations/           55 migrations, applied in order
 │   ├── seed.ts               permissions and default stages
 │   └── demo.ts               builds the demo workspace (npm run db:demo)
 ├── src/
@@ -676,7 +677,7 @@ Email needs no settings: each person connects their own mailbox in Settings → 
 | Command | Does |
 |---|---|
 | `npm run dev` | the app with live updates and workers |
-| `npm run build` · `npm start` | production build · production server |
+| `npm run build` · `npm start` | production build (Next.js, then the server compiled to `dist/server.cjs`) · production server |
 | `npm test` | all integration tests |
 | `npm run lint` | ESLint |
 | `npm run db:demo` | build or rebuild the demo workspace (`DEMO_SCALE=25` for about 10,000 leads) |

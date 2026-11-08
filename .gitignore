@@ -51,3 +51,6 @@ next-env.d.ts
 /.playwright-mcp/
 /skills-lock.json
 .neon
+
+# the compiled server (npm run build:server)
+/dist

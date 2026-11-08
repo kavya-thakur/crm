@@ -73,6 +73,38 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       `User.isSiteAdmin` in the database, which a root switches on with "Make site admin" (or set it
       in the database directly). Only a root can open another site admin's account or make more.
       Closed while logged in as someone. `src/lib/auth/siteAdmin.ts`
+- [x] **Billing: 7-day trial, then Pro** (2026-11-07, Settings → Billing). Every workspace starts
+      on a **7-day free trial** (`Organization.trialEndsAt`, a database default; existing workspaces
+      got 7 days from the migration). **Pro** has everything, **₹1,499/month or ₹14,990/year**
+      (`src/lib/billing/plans.ts`, the one place to change prices). The sidebar counts the trial's
+      days down. When the trial or a paid period ends the workspace **locks**: every page shows
+      Billing ("your data is safe", nothing deleted), and the custom server refuses API requests
+      with 402 before any route runs (`src/lib/billing/gate.ts`), except sign-in, Billing, site
+      admin, health and web forms/integrations (leads keep arriving). Never locked: the demo, and
+      site admins (also when logged in as a customer). **No payment provider yet:** the owner
+      chooses monthly or yearly, which is a request; a site admin sees it (Workspaces → "Waiting for
+      Pro") and, once paid, **Activates Pro** (a renewal adds on to a period still running) or
+      **extends the trial** 7 days. The customer's open app unlocks at once (a "billing" live
+      update).
+- [x] **Online payment with Razorpay** (2026-11-08, Standard Checkout): with `RAZORPAY_KEY_ID` and
+      `RAZORPAY_KEY_SECRET` set, the plan buttons say "Pay ₹14,990" and open Razorpay's window.
+      `/api/billing/order` makes an order for the plan's price (workspace and plan in its notes);
+      `/api/billing/verify` checks the HMAC signature (order_id|payment_id with the secret), reads
+      the order back from Razorpay so the plan and price never come from the browser, records a
+      `Payment` (unique payment id, so a retry never adds time twice) and switches Pro on in one
+      transaction; the app unlocks at once. No SDK (three REST calls). Without the keys it falls back
+      to "ask for Pro" and a site admin.
+- [x] **Payments checked with Razorpay, a webhook, and renewal reminders** (2026-11-08). Before Pro
+      switches on, `settlePayment` (`src/lib/billing/payments.ts`) fetches the payment itself: it must
+      be for the order, of the order's amount, in INR, and **captured** (an authorised one is captured
+      then; left alone Razorpay would refund it while the workspace kept Pro). The browser's verify
+      call and Razorpay's **webhook** (`/api/public/razorpay`, signed with `RAZORPAY_WEBHOOK_SECRET`,
+      events payment.captured / order.paid) both go through it, so a payer whose browser closed still
+      gets Pro, and the payment counts once either way. **Reminders** (`src/lib/billing/reminders.ts`,
+      hourly): the owner gets a bell notification and an email 3 and 1 days before the trial ends,
+      7 and 1 days before Pro ends, and when it has ended; each once (`billingReminderKey`). The
+      sidebar shows Pro's last week too. Renewal itself is paying again (it adds on); automatic
+      charging would be Razorpay Subscriptions
 - [x] **Leads**: table + kanban by stage, filters (multi-stage, source, owner, created/modified
       by and date, custom fields, possible duplicates), saved filters, inline edit, bulk
       stage/assign/edit/merge/delete, side panel with timeline, notes, tasks, activities
@@ -125,6 +157,26 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] Stages and sources editor (one settings page), with won/lost/converted flags
 - [x] Global **⌘K search** with previews
 - [x] Profile (name, password)
+- [x] **Exports carry every field** (2026-11-08): leads add UTM source/medium, created by, last
+      modified by; deals add company, description, products ("2 × Licence; 1 × Setup"), last
+      updated, created/modified by; contacts add job title, description, last updated,
+      created/modified by. Every custom field is a column, read the way people see it. Formula
+      protection no longer puts a ' before phone numbers (+91...) or negative amounts, only before
+      what could run in Excel; the importer drops a ' that an older export added
+- [x] **Activity history** (2026-11-07): every edit to a lead, deal or contact puts a line on its
+      timeline: "Priya · changed Amount from ₹1,00,000 to ₹80,000", "set Company to Acme",
+      "cleared Email (was …)"; custom fields too (Yes/No, dates, teammates by name). Bulk edits put
+      "set Company to Acme (bulk edit)" on each record. Values are shown the way people see them
+      (money in the workspace currency, a source's name), long text cut at 80 characters, and the
+      raw change kept in the entry's `metadata`. `src/lib/history.ts`. Stage moves and assignments
+      already had entries; a deal's amount changing because its products changed doesn't add one
+- [x] **Forgot password** (2026-11-07): "Forgot password?" on sign-in emails a one-time link (an
+      hour; asking again replaces it) from Flash's own mailbox (`SMTP_*`, `src/lib/emails/system.ts`;
+      without it, the link is printed in the dev terminal). Only the link's sha256 is stored
+      (`PasswordReset`). Same answer whether or not the email has an account; rate limited; the demo
+      login is left alone; the link uses `APP_URL` in production, never the request's Host. The page
+      says straight away when a link has expired. Sessions already signed in aren't ended (JWTs
+      can't be taken back without a session table)
 
 ### Selling better
 - [x] **My day** (2026-11-06, `/my-day`, first in the sidebar): one request (`/api/my-day`, the
@@ -154,6 +206,11 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       rules as web forms; a log of what arrived and why anything was rejected; test button; new
       link on demand. See [INTEGRATIONS.md](INTEGRATIONS.md)
 - [x] `/api/health` for the host's health check and a free uptime ping (keeps a sleeping free server awake)
+- [x] **Production server compiled at build** (2026-11-08): `npm run build` bundles `server.ts` with
+      esbuild into `dist/server.cjs` and `npm start` runs it with node (no tsx at runtime): about 2×
+      faster to start and ~90 MB less memory, which matters on Render's free 512 MB / 0.1 CPU,
+      where a wake from sleep was ~30 s of app start. Logout is a plain request now, not a server
+      action with redirect() (that logged an SSL error behind Render's proxy)
 - [x] **Lost reasons** asked when anything moves to a lost stage
 - [x] **Duplicates**: one open lead per person (enforced), warning while typing, "possible
       duplicates" filter, **merge** for leads and deals
@@ -269,6 +326,8 @@ Newest first. The reason matters more than the choice.
 | 2026-11-06 | The mailbox password is **encrypted, key derived from JWT_SECRET**, never returned to the browser | it must be read back to send, so it can't be hashed; deriving the key means no new secret to set up on Render |
 | 2026-11-06 | Recycle bin as a **copy before a real delete**, not a `deletedAt` column | soft delete would mean a `deletedAt: null` filter on every query, search, count, raw SQL and relation in the app, and one miss shows deleted data; a copy leaves all of that untouched |
 | 2026-11-07 | Quote lines **copy** the product's name, price and tax | a quote already sent must not change when the catalogue's price does; the copy can also be changed for one deal |
+| 2026-11-07 | The billing lock is **one check in the custom server**, before any route | one place for 90+ routes, so a new route can't forget it; open workspaces are cached until their trial or period ends, so it costs nothing for them |
+| 2026-11-07 | Pro switched on **by hand by a site admin** for now | sell from day one with UPI or bank transfer, no KYC or provider fees; online payment later only automates the same switch |
 | 2026-11-07 | "Log in as" decided **per person by the owner**, not a role permission | the user wants it held by the owner and handed to individuals; a role checkbox would let any role editor give it out |
 | 2026-11-07 | Quote PDF through the **browser's print dialog**, not a PDF library | every browser can "Save as PDF"; no dependency, no server rendering, and the page is the same HTML as on screen |
 | 2026-11-06 | Company of a deal = the **company of its lead's contact**; companies made from lead company names | no new link to keep in step; the company name leads already carry fills the Companies page by itself |
