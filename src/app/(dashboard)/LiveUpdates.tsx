@@ -44,7 +44,8 @@ const REFRESH: Record<string, string[]> = {
 
 // Changes to these can change what the signed-in person may see (their role, the
 // sidebar), which the server renders, so the page itself is refreshed too
-const RERENDER = new Set(["roles", "agents"]);
+// "billing": a site admin switched Pro on (or extended the trial), so a locked app opens up
+const RERENDER = new Set(["roles", "agents", "billing"]);
 
 interface PushedNotification {
     type: string;

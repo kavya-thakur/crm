@@ -18,6 +18,7 @@ import {
     IconMailFast,
     IconBrandWhatsapp,
     IconArrowBackUp,
+    IconPencil,
     IconPhone,
     IconPlus,
     IconPoint,
@@ -90,6 +91,8 @@ const TIMELINE_ICONS: Record<string, typeof IconPlus> = {
     EMAIL_SENT: IconMailFast,
     WHATSAPP: IconBrandWhatsapp,
     RESTORED: IconArrowBackUp,
+    // a field edited (the activity history)
+    UPDATED: IconPencil,
 };
 
 type LeadChanges = Partial<Pick<Lead, "name" | "email" | "phone" | "companyName" | "stageId" | "lostReason">> & {

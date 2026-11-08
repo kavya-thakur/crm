@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bulkHistoryRows, customFieldBulkValues } from "@/lib/history";
 import { moveToCompany } from "@/lib/companies";
 import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
@@ -183,11 +184,13 @@ export async function PATCH(req: NextRequest) {
             const { customFields: submittedCustomFields, ...fields } = data.changes;
 
             // a source has to be one of this organization's
+            let sourceName: string | null = null;
             if (fields.sourceId) {
                 const source = await prisma.leadSource.findFirst({
                     where: { id: fields.sourceId, organizationId: user.organizationId },
-                    select: { id: true },
+                    select: { id: true, name: true },
                 });
+                sourceName = source?.name ?? null;
 
                 if (!source) {
                     return NextResponse.json({ ok: false, message: "Invalid lead source" }, { status: 400 });
@@ -209,9 +212,18 @@ export async function PATCH(req: NextRequest) {
                 customFields = result.data;
             }
 
+            // the activity history: on each lead's timeline, what it was set to
+            const history = [
+                ...(fields.companyName !== undefined ? [{ field: "companyName", label: "Company", to: fields.companyName }] : []),
+                ...(fields.sourceId !== undefined ? [{ field: "source", label: "Source", to: sourceName }] : []),
+                ...(customFields ? await customFieldBulkValues(user.organizationId, "lead", customFields) : []),
+            ];
+
             // one statement for the plain fields and one for the custom fields, however many
             // leads are selected; together, so either all of them change or none do
             await prisma.$transaction(async (tx) => {
+                await tx.leadTimeline.createMany({ data: leadIds.flatMap((leadId) => bulkHistoryRows(history, user.id).map((row) => ({ ...row, leadId }))) });
+
                 if (Object.keys(fields).length > 0) {
                     await tx.lead.updateMany({
                         where: { id: { in: leadIds }, organizationId: user.organizationId },

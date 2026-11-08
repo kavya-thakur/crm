@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bulkHistoryRows, customFieldBulkValues } from "@/lib/history";
 import { companyNamed } from "@/lib/companies";
 import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
@@ -146,9 +147,18 @@ export async function PATCH(req: NextRequest) {
                 customFields = result.data;
             }
 
+            // the activity history: on each contact's timeline, what it was set to
+            const history = [
+                ...(plain.jobTitle !== undefined ? [{ field: "jobTitle", label: "Job title", to: plain.jobTitle }] : []),
+                ...(companyName !== undefined ? [{ field: "company", label: "Company", to: companyName }] : []),
+                ...(customFields ? await customFieldBulkValues(user.organizationId, "contact", customFields) : []),
+            ];
+
             // one statement for the plain fields and one for the custom fields, however many
             // contacts are selected; together, so either all of them change or none do
             await prisma.$transaction(async (tx) => {
+                await tx.contactTimeline.createMany({ data: contactIds.flatMap((contactId) => bulkHistoryRows(history, user.id).map((row) => ({ ...row, contactId }))) });
+
                 if (Object.keys(fields).length > 0) {
                     await tx.contact.updateMany({
                         where: { id: { in: contactIds }, organizationId: user.organizationId },

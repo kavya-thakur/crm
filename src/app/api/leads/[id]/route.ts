@@ -1,4 +1,6 @@
 import { leadScope, requirePermission } from "@/lib/auth/requirePermission";
+import { customFieldHistory, fieldChanges, historyRows } from "@/lib/history";
+import type { CustomFieldDefinition } from "@/generated/prisma/client";
 import { deleteToBin } from "@/lib/recycleBin";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
@@ -11,6 +13,9 @@ import { alreadyALead, findOpenCopy, isOpen } from "@/lib/leads/duplicates";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
 import { moveToCompany } from "@/lib/companies";
 import { NextRequest, NextResponse } from "next/server";
+
+// The lead's own fields the activity history follows (stage and owner write entries of their own)
+const LEAD_FIELDS = { name: "Name", email: "Email", phone: "Phone", companyName: "Company", source: "Source" };
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -92,8 +97,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
             select: {
                 stageId: true,
                 stage: { select: { name: true, isConverted: true, isLost: true } },
+                // as they were, for the activity history
+                name: true,
                 email: true,
                 phone: true,
+                companyName: true,
+                source: { select: { name: true } },
                 customFields: true,
             },
         });
@@ -157,6 +166,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         // Custom fields are edited one at a time (like every other field here),
         // so only the submitted keys are validated and merged into what's there.
         let customFields: Prisma.InputJsonObject | undefined;
+        let customFieldEdit: { definitions: CustomFieldDefinition[]; values: Record<string, unknown> } | undefined;
 
         if (submittedCustomFields) {
             const definitions = await prisma.customFieldDefinition.findMany({
@@ -176,6 +186,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...(existingLead.customFields as Prisma.InputJsonObject | null),
                 ...result.data,
             } as Prisma.InputJsonObject;
+            customFieldEdit = { definitions, values: result.data };
         }
 
         // scope in the where too, so the write itself is checked; if the lead is
@@ -218,6 +229,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 source: true,
             },
         });
+
+        // the activity history: what this edit changed, on the lead's timeline
+        const view = (lead: { name: string; email: string | null; phone: string | null; companyName: string | null; source: { name: string } | null }) => ({ ...lead, source: lead.source?.name });
+        const changes = [
+            ...fieldChanges(view(existingLead), view(updatedLead), LEAD_FIELDS),
+            ...(customFieldEdit ? await customFieldHistory(user.organizationId, customFieldEdit.definitions, existingLead.customFields, customFieldEdit.values) : []),
+        ];
+        if (changes.length > 0) {
+            await prisma.leadTimeline.createMany({ data: historyRows(changes, user.id).map((row) => ({ ...row, leadId: updatedLead.id })) });
+        }
 
         // its contact moves to the company it now names (or out of its company, when cleared)
         if (fields.companyName !== undefined) await moveToCompany(prisma, user.organizationId, [updatedLead.id], fields.companyName);

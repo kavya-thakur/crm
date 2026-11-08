@@ -1,4 +1,7 @@
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { customFieldHistory, fieldChanges, historyRows } from "@/lib/history";
+import { formatMoneyExact } from "@/lib/utils/format";
+import type { CustomFieldDefinition } from "@/generated/prisma/client";
 import { deleteToBin } from "@/lib/recycleBin";
 import { dealScope, requirePermission } from "@/lib/auth/requirePermission";
 import { prisma } from "@/lib/db/prisma";
@@ -12,6 +15,9 @@ import { dealLeadSelect, dealProductsInclude } from "@/lib/deals/select";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
 
 type Params = { params: Promise<{ id: string }> };
+
+// The deal's own fields the activity history follows (stage and owner write entries of their own)
+const DEAL_FIELDS = { title: "Title", amount: "Amount", probability: "Probability", expectedCloseDate: "Expected close", description: "Description", lead: "Lead" };
 
 function dealNotFound() {
     return NextResponse.json(
@@ -85,6 +91,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
             select: {
                 pipelineStageId: true,
                 customFields: true,
+                // as they were, for the activity history
+                title: true,
+                amount: true,
+                probability: true,
+                expectedCloseDate: true,
+                description: true,
+                lead: { select: { name: true } },
             },
         });
 
@@ -151,6 +164,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         // Custom fields are edited one at a time (like every other field here),
         // so only the submitted keys are validated and merged into what's there.
         let customFields: Prisma.InputJsonObject | undefined;
+        let customFieldEdit: { definitions: CustomFieldDefinition[]; values: Record<string, unknown> } | undefined;
 
         if (submittedCustomFields) {
             const definitions = await prisma.customFieldDefinition.findMany({
@@ -170,6 +184,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...(existingDeal.customFields as Prisma.InputJsonObject | null),
                 ...result.data,
             } as Prisma.InputJsonObject;
+            customFieldEdit = { definitions, values: result.data };
         }
 
         // scope in the where too, so the write itself is checked; if the deal is
@@ -207,6 +222,24 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 products: dealProductsInclude,
             },
         });
+
+        // the activity history: what this edit changed, on the deal's timeline
+        const currency = user.organization.currency;
+        const view = (deal: { title: string; amount: unknown; probability: number; expectedCloseDate: Date | null; description: string | null; lead: { name: string } | null }) => ({
+            title: deal.title,
+            amount: formatMoneyExact(Number(deal.amount), currency),
+            probability: `${deal.probability}%`,
+            expectedCloseDate: deal.expectedCloseDate?.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+            description: deal.description,
+            lead: deal.lead?.name,
+        });
+        const changes = [
+            ...fieldChanges(view(existingDeal), view(updatedDeal), DEAL_FIELDS),
+            ...(customFieldEdit ? await customFieldHistory(user.organizationId, customFieldEdit.definitions, existingDeal.customFields, customFieldEdit.values) : []),
+        ];
+        if (changes.length > 0) {
+            await prisma.dealTimeline.createMany({ data: historyRows(changes, user.id).map((row) => ({ ...row, dealId: updatedDeal.id })) });
+        }
 
         // the workspace's "deal moves to a stage", "won" and "lost" rules
         if (stageChanged && newStage) {

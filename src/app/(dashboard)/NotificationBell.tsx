@@ -32,6 +32,7 @@ const SECTION_OF: Record<string, Section> = {
     EMAIL_FAILED: "emails",
     AUTOMATION: "automations",
     LOGGED_IN_AS: "members",
+    BILLING: "billing",
 };
 
 /**

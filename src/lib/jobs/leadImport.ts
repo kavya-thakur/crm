@@ -50,7 +50,8 @@ export async function runImport(importJobId: number) {
     const columnOf = (field: string) => Object.keys(mapping).find((column) => mapping[column] === field);
     const cell = (row: Row, field: string) => {
         const column = columnOf(field);
-        return column ? (row[column] ?? "").trim() : "";
+        // a ' an export put before a value so Excel wouldn't run it as a formula isn't part of it
+        return column ? (row[column] ?? "").trim().replace(/^'(?=[=+\-@])/, "") : "";
     };
 
     await prisma.importJob.update({ where: { id: job.id }, data: { status: "RUNNING" } });

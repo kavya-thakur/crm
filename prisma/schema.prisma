@@ -71,6 +71,8 @@ model User {
   emailAccount       EmailAccount?
   // leads, deals and contacts this person deleted (the recycle bin)
   deletedRecords     DeletedRecord[]
+  // "Forgot password?" links sent to them, still usable
+  passwordResets     PasswordReset[]
 
   @@index([organizationId])
   @@index([roleId])
@@ -82,6 +84,20 @@ model Organization {
   slug      String   @unique
   // how amounts are shown ("INR", "USD"...), set in Settings > Workspace; amounts aren't converted
   currency  String   @default("INR")
+
+  // Billing (Settings > Billing, src/lib/billing). Every workspace starts on a 7-day free trial;
+  // when it (or a paid period) runs out, the app locks until Pro is switched on. Nothing is deleted.
+  trialEndsAt     DateTime  @default(dbgenerated("(now() + '7 days'::interval)"))
+  // "TRIAL", or "PRO" once a site admin has switched it on after payment
+  plan            String    @default("TRIAL")
+  // Pro: paid monthly or yearly ("MONTHLY" | "YEARLY"), and paid up to when
+  billingCycle    String?
+  paidUntil       DateTime?
+  // the owner asked for Pro ("MONTHLY" | "YEARLY"); a site admin switches it on once they've paid
+  planRequest     String?
+  planRequestedAt DateTime?
+  // the last "your trial/plan ends soon" reminder sent ("trial:2026-11-14:3"), so each goes once
+  billingReminderKey String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -106,6 +122,7 @@ model Organization {
   emailTemplates         EmailTemplate[]
   automationRules        AutomationRule[]
   products               Product[]
+  payments               Payment[]
 }
 
 model Role {
@@ -1036,4 +1053,38 @@ model DealProduct {
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([dealId])
+}
+
+// A "Forgot password?" link: works once, for an hour. Only a hash of its secret is kept, so a copy
+// of the database can't be used to reset anyone's password (like storing a password's hash).
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// A Pro payment made online (Razorpay), once its signature checked out. Each payment counts once:
+// paying switched Pro on (or added a month or a year) up to paidUntil.
+model Payment {
+  id                Int      @id @default(autoincrement())
+  organizationId    Int
+  // who paid (their email, kept even if they leave)
+  paidBy            String
+  razorpayOrderId   String
+  razorpayPaymentId String   @unique
+  // "MONTHLY" | "YEARLY", and how much, in paise
+  cycle             String
+  amount            Int
+  paidUntil         DateTime
+  createdAt         DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }

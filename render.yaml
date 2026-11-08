@@ -24,6 +24,22 @@ services:
       # root site admins (comma-separated emails), set in the dashboard
       - key: SITE_ADMIN_EMAILS
         sync: false
+      # Flash's own mailbox for "Forgot password?" emails (see .env.example), set in the dashboard
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      # online payment for Pro (see .env.example), set in the dashboard
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
       - key: REDIS_URL
         fromService:
           type: keyvalue

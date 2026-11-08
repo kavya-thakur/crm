@@ -23,5 +23,16 @@ export const changePasswordSchema = z.object({
     newPassword: z.string().min(8, "Password must be at least 8 characters"),
 });
 
+// "Forgot password?": the email to send the link to
+export const forgotPasswordSchema = z.object({
+    email: emailSchema,
+});
+
+// The link's secret, and the new password
+export const resetPasswordSchema = z.object({
+    token: z.string().min(20).max(200),
+    password: z.string().min(8, "Password must be at least 8 characters").max(200),
+});
+
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;

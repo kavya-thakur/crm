@@ -1,6 +1,7 @@
 import type { IncomingMessage, Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
-import { verifyToken } from "@/lib/auth/jwt";
+import { signedIn } from "@/lib/auth/jwt";
+import { sendBillingReminders } from "@/lib/billing/reminders";
 import { prisma } from "@/lib/db/prisma";
 import { broadcastChange, notify, orgRoom, setSocketServer, userRoom } from "./notify";
 
@@ -20,24 +21,6 @@ import { broadcastChange, notify, orgRoom, setSocketServer, userRoom } from "./n
 // Writes that don't change anything other people are looking at
 // (bulk-jobs and imports report their own progress as they go)
 const QUIET = new Set(["auth", "me", "public", "notifications", "saved-filters", "bulk-jobs"]);
-
-function cookieValue(header: string | undefined, name: string) {
-    const pair = header?.split(";").find((part) => part.trim().startsWith(`${name}=`));
-    return pair ? decodeURIComponent(pair.trim().slice(name.length + 1)) : undefined;
-}
-
-// Who's signed in, from the same access_token cookie the API reads. Null when nobody is.
-function signedIn(cookieHeader: string | undefined) {
-    const token = cookieValue(cookieHeader, "access_token");
-    if (!token) return null;
-    try {
-        const payload = verifyToken(token);
-        if (typeof payload !== "object" || typeof payload.userId !== "number" || typeof payload.organizationId !== "number") return null;
-        return { userId: payload.userId as number, organizationId: payload.organizationId as number };
-    } catch {
-        return null;
-    }
-}
 
 export function startRealtime(httpServer: HttpServer) {
     const io = new Server(httpServer, {
@@ -62,6 +45,9 @@ export function startRealtime(httpServer: HttpServer) {
     });
 
     setInterval(() => void sendReminders(), 30_000);
+    // "your trial / Pro plan ends soon", to workspace owners: hourly is plenty for days-ahead notice
+    setTimeout(() => void sendBillingReminders(), 60_000);
+    setInterval(() => void sendBillingReminders(), 60 * 60_000);
 
     return io;
 }

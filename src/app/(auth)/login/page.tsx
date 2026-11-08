@@ -42,6 +42,9 @@ export default function LoginPage() {
                 Welcome <span className="font-(family-name:--font-host-grotesk) tracking-[-0.05em]">back</span>
             </h1>
             <p className="mt-3 text-[15px] text-[#1c1c1c]/55">Sign in to your workspace</p>
+            <Suspense>
+                <ResetNotice />
+            </Suspense>
 
             <form
                 onSubmit={handleSubmit((values) => loginMutation.mutate(values))}
@@ -66,9 +69,14 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                    <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-[#1c1c1c]/70">
-                        Password
-                    </label>
+                    <div className="mb-1.5 flex items-center justify-between">
+                        <label htmlFor="password" className="text-[13px] font-medium text-[#1c1c1c]/70">
+                            Password
+                        </label>
+                        <Link href="/forgot-password" className="text-[13px] font-medium text-[#4a38f5] hover:underline">
+                            Forgot password?
+                        </Link>
+                    </div>
                     <div className="relative">
                         <input
                             id="password"
@@ -131,6 +139,16 @@ export default function LoginPage() {
                 </Link>
             </p>
         </>
+    );
+}
+
+// Back from "Choose a new password"
+function ResetNotice() {
+    if (useSearchParams().get("reset") !== "1") return null;
+    return (
+        <p role="status" className="mt-5 rounded-xl bg-success-soft px-3.5 py-2.5 text-sm text-success">
+            Password changed. Sign in with your new password.
+        </p>
     );
 }
 

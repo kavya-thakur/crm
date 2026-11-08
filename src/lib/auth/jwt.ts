@@ -36,3 +36,27 @@ export function sessionCookie(seconds: number) {
         path: "/",
     };
 }
+
+// A cookie from a raw Cookie header (the custom server and sockets, outside Next's cookies())
+export function cookieValue(header: string | undefined, name: string) {
+    const pair = header?.split(";").find((part) => part.trim().startsWith(`${name}=`));
+    return pair ? decodeURIComponent(pair.trim().slice(name.length + 1)) : undefined;
+}
+
+// Who's signed in, from the same access_token cookie the API reads. Null when nobody is.
+// `actingAs`: who really is, while logged in as someone else ("Log in as")
+export function signedIn(cookieHeader: string | undefined) {
+    const token = cookieValue(cookieHeader, "access_token");
+    if (!token) return null;
+    try {
+        const payload = verifyToken(token);
+        if (typeof payload !== "object" || typeof payload.userId !== "number" || typeof payload.organizationId !== "number") return null;
+        return {
+            userId: payload.userId as number,
+            organizationId: payload.organizationId as number,
+            actingAs: typeof payload.actingAs === "number" ? (payload.actingAs as number) : null,
+        };
+    } catch {
+        return null;
+    }
+}

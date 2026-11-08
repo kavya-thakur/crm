@@ -15,9 +15,16 @@ const PAGE = 1000;
 const day = (date: Date | string | null | undefined) => (date ? new Date(date).toISOString().slice(0, 10) : "");
 
 /**
- * A streamed CSV response. `escapeFormulae` stops a value like "=HYPERLINK(...)" (typed into a
- * lead by anyone, even through a web form) from running as a formula when the file is
- * opened in Excel. The first character tells Excel the file is UTF-8, so ₹ and names in any
+ * What could run as a formula when the file is opened in Excel: a value starting with = @ or a
+ * tab, or with + or - followed by anything but number characters. So "=HYPERLINK(...)" (typed into
+ * a lead by anyone, even through a web form) gets a ' in front, but a phone number like
+ * "+91 98000 80001" or an amount like "-500" stays as it is: those can't hold a formula.
+ */
+const FORMULA = /^(?:[=@\t\r]|[+-](?![\d\s().+-]*$))/;
+
+/**
+ * A streamed CSV response. `escapeFormulae` (FORMULA, above) stops a value from running as a
+ * formula when the file is opened in Excel. The first character tells Excel the file is UTF-8, so ₹ and names in any
  * language come out right.
  */
 function csvResponse(fileName: string, header: string[], rows: AsyncGenerator<unknown[][]>) {
@@ -33,7 +40,7 @@ function csvResponse(fileName: string, header: string[], rows: AsyncGenerator<un
             }
             const next = await rows.next();
             if (next.done) return controller.close();
-            controller.enqueue(encoder.encode(Papa.unparse(next.value, { escapeFormulae: true }) + "\r\n"));
+            controller.enqueue(encoder.encode(Papa.unparse(next.value, { escapeFormulae: FORMULA }) + "\r\n"));
         },
     });
 
@@ -58,6 +65,9 @@ async function* pages<T extends { id: number }>(load: (after?: number) => Promis
 }
 
 
+// who made it and who changed it last, by name (empty for records from before this was tracked)
+const byWhom = { createdBy: { select: { name: true } }, updatedBy: { select: { name: true } } } as const;
+
 // A record's custom fields as columns, labelled like the table; an Agent field shows the person's name
 async function customColumns(organizationId: number, entity: "lead" | "deal" | "contact") {
     const [definitions, people] = await Promise.all([
@@ -70,6 +80,7 @@ async function customColumns(organizationId: number, entity: "lead" | "deal" | "
         if (definition.type === "BOOLEAN") return value ? "Yes" : "No";
         if (definition.type === "DATE") return day(value as string);
         if (definition.type === "AGENT") return people.find((person) => person.id === Number(value))?.name ?? "";
+        if (Array.isArray(value)) return value.join(", ");
         return String(value);
     };
 
@@ -82,13 +93,17 @@ async function customColumns(organizationId: number, entity: "lead" | "deal" | "
 export async function exportLeads(organizationId: number, where: Prisma.LeadWhereInput) {
     const custom = await customColumns(organizationId, "lead");
     // the same column names the importer recognises, so an exported file can be imported again
-    const header = ["Name", "Email", "Phone", "Company", "Stage", "Source", "Campaign", "Assigned to", "Lost reason", "Created", "Last updated", ...custom.header];
+    const header = [
+        "Name", "Email", "Phone", "Company", "Stage", "Source", "Campaign", "Assigned to", "Lost reason", "Created", "Last updated",
+        "UTM source", "UTM medium", "Created by", "Last modified by",
+        ...custom.header,
+    ];
 
     return csvResponse(
         "leads",
         header,
         pages(
-            (id) => prisma.lead.findMany({ where: { AND: [where, { id: { gt: id ?? 0 } }] }, orderBy: { id: "asc" }, take: PAGE, include: { stage: true, source: true, assignedTo: { select: { name: true } } } }),
+            (id) => prisma.lead.findMany({ where: { AND: [where, { id: { gt: id ?? 0 } }] }, orderBy: { id: "asc" }, take: PAGE, include: { stage: true, source: true, assignedTo: { select: { name: true } }, ...byWhom } }),
             (lead) => [
                 lead.name,
                 lead.email ?? "",
@@ -101,6 +116,10 @@ export async function exportLeads(organizationId: number, where: Prisma.LeadWher
                 lead.lostReason ?? "",
                 day(lead.createdAt),
                 day(lead.updatedAt),
+                lead.utmSource ?? "",
+                lead.utmMedium ?? "",
+                lead.createdBy?.name ?? "",
+                lead.updatedBy?.name ?? "",
                 ...custom.values(lead.customFields),
             ],
         ),
@@ -109,7 +128,11 @@ export async function exportLeads(organizationId: number, where: Prisma.LeadWher
 
 export async function exportDeals(organizationId: number, where: Prisma.DealWhereInput) {
     const custom = await customColumns(organizationId, "deal");
-    const header = ["Title", "Amount", "Probability %", "Stage", "Expected close", "Lead", "Phone", "Email", "Assigned to", "Lost reason", "Closed", "Created", ...custom.header];
+    const header = [
+        "Title", "Amount", "Probability %", "Stage", "Expected close", "Lead", "Phone", "Email", "Company", "Assigned to", "Lost reason", "Closed",
+        "Description", "Products", "Created", "Last updated", "Created by", "Last modified by",
+        ...custom.header,
+    ];
 
     return csvResponse(
         "deals",
@@ -120,7 +143,14 @@ export async function exportDeals(organizationId: number, where: Prisma.DealWher
                     where: { AND: [where, { id: { gt: id ?? 0 } }] },
                     orderBy: { id: "asc" },
                     take: PAGE,
-                    include: { pipelineStage: true, lead: { select: { name: true, phone: true, email: true } }, assignedTo: { select: { name: true } } },
+                    include: {
+                        pipelineStage: true,
+                        lead: { select: { name: true, phone: true, email: true, contact: { select: { company: { select: { name: true } } } } } },
+                        assignedTo: { select: { name: true } },
+                        // its quote's lines, as "2 × Licence; 1 × Setup"
+                        products: { select: { name: true, quantity: true }, orderBy: { id: "asc" } },
+                        ...byWhom,
+                    },
                 }),
             (deal) => [
                 deal.title,
@@ -131,10 +161,16 @@ export async function exportDeals(organizationId: number, where: Prisma.DealWher
                 deal.lead?.name ?? "",
                 deal.lead?.phone ?? "",
                 deal.lead?.email ?? "",
+                deal.lead?.contact?.company?.name ?? "",
                 deal.assignedTo?.name ?? "",
                 deal.lostReason ?? "",
                 day(deal.closedAt),
+                deal.description ?? "",
+                deal.products.map((line) => `${line.quantity} × ${line.name}`).join("; "),
                 day(deal.createdAt),
+                day(deal.updatedAt),
+                deal.createdBy?.name ?? "",
+                deal.updatedBy?.name ?? "",
                 ...custom.values(deal.customFields),
             ],
         ),
@@ -143,14 +179,27 @@ export async function exportDeals(organizationId: number, where: Prisma.DealWher
 
 export async function exportContacts(organizationId: number, where: Prisma.ContactWhereInput) {
     const custom = await customColumns(organizationId, "contact");
-    const header = ["Name", "Email", "Phone", "Company", "Assigned to", "Created", ...custom.header];
+    const header = ["Name", "Email", "Phone", "Company", "Job title", "Assigned to", "Description", "Created", "Last updated", "Created by", "Last modified by", ...custom.header];
 
     return csvResponse(
         "contacts",
         header,
         pages(
-            (id) => prisma.contact.findMany({ where: { AND: [where, { id: { gt: id ?? 0 } }] }, orderBy: { id: "asc" }, take: PAGE, include: { company: { select: { name: true } }, assignedTo: { select: { name: true } } } }),
-            (contact) => [contact.name, contact.email ?? "", contact.phone ?? "", contact.company?.name ?? "", contact.assignedTo?.name ?? "", day(contact.createdAt), ...custom.values(contact.customFields)],
+            (id) => prisma.contact.findMany({ where: { AND: [where, { id: { gt: id ?? 0 } }] }, orderBy: { id: "asc" }, take: PAGE, include: { company: { select: { name: true } }, assignedTo: { select: { name: true } }, ...byWhom } }),
+            (contact) => [
+                contact.name,
+                contact.email ?? "",
+                contact.phone ?? "",
+                contact.company?.name ?? "",
+                contact.jobTitle ?? "",
+                contact.assignedTo?.name ?? "",
+                contact.description ?? "",
+                day(contact.createdAt),
+                day(contact.updatedAt),
+                contact.createdBy?.name ?? "",
+                contact.updatedBy?.name ?? "",
+                ...custom.values(contact.customFields),
+            ],
         ),
     );
 }

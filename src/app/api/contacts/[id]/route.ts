@@ -1,4 +1,6 @@
 import { contactScope, requirePermission } from "@/lib/auth/requirePermission";
+import { customFieldHistory, fieldChanges, historyRows } from "@/lib/history";
+import type { CustomFieldDefinition } from "@/generated/prisma/client";
 import { deleteToBin } from "@/lib/recycleBin";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
@@ -8,6 +10,9 @@ import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { NextRequest, NextResponse } from "next/server";
 import { companyNamed } from "@/lib/companies";
+
+// The contact's own fields the activity history follows (owner changes write entries of their own)
+const CONTACT_FIELDS = { name: "Name", email: "Email", phone: "Phone", jobTitle: "Job title", company: "Company", description: "Description" };
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,7 +85,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 id: id.data,
                 ...contactScope(user),
             },
-            select: { id: true, customFields: true },
+            // and as it was, for the activity history
+            select: { id: true, customFields: true, name: true, email: true, phone: true, jobTitle: true, description: true, company: { select: { name: true } } },
         });
 
         if (!existingContact) {
@@ -92,6 +98,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         // Custom fields are edited one at a time (like every other field here),
         // so only the submitted keys are validated and merged into what's there.
         let customFields: Prisma.InputJsonObject | undefined;
+        let customFieldEdit: { definitions: CustomFieldDefinition[]; values: Record<string, unknown> } | undefined;
 
         if (submittedCustomFields) {
             const definitions = await prisma.customFieldDefinition.findMany({
@@ -111,6 +118,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 ...(existingContact.customFields as Prisma.InputJsonObject | null),
                 ...result.data,
             } as Prisma.InputJsonObject;
+            customFieldEdit = { definitions, values: result.data };
         }
 
         // Verify that the company belongs to this organization, if changing it.
@@ -175,6 +183,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
                 },
             },
         });
+
+        // the activity history: what this edit changed, on the contact's timeline
+        const view = (contact: { name: string; email: string | null; phone: string; jobTitle: string | null; description: string | null; company: { name: string } | null }) => ({ ...contact, company: contact.company?.name });
+        const changes = [
+            ...fieldChanges(view(existingContact), view(updatedContact), CONTACT_FIELDS),
+            ...(customFieldEdit ? await customFieldHistory(user.organizationId, customFieldEdit.definitions, existingContact.customFields, customFieldEdit.values) : []),
+        ];
+        if (changes.length > 0) {
+            await prisma.contactTimeline.createMany({ data: historyRows(changes, user.id).map((row) => ({ ...row, contactId: updatedContact.id })) });
+        }
 
         return NextResponse.json({
             ok: true,
