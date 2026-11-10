@@ -8,7 +8,7 @@ import { getCurrentUser } from "./getCurrentUser";
  *  - User.isSiteAdmin in the database: given by a root, or set straight in the database.
  */
 
-const rootEmails = () =>
+export const rootEmails = () =>
     (process.env.SITE_ADMIN_EMAILS ?? "")
         .split(",")
         .map((email) => email.trim().toLowerCase())

@@ -12,7 +12,11 @@ vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { POST as requestPlan } from "@/app/api/billing/route";
-import { PUT as changePlan } from "@/app/api/site-admin/workspaces/[id]/route";
+import { GET as workspaceDetail, PUT as changePlan } from "@/app/api/site-admin/workspaces/[id]/route";
+import { GET as overview } from "@/app/api/site-admin/overview/route";
+import { GET as payments } from "@/app/api/site-admin/payments/route";
+import { GET as workspaceList } from "@/app/api/site-admin/workspaces/route";
+import { GET as userList } from "@/app/api/site-admin/users/route";
 
 const DAY = 24 * 60 * 60 * 1000;
 const send = (body: object) => new NextRequest("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -129,5 +133,92 @@ describe("billing lock", () => {
         expect((await changePlan(send({ action: "extendTrial" }), params(organization.id))).status).toBe(200);
         const extended = await prisma.organization.findUniqueOrThrow({ where: { id: organization.id } });
         expect(accessOf(extended)).toMatchObject({ state: "trial", daysLeft: 7 });
+    });
+
+    it("never turns a workspace on Pro back into a trial", async () => {
+        const { organization } = await workspace();
+        const admin = await workspace();
+        vi.stubEnv("SITE_ADMIN_EMAILS", admin.owner.email);
+        const paidUntil = await activatePro(organization.id, "YEARLY");
+
+        (getCurrentUser as Mock).mockResolvedValue({ ...admin.owner, actingAsId: null });
+        expect((await changePlan(send({ action: "extendTrial" }), params(organization.id))).status).toBe(409);
+        const still = await prisma.organization.findUniqueOrThrow({ where: { id: organization.id } });
+        expect(still).toMatchObject({ plan: "PRO", paidUntil });
+        expect(accessOf(still).state).toBe("pro");
+    });
+
+    it("records Pro switched on by hand as a payment, shown in the company, the payments list and the overview", async () => {
+        const { organization } = await workspace();
+        const admin = await workspace();
+        vi.stubEnv("SITE_ADMIN_EMAILS", admin.owner.email);
+        (getCurrentUser as Mock).mockResolvedValue({ ...admin.owner, actingAsId: null });
+        const before = (await (await overview()).json()).data;
+
+        // the plan's price unless said otherwise; 0 is still recorded
+        expect((await changePlan(send({ action: "activate", cycle: "MONTHLY", note: "UPI 4521" }), params(organization.id))).status).toBe(200);
+        expect((await changePlan(send({ action: "activate", cycle: "YEARLY", amount: 0 }), params(organization.id))).status).toBe(200);
+
+        const recorded = await prisma.payment.findMany({ where: { organizationId: organization.id }, orderBy: { id: "asc" } });
+        expect(recorded).toMatchObject([
+            { method: "MANUAL", cycle: "MONTHLY", amount: 149_900, note: "UPI 4521", recordedBy: admin.owner.email, razorpayPaymentId: null },
+            { method: "MANUAL", cycle: "YEARLY", amount: 0, note: null },
+        ]);
+        // the year starts after the month
+        expect(Math.round((recorded[1].paidUntil.getTime() - recorded[0].paidUntil.getTime()) / DAY)).toBe(365);
+
+        const detail = (await (await workspaceDetail(send({}), params(organization.id))).json()).data;
+        expect(detail).toMatchObject({ access: { state: "pro" }, paidTotal: 1499, counts: { users: 1 } });
+        expect(detail.payments).toHaveLength(2);
+
+        const list = await (await payments(new NextRequest(`http://localhost/api/site-admin/payments?method=MANUAL&search=${encodeURIComponent(organization.name)}`))).json();
+        expect(list).toMatchObject({ total: 2, sum: 1499 });
+        expect(list.data[0].organization.id).toBe(organization.id);
+        const online = await (await payments(new NextRequest(`http://localhost/api/site-admin/payments?method=RAZORPAY&search=${encodeURIComponent(organization.name)}`))).json();
+        expect(online.total).toBe(0);
+
+        const after = (await (await overview()).json()).data;
+        expect(after.revenue.allTime - before.revenue.allTime).toBe(1499);
+        expect(after.revenue.allTimePayments - before.revenue.allTimePayments).toBe(2);
+        expect(after.payingCustomers - before.payingCustomers).toBe(1);
+        expect(after.workspaces.pro - before.workspaces.pro).toBe(1);
+    });
+
+    it("keeps the business numbers to site admins", async () => {
+        const { owner } = await workspace();
+        (getCurrentUser as Mock).mockResolvedValue({ ...owner, actingAsId: null });
+        expect((await overview()).status).toBe(403);
+        expect((await payments(new NextRequest("http://localhost/api/site-admin/payments"))).status).toBe(403);
+    });
+
+    it("filters companies by plan and finds them by owner email, users by owners or site admins, payments by month", async () => {
+        const { organization, owner } = await workspace();
+        const admin = await workspace();
+        vi.stubEnv("SITE_ADMIN_EMAILS", admin.owner.email);
+        (getCurrentUser as Mock).mockResolvedValue({ ...admin.owner, actingAsId: null });
+        const get = async (handler: (req: NextRequest) => Promise<Response>, query: string) => (await handler(new NextRequest(`http://localhost/api?${query}`))).json();
+        const ids = (list: { data: { id: number }[] }) => list.data.map((row) => row.id);
+        const search = encodeURIComponent(owner.email);
+
+        // on trial: found by its owner's email under Trial, not Pro or Ended
+        expect(ids(await get(workspaceList, `search=${search}&plan=trial`))).toEqual([organization.id]);
+        expect(ids(await get(workspaceList, `search=${search}&plan=pro`))).toEqual([]);
+        await endTrial(organization.id);
+        expect(ids(await get(workspaceList, `search=${search}&plan=ended`))).toEqual([organization.id]);
+        await changePlan(send({ action: "activate", cycle: "MONTHLY" }), params(organization.id));
+        expect(ids(await get(workspaceList, `search=${search}&plan=pro`))).toEqual([organization.id]);
+        expect((await workspaceList(new NextRequest("http://localhost/api?plan=gold"))).status).toBe(400);
+
+        // the root admin (by email) shows under Site admins; an owner under Owners
+        const people = encodeURIComponent(String(organization.id));
+        expect(ids(await get(userList, `organizationId=${people}&type=owners`))).toEqual([owner.id]);
+        expect(ids(await get(userList, `organizationId=${people}&type=agents`))).toEqual([]);
+        expect(ids(await get(userList, `organizationId=${people}&type=admins`))).toEqual([]);
+        expect(ids(await get(userList, `search=${encodeURIComponent(admin.owner.email)}&type=admins`))).toEqual([admin.owner.id]);
+
+        // this month's payment, not last month's
+        const name = encodeURIComponent(organization.name);
+        expect((await get(payments, `search=${name}&period=thisMonth`)).total).toBe(1);
+        expect((await get(payments, `search=${name}&period=lastMonth`)).total).toBe(0);
     });
 });

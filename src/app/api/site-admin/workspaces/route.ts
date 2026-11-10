@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { handleRouteError, validationError } from "@/lib/api/http";
 import { requireSiteAdmin } from "@/lib/auth/siteAdmin";
 import { accessOf } from "@/lib/billing/plans";
@@ -9,30 +10,53 @@ import { accessOf } from "@/lib/billing/plans";
 const PAGE_SIZE = 50;
 
 const querySchema = z.object({
+    // the company, or its owner's name or email
     search: z.string().trim().max(100).optional(),
-    // only the ones whose owner asked for Pro, waiting to be switched on
-    requested: z.literal("1").optional(),
+    plan: z.enum(["trial", "pro", "ended"]).optional(),
+    sort: z.enum(["newest", "oldest", "people", "leads"]).default("newest"),
     page: z.coerce.number().int().min(1).max(10_000).default(1),
 });
 
-// Every workspace (company) signed up, newest first: its owner, and how many people, leads and deals
+const ORDER: Record<string, Prisma.OrganizationOrderByWithRelationInput[]> = {
+    newest: [{ createdAt: "desc" }, { id: "desc" }],
+    oldest: [{ createdAt: "asc" }, { id: "asc" }],
+    people: [{ users: { _count: "desc" } }, { id: "desc" }],
+    leads: [{ leads: { _count: "desc" } }, { id: "desc" }],
+};
+
+// Where each plan state stands right now, the same rule as accessOf (src/lib/billing/plans.ts)
+function planWhere(plan: "trial" | "pro" | "ended", now: Date): Prisma.OrganizationWhereInput {
+    if (plan === "pro") return { plan: "PRO", paidUntil: { gt: now } };
+    if (plan === "trial") return { plan: { not: "PRO" }, trialEndsAt: { gt: now } };
+    return { OR: [{ plan: "PRO", OR: [{ paidUntil: null }, { paidUntil: { lte: now } }] }, { plan: { not: "PRO" }, trialEndsAt: { lte: now } }] };
+}
+
+// Every workspace (company) signed up: its owner, plan, and how many people, leads and deals
 export async function GET(req: NextRequest) {
     try {
         await requireSiteAdmin();
 
         const params = req.nextUrl.searchParams;
-        const query = querySchema.safeParse({ search: params.get("search") || undefined, requested: params.get("requested") || undefined, page: params.get("page") ?? undefined });
+        const query = querySchema.safeParse({
+            search: params.get("search") || undefined,
+            plan: params.get("plan") || undefined,
+            sort: params.get("sort") || undefined,
+            page: params.get("page") ?? undefined,
+        });
         if (!query.success) return validationError(query.error);
-        const { search, requested, page } = query.data;
+        const { search, plan, sort, page } = query.data;
 
-        const where = {
-            ...(search && { name: { contains: search, mode: "insensitive" as const } }),
-            ...(requested && { planRequest: { not: null } }),
+        const contains = { contains: search, mode: "insensitive" as const };
+        const where: Prisma.OrganizationWhereInput = {
+            AND: [
+                search ? { OR: [{ name: contains }, { users: { some: { isOwner: true, OR: [{ name: contains }, { email: contains }] } } }] } : {},
+                plan ? planWhere(plan, new Date()) : {},
+            ],
         };
         const [workspaces, total] = await Promise.all([
             prisma.organization.findMany({
                 where,
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                orderBy: ORDER[sort],
                 skip: (page - 1) * PAGE_SIZE,
                 take: PAGE_SIZE,
                 select: {
@@ -56,9 +80,7 @@ export async function GET(req: NextRequest) {
             const { state, endsAt, daysLeft } = accessOf(workspace);
             return { ...workspace, owner: users[0] ?? null, counts: _count, access: { state, endsAt, daysLeft } };
         });
-        // how many owners are waiting for Pro, for the tab's badge
-        const waiting = await prisma.organization.count({ where: { planRequest: { not: null } } });
-        return NextResponse.json({ ok: true, data, total, pageSize: PAGE_SIZE, waiting });
+        return NextResponse.json({ ok: true, data, total, pageSize: PAGE_SIZE });
     } catch (error) {
         return handleRouteError(error, "Site admin workspaces");
     }

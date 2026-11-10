@@ -6,6 +6,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { createAgentSchema } from "@/lib/validations/agents";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { assertNotDemo } from "@/lib/demo/workspace";
+import { isRootAdmin } from "@/lib/auth/siteAdmin";
 
 // Never select passwordHash into a response
 const agentSelect = {
@@ -33,6 +34,11 @@ export async function POST(req: NextRequest) {
         }
 
         const { name, email, password, roleId } = body.data;
+
+        // a site admin's email (SITE_ADMIN_EMAILS) makes whoever has it a site admin: never given out here
+        if (isRootAdmin({ email })) {
+            return NextResponse.json({ ok: false, message: "This email can't be used for a team member" }, { status: 403 });
+        }
 
         const existingUser = await prisma.user.findUnique({
             where: { email },

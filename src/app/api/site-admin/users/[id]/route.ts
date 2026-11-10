@@ -6,6 +6,7 @@ import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { idParamSchema } from "@/lib/validations/common";
 import { isRootAdmin, isSiteAdmin, requireSiteAdmin } from "@/lib/auth/siteAdmin";
 import { startLogInAs } from "@/lib/auth/logInAs";
+import { isDemoWorkspace } from "@/lib/demo/workspace";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,7 @@ const refuse = (message: string, status = 403) => NextResponse.json({ ok: false,
 async function findPerson(params: Params["params"]) {
     const id = idParamSchema.safeParse((await params).id);
     if (!id.success) return { error: validationError(id.error) };
-    const person = await prisma.user.findUnique({ where: { id: id.data }, select: { id: true, name: true, email: true, organizationId: true, isSiteAdmin: true } });
+    const person = await prisma.user.findUnique({ where: { id: id.data }, select: { id: true, name: true, email: true, organizationId: true, isSiteAdmin: true, organization: { select: { slug: true } } } });
     return person ? { person } : { error: refuse("User not found", 404) };
 }
 
@@ -54,6 +55,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
         const found = await findPerson(params);
         if (!found.person) return found.error;
         if (isRootAdmin(found.person)) return refuse("A root admin is set by email in the server's settings", 400);
+        // everyone who tries the demo signs in as this one person
+        if (body.data.siteAdmin && isDemoWorkspace(found.person)) return refuse("The demo login is shared by every visitor, so it can't be a site admin", 400);
 
         await prisma.user.update({ where: { id: found.person.id }, data: { isSiteAdmin: body.data.siteAdmin } });
         return NextResponse.json({

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { handleRouteError, validationError } from "@/lib/api/http";
 import { idParamSchema } from "@/lib/validations/common";
-import { isRootAdmin, requireSiteAdmin } from "@/lib/auth/siteAdmin";
+import { isRootAdmin, requireSiteAdmin, rootEmails } from "@/lib/auth/siteAdmin";
 
 const PAGE_SIZE = 50;
 
@@ -13,6 +13,8 @@ const querySchema = z.object({
     search: z.string().trim().max(100).optional(),
     // one workspace's people (from the Workspaces tab)
     organizationId: idParamSchema.optional(),
+    // workspace owners, agents (everyone else in a workspace), or site admins (roots by email included)
+    type: z.enum(["owners", "agents", "admins"]).optional(),
     page: z.coerce.number().int().min(1).max(10_000).default(1),
 });
 
@@ -25,15 +27,19 @@ export async function GET(req: NextRequest) {
         const query = querySchema.safeParse({
             search: params.get("search") || undefined,
             organizationId: params.get("organizationId") || undefined,
+            type: params.get("type") || undefined,
             page: params.get("page") ?? undefined,
         });
         if (!query.success) return validationError(query.error);
-        const { search, organizationId, page } = query.data;
+        const { search, organizationId, type, page } = query.data;
 
         const contains = { contains: search, mode: "insensitive" as const };
         const where: Prisma.UserWhereInput = {
             ...(organizationId && { organizationId }),
-            ...(search && { OR: [{ name: contains }, { email: contains }, { organization: { name: contains } }] }),
+            ...(type === "owners" && { isOwner: true }),
+            ...(type === "agents" && { isOwner: false }),
+            ...(type === "admins" && { OR: [{ isSiteAdmin: true }, { email: { in: rootEmails() } }] }),
+            ...(search && { AND: [{ OR: [{ name: contains }, { email: contains }, { organization: { name: contains } }] }] }),
         };
         const [users, total] = await Promise.all([
             prisma.user.findMany({

@@ -190,7 +190,7 @@ src/app/
     LiveUpdates.tsx            the Socket.IO client
     NotificationBell.tsx  CommandMenu.tsx (⌘K)  ActivityAlert.tsx (start-time popup)
     BackgroundJobs.tsx (progress cards)  LoggedInAsBar.tsx  SidebarShell.tsx (mobile drawer)
-  api/                         103 route handlers, one folder per resource; api/public = no login
+  api/                         105 route handlers, one folder per resource; api/public = no login
   providers/QueryProvider.tsx  React Query defaults
   globals.css                  Tailwind 4 + design tokens
 src/components/                DataTable, Board (kanban), FilterPanel, ListPage, Dropdown, Select,
@@ -259,7 +259,7 @@ Key facts:
   pipeline, starter email templates. `/onboarding` then names workspace + person + currency
   (`User.needsOnboarding`, set only by sign up).
 - **Session**: JWT in httpOnly `access_token`; same cookie authenticates the socket. Sign-in rate limited.
-- **Forgot password**: one-time link (1 hour), only its sha256 stored, same answer whether the email exists.
+- **Forgot password**: one-time link (1 hour), only its sha256 stored, says "No account uses this email" when none does (sign up already reveals that), sends nothing.
 - **Permissions** (admins build roles from checkboxes):
   - `lead:create/read/update/delete` (same for `deal:`, `contact:`) → own records
   - `lead:all`, `deal:all`, `contact:all` → everyone's; also assign to others, see the team on the dashboard

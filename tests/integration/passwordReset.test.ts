@@ -12,7 +12,10 @@ import { sendSystemEmail } from "@/lib/emails/system";
 import { POST as forgot } from "@/app/api/auth/forgot-password/route";
 import { POST as reset } from "@/app/api/auth/reset-password/route";
 
-const post = (body: object) => new NextRequest("http://localhost:3000/api", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+// a fresh address each run, so the per-visitor limit never carries over from an earlier run
+const visitor = `10.0.${Math.floor(Math.random() * 250)}.${Date.now() % 250}`;
+const post = (body: object) =>
+    new NextRequest("http://localhost:3000/api", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": visitor }, body: JSON.stringify(body) });
 // the link in the email that was "sent"
 const sentLinkToken = () => {
     const [{ text }] = (sendSystemEmail as Mock).mock.calls.at(-1)!;
@@ -33,12 +36,18 @@ describe("forgot password", () => {
         return user;
     }
 
-    it("emails a link that sets a new password once, and answers the same for an unknown email", async () => {
+    it("emails a link that sets a new password once, and sends nothing to an email with no account", async () => {
         const user = await someone();
 
-        const unknown = await (await forgot(post({ email: "nobody-here@example.com" }))).json();
-        const known = await (await forgot(post({ email: user.email.toUpperCase() }))).json();
-        expect(unknown).toEqual(known);
+        // nothing sent, and it doesn't use up the 5 emails an hour
+        for (let i = 0; i < 6; i++) {
+            const unknown = await forgot(post({ email: "nobody-here@example.com" }));
+            expect(unknown.status).toBe(404);
+            expect((await unknown.json()).message).toMatch(/No account uses this email/);
+        }
+        expect(sendSystemEmail).not.toHaveBeenCalled();
+
+        expect((await forgot(post({ email: user.email.toUpperCase() }))).status).toBe(200);
         expect(sendSystemEmail).toHaveBeenCalledTimes(1);
 
         const token = sentLinkToken();
