@@ -70,7 +70,10 @@ async function remind(workspace: { id: number; name: string }, owner: { id: numb
 
     await notify([owner.id], { organizationId: workspace.id, actorId: null, type: "BILLING", title, body, link: "/settings/billing" });
 
-    const link = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/settings/billing`;
+    // the email needs the site's real address; never a localhost link to a customer
+    const site = process.env.APP_URL?.replace(/\/$/, "") ?? (process.env.NODE_ENV === "production" ? null : "http://localhost:3000");
+    if (!site) return console.error("Billing reminder: APP_URL isn't set, so only the in-app notification was sent");
+    const link = `${site}/settings/billing`;
     const firstName = owner.name.split(" ")[0];
     await sendSystemEmail({
         to: owner.email,

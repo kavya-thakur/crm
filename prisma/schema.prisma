@@ -13,24 +13,26 @@ datasource db {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  organizationId Int
-  roleId         Int
-  name           String
-  email          String   @unique
-  passwordHash   String
+  id                Int       @id @default(autoincrement())
+  organizationId    Int
+  roleId            Int
+  name              String
+  email             String    @unique
+  passwordHash      String
+  // sessions signed in before this end (a changed or reset password signs everyone else out)
+  passwordChangedAt DateTime?
   // the person who created the workspace; only they decide who may "Log in as" teammates
-  isOwner        Boolean  @default(false)
+  isOwner           Boolean   @default(false)
   // allowed by the owner to log in to teammates' accounts without their password (the owner always can)
-  canLogInAs     Boolean  @default(false)
+  canLogInAs        Boolean   @default(false)
   // runs the whole website with you: sees every workspace and user, and can log in as anyone
   // (Settings > Site admin). Also everyone whose email is in SITE_ADMIN_EMAILS (src/lib/auth/siteAdmin.ts)
-  isSiteAdmin    Boolean  @default(false)
+  isSiteAdmin       Boolean   @default(false)
   // signed up but hasn't finished the first-run setup yet (/onboarding: workspace name, their name,
   // currency). Only set by sign up, so teammates added in Members skip it
-  needsOnboarding Boolean @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  needsOnboarding   Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   organization       Organization        @relation(fields: [organizationId], references: [id])
   role               Role                @relation(fields: [roleId], references: [id])
@@ -80,27 +82,27 @@ model User {
 }
 
 model Organization {
-  id        Int      @id @default(autoincrement())
-  name      String
-  slug      String   @unique
+  id       Int    @id @default(autoincrement())
+  name     String
+  slug     String @unique
   // how amounts are shown ("INR", "USD"...), set in Settings > Workspace; amounts aren't converted
-  currency  String   @default("INR")
+  currency String @default("INR")
 
   // Billing (Settings > Billing, src/lib/billing). Every workspace starts on a 7-day free trial;
   // when it (or a paid period) runs out, the app locks until Pro is switched on. Nothing is deleted.
-  trialEndsAt     DateTime  @default(dbgenerated("(now() + '7 days'::interval)"))
+  trialEndsAt        DateTime  @default(dbgenerated("(now() + '7 days'::interval)"))
   // "TRIAL", or "PRO" once a site admin has switched it on after payment
-  plan            String    @default("TRIAL")
+  plan               String    @default("TRIAL")
   // Pro: paid monthly or yearly ("MONTHLY" | "YEARLY"), and paid up to when
-  billingCycle    String?
-  paidUntil       DateTime?
+  billingCycle       String?
+  paidUntil          DateTime?
   // the owner asked for Pro ("MONTHLY" | "YEARLY"); a site admin switches it on once they've paid
-  planRequest     String?
-  planRequestedAt DateTime?
+  planRequest        String?
+  planRequestedAt    DateTime?
   // the last "your trial/plan ends soon" reminder sent ("trial:2026-11-14:3"), so each goes once
   billingReminderKey String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   users                  User[]
   roles                  Role[]
@@ -741,9 +743,9 @@ model LeadForm {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  source       LeadSource?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  owner        User?        @relation("LeadFormOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source       LeadSource?        @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  owner        User?              @relation("LeadFormOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   deliveries   LeadFormDelivery[]
 
   @@index([organizationId])
@@ -1074,16 +1076,23 @@ model PasswordReset {
   @@index([userId])
 }
 
-// A Pro payment made online (Razorpay), once its signature checked out. Each payment counts once:
-// paying switched Pro on (or added a month or a year) up to paidUntil.
+// A Pro payment: made online (Razorpay), once checked with Razorpay; or taken another way (UPI,
+// bank transfer, cash) and recorded by a site admin as they switched Pro on by hand. Each counts once:
+// it switched Pro on (or added a month or a year) up to paidUntil. Site admin > Payments lists them.
 model Payment {
   id                Int      @id @default(autoincrement())
   organizationId    Int
   // who paid (their email, kept even if they leave)
   paidBy            String
-  razorpayOrderId   String
-  razorpayPaymentId String   @unique
-  // "MONTHLY" | "YEARLY", and how much, in paise
+  // "RAZORPAY" (online) or "MANUAL" (recorded by a site admin)
+  method            String   @default("RAZORPAY")
+  // online only
+  razorpayOrderId   String?
+  razorpayPaymentId String?  @unique
+  // manual only: the reference noted ("UPI 4521…"), and the site admin who recorded it (their email)
+  note              String?
+  recordedBy        String?
+  // "MONTHLY" | "YEARLY", and how much, in paise (0: switched on without payment)
   cycle             String
   amount            Int
   paidUntil         DateTime
@@ -1092,4 +1101,5 @@ model Payment {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+  @@index([createdAt])
 }

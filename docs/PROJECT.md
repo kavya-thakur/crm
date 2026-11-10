@@ -76,6 +76,31 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       `User.isSiteAdmin` in the database, which a root switches on with "Make site admin" (or set it
       in the database directly). Only a root can open another site admin's account or make more.
       Closed while logged in as someone. `src/lib/auth/siteAdmin.ts`
+- [x] **Site admin: the business side** (2026-11-10). Four tabs. **Overview** (the default):
+      revenue this month and in all, companies (new this month), on Pro / trial / ended, how many
+      have paid at least once, owners waiting for Pro, and the trials and Pro plans ending in the
+      next 7 days (to follow up). The demo workspace isn't counted. **Payments**: every payment,
+      online or manual, searchable (company, email, Razorpay id, reference), 50 a page, with the
+      total of what matches. **A company's panel** (click any company): owner, plan, usage, team
+      email, people and payments, with **Record a payment** (plan, amount received, a reference;
+      it switches Pro on and is saved as a `Payment` with `method: "MANUAL"` and who recorded it;
+      0 for a free month), Trial +7 days, Log in as owner, and its people. **Filters**: Workspaces by
+      company, owner name or email, plan (Trial / Pro / Ended, the same rule as `accessOf`) and sort
+      (newest, oldest, most people, most leads); Users by Everyone / Owners / Site admins (roots by
+      email included); Payments by Online / Manual and All time / This month / Last month. The
+      overview's numbers open the list behind them. Tabs keep their search and filters when you
+      switch; a filter change goes back to page 1. ("Waiting for Pro" was removed: with Razorpay
+      owners pay themselves, so it was always empty.)
+- [x] **Account safety fixes** (2026-11-10, from an audit of every action against every state it
+      can be called in). "Trial +7 days" is refused on a workspace on Pro (it used to replace the
+      paid plan with a trial). The **owner's account** is only the owner's: nobody else can change
+      its email, name or role, and it can't be deleted. A **site admin's email** is only changed by
+      them, and no member can be created or renamed to an email in `SITE_ADMIN_EMAILS`. A changed
+      email cancels pending reset links. **Log in as** ends at once when the right to it goes
+      (`getCurrentUser` checks the real person on every request). A **changed or reset password**
+      signs out every other session (`User.passwordChangedAt` against the token's `iat`; changing
+      it gives this browser a fresh token, and is refused while logged in as someone). The demo's
+      shared login can't be made a site admin. Tests: `tests/integration/accountSafety.test.ts`.
 - [x] **Billing: 7-day trial, then Pro** (2026-11-07, Settings → Billing). Every workspace starts
       on a **7-day free trial** (`Organization.trialEndsAt`, a database default; existing workspaces
       got 7 days from the migration). **Pro** has everything, **₹1,499/month or ₹14,990/year**
@@ -85,8 +110,8 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       with 402 before any route runs (`src/lib/billing/gate.ts`), except sign-in, Billing, site
       admin, health and web forms/integrations (leads keep arriving). Never locked: the demo, and
       site admins (also when logged in as a customer). **No payment provider yet:** the owner
-      chooses monthly or yearly, which is a request; a site admin sees it (Workspaces → "Waiting for
-      Pro") and, once paid, **Activates Pro** (a renewal adds on to a period still running) or
+      chooses monthly or yearly, which is a request (only without Razorpay keys; the company shows
+      "Wants Pro" in Site admin) and, once paid, **Activates Pro** (a renewal adds on to a period still running) or
       **extends the trial** 7 days. The customer's open app unlocks at once (a "billing" live
       update).
 - [x] **Online payment with Razorpay** (2026-11-08, Standard Checkout): with `RAZORPAY_KEY_ID` and
@@ -202,7 +227,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Forgot password** (2026-11-07): "Forgot password?" on sign-in emails a one-time link (an
       hour; asking again replaces it) from Flash's own mailbox (`SMTP_*`, `src/lib/emails/system.ts`;
       without it, the link is printed in the dev terminal). Only the link's sha256 is stored
-      (`PasswordReset`). Same answer whether or not the email has an account; rate limited; the demo
+      (`PasswordReset`). An email with no account gets "No account uses this email" and nothing is sent (2026-11-10; sign up already reveals it, so a vague answer only confused people); rate limited; the demo
       login is left alone; the link uses `APP_URL` in production, never the request's Host. The page
       says straight away when a link has expired. Sessions already signed in aren't ended (JWTs
       can't be taken back without a session table)

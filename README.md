@@ -165,7 +165,7 @@ integration tests against a real PostgreSQL database, not mocks.
 - **Multi-tenant:** every record belongs to a workspace, every query is scoped to it
 - **Roles and permissions** an admin builds: own records or everyone's, and access to each setting
 - **Plans and billing:** a 7-day free trial, then Pro monthly or yearly paid online with **Razorpay**; when it ends the app locks (data kept) until Pro is on
-- A **site admin** area for whoever runs Flash: every company and user on the site, and log in as anyone
+- A **site admin** area for whoever runs Flash: revenue and trials ending at a glance, every company, user and payment, record a payment taken by UPI or bank transfer, and log in as anyone
 - **Log in as a teammate** for the workspace owner (and people they allow), to see exactly what they see; an hour at a time, with a banner and a notification to the teammate
 - **Bulk actions** on up to 50,000 records as background jobs with a progress bar
 - **Demo mode:** one-click logins and a nightly reset
@@ -565,7 +565,7 @@ erDiagram
 
 ## API
 
-103 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
+105 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |
@@ -578,7 +578,7 @@ of them check sign-in, permission, input (Zod) and workspace scope.
 | **Workspace** | `workspace` (its currency), `workspace/email-account` (the team mailbox), `onboarding`, `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
 | **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `auth/forgot-password`, `auth/reset-password`, `auth/back` (end "log in as"), `me`, `me/password`, `notifications` |
 | **Billing** | `billing` (plan and status), `billing/order` (start a Razorpay payment), `billing/verify` (confirm it) |
-| **Site admin** | `site-admin/workspaces`, `site-admin/users` (every company and user on the site) |
+| **Site admin** | `site-admin/overview` (counts, revenue, trials ending), `site-admin/workspaces` (+ `:id`: one company, record a payment, extend a trial), `site-admin/users`, `site-admin/payments` |
 | **Insight** | `dashboard`, `my-day`, `search` |
 | **Public (no login)** | `public/forms/:key` (web forms), `public/leads/:key` (integration webhooks), `public/emails/:token/open` (open tracking), `public/razorpay` (payment webhook), `health` |
 

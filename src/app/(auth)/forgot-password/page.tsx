@@ -44,8 +44,8 @@ export default function ForgotPasswordPage() {
                 </span>
                 <h1 className="mt-5 text-[32px] leading-tight font-light tracking-[-0.03em] text-[#1c1c1c]">Check your inbox</h1>
                 <p className="mt-3 text-[15px] text-[#1c1c1c]/55">
-                    If an account uses <span className="font-medium text-[#1c1c1c]">{email.trim()}</span>, a link to choose a new password is on its way. It
-                    works for an hour. Not there? Look in your spam folder.
+                    A link to choose a new password is on its way to <span className="font-medium text-[#1c1c1c]">{email.trim()}</span>. It works for an
+                    hour. Not there? Look in your spam folder.
                 </p>
 
                 <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2">

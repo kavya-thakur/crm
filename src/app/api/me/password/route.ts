@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { createToken, SESSION_SECONDS, sessionCookie } from "@/lib/auth/jwt";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { changePasswordSchema } from "@/lib/validations/auth";
 import { handleRouteError, parseBody } from "@/lib/api/http";
@@ -15,6 +16,10 @@ export async function PATCH(req: NextRequest) {
         }
         // the demo workspace stays the same for every visitor
         assertNotDemo(user);
+        // it signs this account out everywhere else, which would include the real person
+        if (user.actingAsId) {
+            return NextResponse.json({ ok: false, message: "Go back to your own account to change a password" }, { status: 403 });
+        }
 
         const body = await parseBody(req, changePasswordSchema);
 
@@ -38,12 +43,15 @@ export async function PATCH(req: NextRequest) {
             );
         }
 
+        // every other session signed in before now ends (getCurrentUser); this one gets a fresh token
         await prisma.user.update({
             where: { id: user.id },
-            data: { passwordHash: await hashPassword(newPassword) },
+            data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date() },
         });
 
-        return NextResponse.json({ ok: true, message: "Password changed" });
+        const response = NextResponse.json({ ok: true, message: "Password changed. You've been signed out everywhere else." });
+        response.cookies.set("access_token", createToken({ userId: user.id, organizationId: user.organizationId }), sessionCookie(SESSION_SECONDS));
+        return response;
     } catch (error) {
         return handleRouteError(error, "Change password");
     }

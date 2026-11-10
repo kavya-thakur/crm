@@ -6,6 +6,7 @@ import { idParamSchema } from "@/lib/validations/common";
 import { updateAgentSchema } from "@/lib/validations/agents";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { assertNotDemo } from "@/lib/demo/workspace";
+import { isRootAdmin, isSiteAdmin } from "@/lib/auth/siteAdmin";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -79,15 +80,33 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
         const agent = await prisma.user.findFirst({
             where: { id: id.data, organizationId: user.organizationId },
-            select: { id: true, roleId: true },
+            select: { id: true, roleId: true, email: true, isOwner: true, isSiteAdmin: true },
         });
 
         if (!agent) {
             return agentNotFound();
         }
 
+        // The owner's account is the owner's alone: an admin changing its email (then "Forgot
+        // password") or its role would take the workspace, and its billing, from them
+        if (agent.isOwner && agent.id !== user.id) {
+            return NextResponse.json({ ok: false, message: "Only the owner can change the owner's account" }, { status: 403 });
+        }
+
         // 403 if the agent's role is stronger than yours (a manager can't edit an admin)
         await findManageableRole(user, agent.roleId);
+
+        const emailChanged = email !== undefined && email !== agent.email;
+        if (emailChanged) {
+            // a site admin's email is their key to every workspace: only they change it
+            if (isSiteAdmin(agent) && agent.id !== user.id) {
+                return NextResponse.json({ ok: false, message: "Only they can change their own email" }, { status: 403 });
+            }
+            // and an email in SITE_ADMIN_EMAILS would make this person a site admin
+            if (isRootAdmin({ email })) {
+                return NextResponse.json({ ok: false, message: "This email can't be used for a team member" }, { status: 403 });
+            }
+        }
 
         if (roleId !== undefined && roleId !== agent.roleId) {
             // Demoting yourself could leave the org with nobody able to manage agents
@@ -126,6 +145,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             data: { name, email, roleId },
             select: agentSelect,
         });
+        // a reset link sent to the old address stops working
+        if (emailChanged) await prisma.passwordReset.deleteMany({ where: { userId: agent.id } });
 
         return NextResponse.json({
             ok: true,
@@ -158,11 +179,16 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
         const agent = await prisma.user.findFirst({
             where: { id: id.data, organizationId: user.organizationId },
-            select: { id: true, roleId: true, _count: { select: { leadTimeline: true } } },
+            select: { id: true, roleId: true, isOwner: true, _count: { select: { leadTimeline: true } } },
         });
 
         if (!agent) {
             return agentNotFound();
+        }
+
+        // without its owner nobody can pay for the workspace or run it: never deleted from here
+        if (agent.isOwner) {
+            return NextResponse.json({ ok: false, message: "The workspace owner can't be removed" }, { status: 403 });
         }
 
         // 403 if the agent's role is stronger than yours (a manager can't delete an admin)

@@ -206,8 +206,9 @@ export default function MembersView({ me, can }: { me: Me; can: Can }) {
                             {shown.map((member) => {
                                 const isMe = member.id === me.id;
                                 const manageable = isManageable(member.role.id);
-                                const canEdit = can.update && manageable;
-                                const canDelete = can.delete && manageable && !isMe;
+                                // the owner's account is only the owner's to change, and never deleted (the API checks too)
+                                const canEdit = can.update && manageable && (!member.isOwner || isMe);
+                                const canDelete = can.delete && manageable && !isMe && !member.isOwner;
                                 // the owner can open anyone's account; someone they allowed, only weaker accounts (the API checks too)
                                 const mayLogInAs = me.canLogInAs && !isMe && (me.isOwner || (!member.isOwner && manageable));
                                 const mayAllow = me.isOwner && !isMe && !member.isOwner;
