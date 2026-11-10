@@ -18,7 +18,12 @@ export default function QueryProvider({
             new QueryClient({
                 defaultOptions: {
                     queries: {
-                        staleTime: 60 * 1000,
+                        // What's loaded stays good for 5 minutes: coming back to a page shows it without
+                        // asking again. It doesn't go stale meanwhile, because every change (anyone's, or a
+                        // web form's, an import's, an automation's) is announced over the live connection
+                        // and refetched straight away (LiveUpdates), and everything is refetched when that
+                        // connection comes back after a drop.
+                        staleTime: 5 * 60 * 1000,
                         retry: 1,
                         refetchOnWindowFocus: false,
                     },

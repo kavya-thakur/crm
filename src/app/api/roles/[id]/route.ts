@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
-import {
-    assertHoldsPermissions,
-    findManageableRole,
-    requirePermission,
-} from "@/lib/auth/requirePermission";
+import { assertHoldsPermissions, findManageableRole, requirePermission, withViewPermissions } from "@/lib/auth/requirePermission";
 import { escapeLike, idParamSchema } from "@/lib/validations/common";
 import { updateRoleSchema } from "@/lib/validations/roles";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
@@ -75,7 +71,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             return body.response;
         }
 
-        const { name, permissionIds } = body.data;
+        const { name } = body.data;
+        // Create, Edit or Delete without View is no use: View comes with them
+        const permissionIds = body.data.permissionIds && (await withViewPermissions(body.data.permissionIds));
 
         const role = await findManageableRole(user, id.data);
 

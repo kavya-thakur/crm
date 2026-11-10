@@ -70,8 +70,6 @@ model User {
   bulkJobs           BulkJob[]
   // emails this person sent from the CRM
   sentEmails         Email[]
-  // their own mailbox, connected in Profile, that their emails go out through
-  emailAccount       EmailAccount?
   // leads, deals and contacts this person deleted (the recycle bin)
   deletedRecords     DeletedRecord[]
   // "Forgot password?" links sent to them, still usable
@@ -126,6 +124,8 @@ model Organization {
   automationRules        AutomationRule[]
   products               Product[]
   payments               Payment[]
+  // the shared mailbox the team sends from (Settings > Workspace)
+  emailAccount           EmailAccount?
 }
 
 model Role {
@@ -912,10 +912,12 @@ model Email {
 // through it (SMTP), so they're sent from their own address and replies come back to them.
 // The password is an app password (Gmail: Google account > App passwords), stored encrypted
 // (src/lib/emails/account.ts) and never sent back to the browser.
+// The workspace's mailbox that emails to leads go out from (Settings > Workspace > Team email), like
+// sales@company.com. Only admins connect it; everyone sends from it, with their own name on each email.
 model EmailAccount {
   id                Int      @id @default(autoincrement())
-  userId            Int      @unique
-  // "priya@gmail.com": the address emails are sent from, and the SMTP login
+  organizationId    Int      @unique
+  // "sales@company.com": the address emails are sent from, and the SMTP login
   email             String
   host              String
   port              Int
@@ -923,7 +925,7 @@ model EmailAccount {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // The recycle bin. Deleting a lead, deal or contact still deletes it for real (so every list,

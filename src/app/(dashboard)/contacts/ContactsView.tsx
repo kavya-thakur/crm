@@ -161,8 +161,18 @@ export default function ContactsView({ can, meId }: { can: Permissions; meId: nu
 
     const isDefaultSort = filters.sortBy === "createdAt" && filters.sortOrder === "desc";
 
-    // Contacts has no built-in field of its own beyond what every entity shares.
     const FILTER_FIELDS = [
+        // the company they're at, searched like the company picker, or no company at all
+        {
+            key: "company",
+            label: "Company",
+            isActive: (f: ContactFilters) => !!f.company,
+            clear: () => ({ company: undefined }),
+            renderControl: (f: ContactFilters, onChange: (change: Partial<ContactFilters>) => void) => (
+                <CompanyOptions value={f.company && f.company !== "none" ? f.company : null} onPick={(name) => onChange({ company: name ?? "none" })} canAdd={false} noneLabel="Without a company" />
+            ),
+            renderChip: (f: ContactFilters) => (f.company === "none" ? "Without a company" : `Company: ${f.company}`),
+        },
         createAssignedToField<ContactFilters>({
             get: (f) => f.assignedTo,
             set: (value) => ({ assignedTo: value }),

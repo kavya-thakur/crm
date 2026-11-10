@@ -117,6 +117,8 @@ export function withLeadEdits(
                         close();
                     }}
                     buttonClassName="flex h-7 w-full items-center gap-1 rounded-lg border border-line-strong bg-surface px-1 text-left"
+                    startOpen
+                    onClose={close}
                 />
             ),
         },
@@ -193,7 +195,7 @@ export default function LeadsTable({
                                 />
                             )}
                         </th>
-                        <th className="left-8 z-20! w-60">
+                        <th className="md:left-8 z-20! w-60">
                             <span className="flex items-center gap-1">
                                 <IconUser size={16} />
                                 Name
@@ -234,7 +236,7 @@ export default function LeadsTable({
                                         />
                                     )}
                                 </td>
-                                <td className="sticky left-8 z-1 px-1!">
+                                <td className="md:sticky md:left-8 z-1 px-1!">
                                     <button
                                         onClick={() => onOpen(lead.id)}
                                         className="flex max-w-full items-center gap-1.5 rounded px-1 py-0.5 hover:bg-fill"

@@ -11,6 +11,7 @@ import { SidePanel } from "@/components/SidePanel";
 import { ErrorState } from "@/components/ErrorState";
 import { PageLoader, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
+import { viewNeededFor } from "@/lib/validations/roles";
 
 interface Permission {
     id: number;
@@ -243,10 +244,20 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
         },
     });
 
+    // Create, Edit and Delete (and "Every lead") need View: ticking one ticks View too, and
+    // unticking View unticks the rest of its row. Without View the page doesn't even open.
     function toggle(id: number) {
+        const permission = allPermissions.find((item) => item.id === id);
+        if (!permission) return;
         const next = new Set(selected);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
+        if (next.has(id)) {
+            next.delete(id);
+            for (const other of allPermissions) if (viewNeededFor(other.name) === permission.name) next.delete(other.id);
+        } else {
+            next.add(id);
+            const view = allPermissions.find((item) => item.name === viewNeededFor(permission.name));
+            if (view) next.add(view.id);
+        }
         setSelected(next);
     }
 
@@ -271,18 +282,20 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
     }
 
     return (
+        // the title stays on top and Delete / Cancel / Save at the bottom; only the permissions scroll
         <form
             onSubmit={(e) => {
                 e.preventDefault();
                 if (role && !nameChanged && !permissionsChanged) return onDone();
                 save.mutate();
             }}
+            className="flex h-full flex-col"
         >
-            <h2 className="border-b border-line-light px-5 py-4 text-lg font-semibold">
+            <h2 className="shrink-0 border-b border-line-light px-5 py-4 text-lg font-semibold">
                 {role ? role.name : "New role"}
             </h2>
 
-            <div className="space-y-5 px-5 py-4">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
                 {isStronger && (
                     <p className="rounded-lg bg-app px-3 py-2 text-muted">
                         This role has permissions you don&apos;t have, so you can&apos;t change it.
@@ -337,7 +350,10 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
                             ))}
                         </tbody>
                     </table>
-
+                    <p className="mt-2 text-sm text-faint">
+                        Create, Edit and Delete come with View: someone can&apos;t add leads to a page they can&apos;t open. Taking View away takes the rest of
+                        the row with it.
+                    </p>
                 </div>
 
                 {[
@@ -367,7 +383,7 @@ function RoleForm({ role, allPermissions, me, can, onDone }: RoleFormProps) {
                 )}
             </div>
 
-            <div className="flex items-center gap-2 border-t border-line-light px-5 py-3">
+            <div className="flex shrink-0 items-center gap-2 border-t border-line-light bg-surface px-5 py-3">
                 {role && can.delete && !isStronger && (
                     <button
                         type="button"

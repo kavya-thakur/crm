@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { createToken } from "@/lib/auth/jwt";
 import { accessOf, paidUntilAfter } from "@/lib/billing/plans";
-import { apiLocked, lockedFor } from "@/lib/billing/gate";
+import { activatePro, apiLocked, lockedFor } from "@/lib/billing/gate";
 import { createOrgWithUser, cleanupOrg } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
@@ -108,6 +108,15 @@ describe("billing lock", () => {
         expect(paid).toMatchObject({ plan: "PRO", billingCycle: "YEARLY", planRequest: null });
         expect(Math.round((paid.paidUntil!.getTime() - Date.now()) / DAY)).toBe(365);
         expect(await apiLocked(apiCall("/api/leads", owner))).toBe(false);
+    });
+
+    it("starts a plan bought during the trial when the trial ends, so no trial day is lost", async () => {
+        const { organization } = await workspace();
+        const trialEndsAt = new Date(Date.now() + 5 * DAY);
+        await prisma.organization.update({ where: { id: organization.id }, data: { trialEndsAt } });
+
+        const paidUntil = await activatePro(organization.id, "MONTHLY");
+        expect(paidUntil.getTime()).toBe(trialEndsAt.getTime() + 30 * DAY);
     });
 
     it("lets a site admin give a trial 7 more days", async () => {

@@ -11,7 +11,7 @@ import { POST as createLead } from "@/app/api/leads/route";
 import { PUT as updateLead } from "@/app/api/leads/[id]/route";
 import { PATCH as bulkLeads } from "@/app/api/leads/bulkUpdate/route";
 import { PUT as updateContact } from "@/app/api/contacts/[id]/route";
-import { POST as createContact } from "@/app/api/contacts/route";
+import { GET as listContacts, POST as createContact } from "@/app/api/contacts/route";
 import { PATCH as bulkContacts } from "@/app/api/contacts/bulkUpdate/route";
 import { GET as listCompanies, POST as createCompany } from "@/app/api/companies/route";
 import { DELETE as deleteCompany, GET as getCompany } from "@/app/api/companies/[id]/route";
@@ -136,6 +136,22 @@ describe("companies", () => {
         expect((await bulkContacts(send("PATCH", { action: "update", contactIds: [meera.id, other.id], changes: { companyName: "Globex" } }))).status).toBe(200);
         const moved = await prisma.contact.findMany({ where: { id: { in: [meera.id, other.id] } }, include: { company: true } });
         expect(moved.map((contact) => contact.company?.name)).toEqual(["Globex", "Globex"]);
+    });
+
+    it("filters contacts by company, ignoring case, or by having none", async () => {
+        const { org } = await setUp();
+        const acme = await prisma.company.create({ data: { ...org, name: "Acme" } });
+        await prisma.contact.createMany({
+            data: [
+                { ...org, name: "At Acme", phone: "+91 98000 60001", companyId: acme.id },
+                { ...org, name: "Nowhere", phone: "+91 98000 60002" },
+            ],
+        });
+        const names = async (company: string) =>
+            (await (await listContacts(new NextRequest(`http://localhost/api/contacts?company=${encodeURIComponent(company)}`))).json()).data.map((contact: { name: string }) => contact.name);
+
+        expect(await names("acme")).toEqual(["At Acme"]);
+        expect(await names("none")).toEqual(["Nowhere"]);
     });
 
     it("needs contact access to see companies, and shows no deal money without deal access", async () => {

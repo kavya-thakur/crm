@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LegalPage } from "../components/LegalPage";
 import { pageMetadata } from "../metadata";
+import { TRIAL_DAYS } from "@/lib/billing/plans";
 
 export const metadata = pageMetadata("/terms", "Terms of service", "The rules for using Flash, in plain words.");
 
@@ -37,11 +38,16 @@ export default function TermsPage() {
 
             <h2>Plans and payment</h2>
             <ul>
-                <li>The Free plan is free for up to 3 users, with no time limit.</li>
+                <li>Every new workspace gets a free trial with every feature, for {TRIAL_DAYS} days. No card is needed.</li>
                 <li>
-                    The Team plan is charged per user. You can pay monthly, or yearly for 20% less. Prices are on our <Link href="/pricing">pricing page</Link>.
+                    After the trial, the Pro plan is one price for the whole workspace, whatever the number of people in it. You can pay monthly, or
+                    yearly for two months free. Prices are on our <Link href="/pricing">pricing page</Link>.
                 </li>
-                <li>You can cancel any time. Your plan stays active until the end of the period you&apos;ve paid for.</li>
+                <li>
+                    When a trial or a paid period ends without a new payment, the workspace is locked until a plan is chosen. Nothing is deleted: your
+                    data stays exactly as you left it.
+                </li>
+                <li>Your plan stays active until the end of the period you&apos;ve paid for. It doesn&apos;t renew by itself.</li>
                 <li>If we ever change prices, we&apos;ll tell you before your next bill.</li>
             </ul>
 

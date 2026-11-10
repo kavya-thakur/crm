@@ -89,7 +89,7 @@ export default function LandingPage({ loggedIn }: { loggedIn: boolean }) {
             <UseCasesSection />
             <CaptureSection />
             <PromiseSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
-            <PricingSection />
+            <PricingSection loggedIn={loggedIn} />
             <SecuritySection />
             <FaqSection primaryHref={primaryHref} primaryLabel={primaryLabel} />
             <Footer />

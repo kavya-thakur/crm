@@ -215,7 +215,7 @@ helpers), and mirrored in the UI by the `can` flags.
   source, owner, created/modified by and date, possible duplicates, custom fields marked
   "show in filter"). They become query params (`toQueryParams`) that the list route turns
   into a Prisma `where`. Filters can be saved (`SavedFilter`).
-- **Inline edit:** a column with an `edit` config gets a pencil; saving `PUT`s one field.
+- **Inline edit:** a column with an `edit` config gets a pencil; saving `PUT`s one field. Text editors save on blur; menu editors (select, company) open at once and the editor closes with the menu (a pick, a click outside, Esc).
 - **Bulk actions:** select rows → stage, assign, edit a field for all, merge (2 selected), delete.
   On leads, "Select all N matching" selects every lead the filters match; deleting more than 200
   runs as a background job with a progress card ([QUEUES.md](QUEUES.md)).

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
-import { assertHoldsPermissions, requirePermission } from "@/lib/auth/requirePermission";
+import { assertHoldsPermissions, requirePermission, withViewPermissions } from "@/lib/auth/requirePermission";
 import { createRoleSchema } from "@/lib/validations/roles";
 import { escapeLike } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
@@ -48,7 +48,9 @@ export async function POST(req: NextRequest) {
             return body.response;
         }
 
-        const { name, permissionIds } = body.data;
+        // Create, Edit or Delete without View is no use: View comes with them
+        const permissionIds = await withViewPermissions(body.data.permissionIds);
+        const { name } = body.data;
 
         // Also proves every id exists: the caller's own permissions are real rows
         assertHoldsPermissions(user, permissionIds);

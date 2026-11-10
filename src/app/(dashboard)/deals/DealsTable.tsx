@@ -192,7 +192,7 @@ export default function DealsTable({
                                 />
                             )}
                         </th>
-                        <th className="left-8 z-20! w-60">
+                        <th className="md:left-8 z-20! w-60">
                             <span className="flex items-center gap-1">
                                 <IconTargetArrow size={16} />
                                 Deal
@@ -231,7 +231,7 @@ export default function DealsTable({
                                         />
                                     )}
                                 </td>
-                                <td className="sticky left-8 z-1 px-1!">
+                                <td className="md:sticky md:left-8 z-1 px-1!">
                                     <button
                                         type="button"
                                         onClick={() => onOpen(deal.id)}

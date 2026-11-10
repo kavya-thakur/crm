@@ -4,27 +4,31 @@ Send an email to a lead, a contact or a deal's customer from its **Emails** tab,
 and see whether it went out and whether it was opened. Or open a WhatsApp chat with the message
 already typed. Everything here is free.
 
-## Each person sends from their own mailbox
+## One team email, connected by an admin
 
-In **Settings → Profile → Sending email**, each person connects their own mailbox: their address and
-an **app password** (Gmail: turn on 2-Step Verification, then make one at
-myaccount.google.com/apppasswords). Gmail is the default; Outlook, Zoho, Hostinger or any other
-provider works by changing the server (port 465 or 587).
+In **Settings → Workspace → Team email**, an admin (`workspace:manage`) connects one mailbox for the
+whole workspace, like `sales@yourcompany.com`: its address and an **app password** (Gmail: turn on
+2-Step Verification, then make one at myaccount.google.com/apppasswords). Gmail is the default;
+Outlook, Zoho, Hostinger or any other provider works by changing the server (port 465 or 587).
 
-- **Their own address.** Emails go out from Priya's own Gmail, so replies land in her inbox, the
-  sent email is in her Sent folder, and nobody ever sends from anyone else's account.
+- **Everyone sends from it**, with nothing to set up, and with their own name on each email:
+  `"Priya Sharma (Acme)" <sales@acme.com>`. Replies come back to that shared inbox. Automations too.
+- **Agents can't connect a mailbox**: there's no personal one (decided 2026-11-09; the earlier
+  per-person mailboxes were removed, and a workspace owner's own became the team's). One mailbox per
+  workspace: `EmailAccount.organizationId` is unique. Route: `/api/workspace/email-account`
+  (anyone may see the address; connecting or disconnecting needs `workspace:manage`).
 - **Checked before it's saved.** Connecting logs in to the mailbox first (`verify()`), so a wrong
   password shows up right there, not as a failed email later. Limited to 10 tries an hour.
 - **Kept encrypted.** The app password has to be read back to send, so it's encrypted with
   AES-256-GCM (`src/lib/emails/account.ts`), not hashed. The key comes from `JWT_SECRET`, so there's
-  nothing extra to configure (changing `JWT_SECRET` means everyone connects again). It's never sent
-  back to the browser, not even encrypted.
+  nothing extra to configure (changing `JWT_SECRET` means the team's email is connected again). It's never
+  sent back to the browser, not even encrypted.
 - **Only mail servers.** The server must be a host name (no IP, no localhost) on port 465 or 587.
-- **Not connected yet?** The Emails tab says "connect your own email first" with a link to Profile,
-  and `POST /api/emails` refuses. An automation's email step is skipped with
-  "No email sent: Rohan hasn't connected an email account" in its run log.
+- **Nothing connected?** The Emails tab says an admin connects the team's email in Settings →
+  Workspace, and `POST /api/emails` refuses. An automation's email step is
+  skipped with "No email sent: no email is connected" in its run log.
 - **Revoked later?** If the provider refuses the password, the email fails at once (no pointless
-  retries) with "Reconnect it in Settings → Profile", and the sender is notified.
+  retries) with "An admin reconnects it in Settings → Workspace", and the sender is notified.
 
 Why not "Sign in with Google"? Sending through Gmail's API needs Google's app verification, and
 until then only 100 named test users can sign in. An app password needs no approval.

@@ -92,7 +92,9 @@ export default function Onboarding() {
             // Welcome: bolt rises to the middle, lights swell, title rises word by word,
             // then the lights go down and the app's background fades in
             const split = SplitText.create(".ob-wtitle", { type: "words", mask: "words" });
-            gsap.timeline({ onComplete: () => router.replace("/dashboard") })
+            // came from "Buy Pro": on to Billing to pay; otherwise into the app, on the trial
+            const next = new URLSearchParams(window.location.search).get("plan") === "pro" ? "/settings/billing" : "/dashboard";
+            gsap.timeline({ onComplete: () => router.replace(next) })
                 .to(ctl.current, { center: 1, duration: 2.4, ease: "power3.inOut" }, 0)
                 .to(ctl.current, { light: 1.5, duration: 2.4, ease: "power2.inOut" }, 0)
                 .from(".ob-wtag", { opacity: 0, y: 8, duration: 1, ease: "power3.out" }, 0.9)

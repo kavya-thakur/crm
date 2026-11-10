@@ -178,16 +178,18 @@ export function DataCell<TRecord>({
 export function renderEditor<TRecord>(edit: EditConfig<TRecord>, record: TRecord, close: () => void) {
     if (edit.type === "custom") return edit.render(record, close);
 
+    // the menu opens straight away, and however it closes (a pick, a click outside, Esc) the editor closes with it
     if (edit.type === "select") {
         return (
             <Select
                 value={edit.getValue(record)}
                 onChange={(value) => {
                     if (value !== edit.getValue(record)) edit.onSave(record, value);
-                    close();
                 }}
                 options={edit.options}
                 placeholder="—"
+                startOpen
+                onClose={close}
             />
         );
     }

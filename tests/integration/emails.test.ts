@@ -31,7 +31,7 @@ vi.mock("nodemailer", () => ({
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { GET as listEmails, POST as sendEmailRoute } from "@/app/api/emails/route";
-import { DELETE as disconnect, GET as getAccount, PUT as connect } from "@/app/api/me/email-account/route";
+import { DELETE as disconnect, GET as getAccount, PUT as connect } from "@/app/api/workspace/email-account/route";
 import { POST as logWhatsapp } from "@/app/api/whatsapp/route";
 import { encryptSecret } from "@/lib/emails/account";
 import { GET as listTemplates, POST as createTemplate } from "@/app/api/email-templates/route";
@@ -46,9 +46,9 @@ function post(body: object) {
 
 const put = (body: object) => new NextRequest("http://localhost", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
-// a connected mailbox, as if they'd filled in Settings > Profile
-const connectMailbox = (userId: number, email = "priya.sales@gmail.com") =>
-    prisma.emailAccount.create({ data: { userId, email, host: "smtp.gmail.com", port: 465, passwordEncrypted: encryptSecret("app-password") } });
+// the team's mailbox, as if an admin had filled in Settings > Workspace
+const connectMailbox = (organizationId: number, email = "sales@acme.example") =>
+    prisma.emailAccount.create({ data: { organizationId, email, host: "smtp.gmail.com", port: 465, passwordEncrypted: encryptSecret("app-password") } });
 
 describe("emails from the CRM", () => {
     const organizationIds: number[] = [];
@@ -72,7 +72,7 @@ describe("emails from the CRM", () => {
         const lead = await prisma.lead.create({
             data: { organizationId: organization.id, name: "Rahul Mehta", email: "rahul@acme.example", phone: "98765 43210", stageId: stage.id, assignedToId: user.id },
         });
-        await connectMailbox(user.id);
+        await connectMailbox(user.organizationId);
         return { organization, user, lead };
     }
 
@@ -116,23 +116,23 @@ describe("emails from the CRM", () => {
         expect(await prisma.email.count({ where: { organizationId: organization.id } })).toBe(0);
     });
 
-    it("won't send until you've connected your email, and fails plainly if you disconnect", async () => {
+    it("won't send until the team's email is connected, and fails plainly if it's disconnected", async () => {
         const { user, lead } = await setUp();
-        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+        await prisma.emailAccount.deleteMany({ where: { organizationId: user.organizationId } });
 
         const refused = await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
         expect(refused.status).toBe(400);
-        expect((await refused.json()).message).toContain("Connect your email");
+        expect((await refused.json()).message).toContain("No email is connected yet");
 
         // queued while connected, then disconnected before the worker got to it
-        await connectMailbox(user.id);
+        await connectMailbox(user.organizationId);
         await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
-        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+        await prisma.emailAccount.deleteMany({ where: { organizationId: user.organizationId } });
         await sendEmail(queued[0].emailId);
 
         const email = await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } });
         expect(email).toMatchObject({ status: "FAILED" });
-        expect(email.error).toContain("Connect your email");
+        expect(email.error).toContain("No email is connected yet");
         expect(sent).toHaveLength(0);
     });
 
@@ -146,7 +146,7 @@ describe("emails from the CRM", () => {
 
         const email = await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } });
         expect(email.status).toBe("FAILED");
-        expect(email.error).toContain("Reconnect it in Settings → Profile");
+        expect(email.error).toContain("reconnects it in Settings → Workspace");
 
         // a network blip is thrown, so the queue tries again
         await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Again", body: "Hi" }));
@@ -154,9 +154,9 @@ describe("emails from the CRM", () => {
         await expect(sendEmail(queued[1].emailId)).rejects.toThrow("timeout");
     });
 
-    it("connects a mailbox only after logging in to it, and never hands the password back", async () => {
-        const { user } = await setUp();
-        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+    it("connects the team's mailbox only after logging in to it, and never hands the password back", async () => {
+        const { user } = await setUp(["lead:read", "lead:all", "workspace:manage"]);
+        await prisma.emailAccount.deleteMany({ where: { organizationId: user.organizationId } });
         const account = { email: "priya.sales@gmail.com", password: "abcd efgh ijkl mnop", host: "smtp.gmail.com", port: 465 };
 
         // a wrong password: refused, nothing saved
@@ -164,7 +164,7 @@ describe("emails from the CRM", () => {
         const wrong = await connect(put(account));
         expect(wrong.status).toBe(400);
         expect((await wrong.json()).message).toContain("app password");
-        expect(await prisma.emailAccount.count({ where: { userId: user.id } })).toBe(0);
+        expect(await prisma.emailAccount.count({ where: { organizationId: user.organizationId } })).toBe(0);
 
         // an IP address or an odd port never gets as far as a login
         smtp.error = null;
@@ -173,7 +173,7 @@ describe("emails from the CRM", () => {
 
         const res = await connect(put(account));
         expect(res.status).toBe(200);
-        const saved = await prisma.emailAccount.findUniqueOrThrow({ where: { userId: user.id } });
+        const saved = await prisma.emailAccount.findUniqueOrThrow({ where: { organizationId: user.organizationId } });
         // encrypted, and Gmail's spaces taken out
         expect(saved.passwordEncrypted).not.toContain("abcd");
         const shown = (await (await getAccount()).json()).data;
@@ -187,7 +187,7 @@ describe("emails from the CRM", () => {
         expect(sent[0].login).toEqual({ user: "priya.sales@gmail.com", pass: "abcdefghijklmnop" });
 
         await disconnect();
-        expect(await prisma.emailAccount.count({ where: { userId: user.id } })).toBe(0);
+        expect(await prisma.emailAccount.count({ where: { organizationId: user.organizationId } })).toBe(0);
     });
 
     it("notes a WhatsApp chat on the timeline of a lead you can see", async () => {
@@ -202,14 +202,14 @@ describe("emails from the CRM", () => {
         expect((await logWhatsapp(post({ leadId: lead.id }))).status).toBe(404);
     });
 
-    it("sends from the sender's own address, and tracks the first open", async () => {
-        const { user, lead } = await setUp();
+    it("sends from the team's address with the sender's name on it, and tracks the first open", async () => {
+        const { user, lead, organization } = await setUp();
         vi.stubEnv("APP_URL", "https://flash.example");
         await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi <b>Rahul</b>\nThanks" }));
 
         await sendEmail(queued[0].emailId);
 
-        expect(sent[0]).toMatchObject({ to: "rahul@acme.example", from: { name: user.name, address: "priya.sales@gmail.com" } });
+        expect(sent[0]).toMatchObject({ to: "rahul@acme.example", from: { name: `${user.name} (${organization.name})`, address: "sales@acme.example" } });
         // what they typed is shown as text, never as HTML
         expect(sent[0].html).toContain("Hi &#60;b&#62;Rahul&#60;/b&#62;<br>Thanks");
         const email = await prisma.email.findUniqueOrThrow({ where: { id: queued[0].emailId } });
@@ -229,10 +229,22 @@ describe("emails from the CRM", () => {
         expect((await openPixel(new NextRequest("http://localhost"), { params: Promise.resolve({ token: "nope" }) })).status).toBe(200);
     });
 
+    it("lets only admins connect the team's email", async () => {
+        const { user } = await setUp();
+        await prisma.emailAccount.deleteMany({ where: { organizationId: user.organizationId } });
+        const account = { email: "sales@acme.example", password: "app-password", host: "smtp.gmail.com", port: 465 };
+
+        // an agent (no workspace:manage) can see which address it is, but not change it
+        expect((await connect(put(account))).status).toBe(403);
+        expect((await disconnect()).status).toBe(403);
+        expect((await getAccount()).status).toBe(200);
+        expect(await prisma.emailAccount.count({ where: { organizationId: user.organizationId } })).toBe(0);
+    });
+
     it("never really sends from the demo workspace", async () => {
         const { user, lead } = await setUp();
         // a demo visitor has no mailbox, and can still "send"
-        await prisma.emailAccount.deleteMany({ where: { userId: user.id } });
+        await prisma.emailAccount.deleteMany({ where: { organizationId: user.organizationId } });
         (isDemoWorkspace as Mock).mockReturnValue(true);
         await sendEmailRoute(post({ leadId: lead.id, to: "rahul@acme.example", subject: "Hello", body: "Hi" }));
 

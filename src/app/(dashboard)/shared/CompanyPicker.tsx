@@ -14,7 +14,21 @@ import { Dropdown } from "@/components/Dropdown";
 
 // The search box and the list, without a menu around it: in a dropdown (CompanyPicker), or
 // straight in a panel (bulk edit, where a menu would be cut off by the panel's scroll)
-export function CompanyOptions({ value, onPick, clearable = true }: { value: string | null; onPick: (name: string | null) => void; clearable?: boolean }) {
+// `canAdd`: offer "Add …" for a name that isn't a company yet (not in a filter, which only finds).
+// `noneLabel`: always offer "nothing" under this name ("Without a company"), picked as null.
+export function CompanyOptions({
+    value,
+    onPick,
+    clearable = true,
+    canAdd = true,
+    noneLabel,
+}: {
+    value: string | null;
+    onPick: (name: string | null) => void;
+    clearable?: boolean;
+    canAdd?: boolean;
+    noneLabel?: string;
+}) {
     const [typed, setTyped] = useState("");
     const [term, setTerm] = useState("");
 
@@ -34,7 +48,8 @@ export function CompanyOptions({ value, onPick, clearable = true }: { value: str
     const wanted = typed.trim();
     const exact = companies.data?.find((company) => company.name.toLowerCase() === wanted.toLowerCase());
     const pickTyped = () => {
-        if (wanted) onPick(exact?.name ?? wanted);
+        if (exact) onPick(exact.name);
+        else if (wanted && canAdd) onPick(wanted);
     };
 
     const item = "flex h-8 w-full items-center gap-2 rounded px-1.5 text-left text-sm text-muted hover:bg-fill hover:text-ink";
@@ -55,13 +70,13 @@ export function CompanyOptions({ value, onPick, clearable = true }: { value: str
                         }
                     }}
                     maxLength={200}
-                    placeholder="Search or add a company"
+                    placeholder={canAdd ? "Search or add a company" : "Search companies"}
                     aria-label="Company"
                     className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-light"
                 />
             </label>
 
-            {wanted && !exact && (
+            {wanted && !exact && canAdd && (
                 <button type="button" onClick={pickTyped} className={item}>
                     <IconPlus size={15} className="shrink-0" />
                     <span className="truncate">
@@ -70,11 +85,19 @@ export function CompanyOptions({ value, onPick, clearable = true }: { value: str
                 </button>
             )}
 
-            {clearable && value && !wanted && (
-                <button type="button" onClick={() => onPick(null)} className={item}>
-                    <IconX size={15} className="shrink-0" /> No company
-                </button>
-            )}
+            {noneLabel
+                ? !wanted && (
+                      <button type="button" onClick={() => onPick(null)} className={item}>
+                          <IconX size={15} className="shrink-0" /> {noneLabel}
+                      </button>
+                  )
+                : clearable &&
+                  value &&
+                  !wanted && (
+                      <button type="button" onClick={() => onPick(null)} className={item}>
+                          <IconX size={15} className="shrink-0" /> No company
+                      </button>
+                  )}
 
             {companies.data?.map((company) => (
                 <button key={company.id} type="button" onClick={() => onPick(company.name)} className={item}>
@@ -96,12 +119,16 @@ export function CompanyPicker({
     disabled,
     placeholder = "Add company",
     buttonClassName = "flex h-7 max-w-full items-center gap-1 rounded-lg px-1 hover:bg-fill",
+    startOpen,
+    onClose,
 }: {
     value: string | null;
     onChange: (name: string | null) => void;
     disabled?: boolean;
     placeholder?: string;
     buttonClassName?: string;
+    startOpen?: boolean;
+    onClose?: () => void;
 }) {
     if (disabled) return <span className={`block truncate px-1 ${value ? "" : "text-light"}`}>{value ?? "Empty"}</span>;
 
@@ -109,6 +136,8 @@ export function CompanyPicker({
         <Dropdown
             buttonClassName={buttonClassName}
             panelClassName="max-h-80 w-72 p-1"
+            startOpen={startOpen}
+            onClose={onClose}
             label={
                 <>
                     {value ? <span className="truncate">{value}</span> : <span className="truncate text-light">{placeholder}</span>}

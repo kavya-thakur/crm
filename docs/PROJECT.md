@@ -160,6 +160,20 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] Stages and sources editor (one settings page), with won/lost/converted flags
 - [x] Global **⌘K search** with previews
 - [x] Profile (name, password)
+- [x] **Roles: Create, Edit and Delete come with View** (2026-11-10): a role could have "Create
+      leads" without "View leads", so its people couldn't even open the Leads page. Now ticking
+      Create, Edit, Delete or "Every …" ticks View, and unticking View clears its row; the roles API
+      adds a missing View on save (`viewNeededFor`, `withViewPermissions`); and a migration
+      (`roles_view_with_create`) repaired roles already saved that way
+- [x] **Forgot password: Send again** (2026-11-10): the "Check your inbox" screen names the address,
+      offers "Send again" after a 60-second countdown, and "Use a different email"
+- [x] **Company filter on contacts** (2026-11-10): Filter → Company searches the workspace's
+      companies (like the company picker, without "Add"), or "Without a company"; `?company=` on
+      `/api/contacts`, by name ignoring case, so exports follow it too
+- [x] **Team email** (2026-11-09, Settings → Workspace): only an admin connects email, one shared
+      mailbox (sales@company.com) for the whole workspace; everyone sends from it as "Priya Sharma
+      (Acme)". Agents can't connect their own (per-person mailboxes removed; an owner's existing one
+      became the team's). See [EMAIL.md](EMAIL.md)
 - [x] **Import: check first, fix on screen, nothing dropped unseen** (2026-11-08). After matching
       columns, `/api/imports/check` reads every row (10,000 in ~0.2 s locally) through the same rules
       the import uses (`src/lib/imports/rows.ts`, shared with `leadImport.ts`), so what it says is what
@@ -342,6 +356,8 @@ Newest first. The reason matters more than the choice.
 | 2026-11-06 | The mailbox password is **encrypted, key derived from JWT_SECRET**, never returned to the browser | it must be read back to send, so it can't be hashed; deriving the key means no new secret to set up on Render |
 | 2026-11-06 | Recycle bin as a **copy before a real delete**, not a `deletedAt` column | soft delete would mean a `deletedAt: null` filter on every query, search, count, raw SQL and relation in the app, and one miss shows deleted data; a copy leaves all of that untouched |
 | 2026-11-07 | Quote lines **copy** the product's name, price and tax | a quote already sent must not change when the catalogue's price does; the copy can also be changed for one deal |
+| 2026-11-10 | Pricing: **one price per workspace, unlimited users**; the website reads the app's plan file | a portfolio product first; flat is simplest to explain. The website had said "free for 3 users, ₹999 per user" while the app charged ₹1,499 flat after a 7-day trial; now both come from `src/lib/billing/plans.ts`, so they can't drift apart again |
+| 2026-11-09 | API data kept **5 minutes** (`staleTime`), pages **30 s** in the browser (`staleTimes.dynamic`); the tab that makes a change hears its own live update | live updates already announce every change (people, web forms, imports, automations), so refetching on every visit only repeated identical requests; hearing its own change keeps a tab's other views (dashboard, My day) current |
 | 2026-11-07 | The billing lock is **one check in the custom server**, before any route | one place for 90+ routes, so a new route can't forget it; open workspaces are cached until their trial or period ends, so it costs nothing for them |
 | 2026-11-07 | Pro switched on **by hand by a site admin** for now | sell from day one with UPI or bank transfer, no KYC or provider fees; online payment later only automates the same switch |
 | 2026-11-07 | "Log in as" decided **per person by the owner**, not a role permission | the user wants it held by the owner and handed to individuals; a role checkbox would let any role editor give it out |
@@ -383,3 +399,4 @@ Newest first. The reason matters more than the choice.
 | 2026-10 | **Light-only, Twenty-style** UI (dashboard has its own look) | a calm, modern CRM look; one theme done well |
 | 2026-10 | Agent "deactivation" deferred | confusing to explain; revisit with a clear design |
 | 2026-10 | Integration tests on a real database, not mocks | the queries and permissions *are* the product |
+| 2026-11-10 | In the record tables the Name column is **pinned only from 768px up**; on phones it scrolls away | pinned, it took ~240px of a ~375px screen and left little room for the other fields |
