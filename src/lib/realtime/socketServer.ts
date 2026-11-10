@@ -54,8 +54,7 @@ export function startRealtime(httpServer: HttpServer) {
 
 /**
  * Called by server.ts once a request's response has gone out. A successful write under
- * /api/<topic>/... tells the rest of the workspace that <topic> changed. The tab that made
- * the change sends its socket id (X-Socket-Id) and is skipped: it already refreshed itself.
+ * /api/<topic>/... tells the whole workspace that <topic> changed, the tab that made it included.
  */
 export function announceChange(req: IncomingMessage, status: number) {
     if (req.method === "GET" || req.method === "HEAD" || status >= 400) return;
@@ -66,8 +65,7 @@ export function announceChange(req: IncomingMessage, status: number) {
     const session = signedIn(req.headers.cookie);
     if (!session) return;
 
-    const socketId = req.headers["x-socket-id"];
-    broadcastChange(session.organizationId, topic, typeof socketId === "string" ? socketId : undefined);
+    broadcastChange(session.organizationId, topic);
 }
 
 const REMIND_BEFORE_MS = 10 * 60 * 1000;

@@ -49,6 +49,7 @@ export interface Permissions {
 export interface ContactFilters {
     search?: string;
     assignedTo?: string; // "me" | "unassigned" | agent id
+    company?: string; // a company's name, or "none" for contacts without one
     createdFrom?: string; // "YYYY-MM-DD"
     createdTo?: string;
     createdBy?: string; // "me" | agent id

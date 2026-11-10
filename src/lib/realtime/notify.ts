@@ -25,12 +25,12 @@ export const userRoom = (userId: number) => `user:${userId}`;
  * "Something changed": tells everyone in a workspace that a kind of record changed
  * ("leads"), so their open pages refetch it. Only the word goes out, never the records.
  * server.ts calls it after every successful write; code that changes things without a
- * signed-in request (a web form) calls it itself. `exceptSocketId` is the tab that made
- * the change, which has already refreshed.
+ * signed-in request (a web form) calls it itself. The tab that made the change hears it too:
+ * its other views (the dashboard, My day, a company's totals) refresh the same way, since
+ * fetched data is kept for 5 minutes (QueryProvider).
  */
-export function broadcastChange(organizationId: number, topic: string, exceptSocketId?: string) {
-    const room = getSocketServer()?.to(orgRoom(organizationId));
-    (exceptSocketId ? room?.except(exceptSocketId) : room)?.emit("changed", { topic });
+export function broadcastChange(organizationId: number, topic: string) {
+    getSocketServer()?.to(orgRoom(organizationId)).emit("changed", { topic });
 }
 
 export type NotificationType = "LEAD_ASSIGNED" | "DEAL_ASSIGNED" | "TASK_ASSIGNED" | "ACTIVITY_INVITED" | "MENTIONED" | "REMINDER" | "IMPORT_FINISHED" | "EMAIL_OPENED" | "EMAIL_FAILED" | "AUTOMATION" | "LOGGED_IN_AS" | "BILLING";

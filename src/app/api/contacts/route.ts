@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, companyId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } = query.data;
+        const { page, limit, search, companyId, company, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } = query.data;
 
         const term = search && escapeLike(search);
         const createdAt = dayRange(createdFrom, createdTo);
@@ -196,6 +196,7 @@ export async function GET(req: NextRequest) {
             }),
 
             ...(companyId && { companyId }),
+            ...(company && (company === "none" ? { companyId: null } : { company: { name: { equals: company, mode: "insensitive" as const } } })),
 
             ...(assignedTo !== undefined && {
                 assignedToId:

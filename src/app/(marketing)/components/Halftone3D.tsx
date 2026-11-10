@@ -273,7 +273,7 @@ export function Halftone3D({ shape, color = "#4a38f5", row = 6, className = "" }
                 if (dragging) turned += spin;
                 else turned *= 0.95;
                 spin = 0;
-                object.rotation.y = 0.15 + (still ? 0 : Math.sin(time * 0.5) * 0.3) + turned;
+                object.rotation.y = 0.15 + (still ? 0 : Math.sin(time * 2) * 0.35) + turned;
             } else {
                 // after a throw, the spin eases back down to the slow idle turn
                 if (!dragging) spin += ((still ? 0 : IDLE_SPIN) - spin) * 0.03;

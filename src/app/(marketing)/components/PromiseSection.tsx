@@ -12,7 +12,7 @@ import { Accent, Heading } from "./Eyebrow";
 // Only things Flash actually does (they match the FAQ)
 const PROMISES = [
     "Set up in minutes, no consultants or setup fees",
-    "₹999 per user a month, no minimum number of seats",
+    "One price for your whole team, however many people",
     "Roles that decide exactly who sees what",
     "Every change logged on the record's timeline",
 ];

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { requirePermission } from "@/lib/auth/requirePermission";
+import { hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { emailTemplateSchema } from "@/lib/validations/emails";
 import { isDemoWorkspace } from "@/lib/demo/workspace";
@@ -18,14 +18,20 @@ export async function GET() {
             orderBy: [{ name: "asc" }, { id: "asc" }],
         });
 
-        // who's sending, for the {{me.name}} / {{workspace.name}} placeholders in the compose box,
-        // and the mailbox it goes out from (null: not connected yet, so the Emails tab asks for it)
-        const account = await prisma.emailAccount.findUnique({ where: { userId: user.id }, select: { email: true } });
+        // who's sending, for the {{me.name}} / {{workspace.name}} placeholders in the compose box, and
+        // the team's mailbox it goes out from (null: not set up yet, so the Emails tab says so: to an
+        // admin, with the way to set it up; to anyone else, who to ask)
+        const [account, owner] = await Promise.all([
+            prisma.emailAccount.findUnique({ where: { organizationId: user.organizationId }, select: { email: true } }),
+            prisma.user.findFirst({ where: { organizationId: user.organizationId, isOwner: true }, select: { name: true } }),
+        ]);
         const me = {
             name: user.name,
             email: user.email,
             workspace: user.organization.name,
             sendsFrom: account?.email ?? (isDemoWorkspace(user) ? user.email : null),
+            canSetUpEmail: hasPermission(user, "workspace:manage") && !user.actingAsId,
+            askToSetUp: owner?.name ?? null,
         };
 
         return NextResponse.json({ ok: true, data: templates, me });

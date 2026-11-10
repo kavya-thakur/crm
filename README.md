@@ -7,7 +7,8 @@
 **A real-time, multi-tenant sales CRM for small sales teams.**
 Capture leads from anywhere, work them through a pipeline, and let automations do the routine work.
 
-<!-- After deploying, add the live link here: **[Live demo](https://…)** · -->
+<!-- After deploying, add: **[Live demo](https://…)** · **[2-minute video](https://…)** · -->
+[The hard parts](#the-hard-parts) · [Architecture](#architecture) · [Run it locally](#getting-started)
 
 ![Next.js](https://img.shields.io/badge/Next.js_16-000000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-149ECA?logo=react&logoColor=white)
@@ -17,7 +18,7 @@ Capture leads from anywhere, work them through a pipeline, and let automations d
 ![Redis](https://img.shields.io/badge/Redis_+_BullMQ-DC382D?logo=redis&logoColor=white)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?logo=socketdotio&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-146_passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-205_passing-2ea44f)
 
 <br />
 
@@ -30,10 +31,11 @@ Capture leads from anywhere, work them through a pipeline, and let automations d
 ## Contents
 
 1. [What is Flash?](#what-is-flash)
-2. [Features](#features)
-3. [Tech stack](#tech-stack)
-4. [Architecture](#architecture)
-5. [How it works](#how-it-works)
+2. [The hard parts](#the-hard-parts)
+3. [Features](#features)
+4. [Tech stack](#tech-stack)
+5. [Architecture](#architecture)
+6. [How it works](#how-it-works)
    - [Workspaces, sign-in and permissions](#workspaces-sign-in-and-permissions)
    - [Real-time updates and notifications](#real-time-updates-and-notifications)
    - [Background jobs](#background-jobs)
@@ -44,15 +46,15 @@ Capture leads from anywhere, work them through a pipeline, and let automations d
    - [Lists, filters and boards](#lists-filters-and-boards)
    - [Dashboard](#dashboard)
    - [Demo mode](#demo-mode)
-6. [Data model](#data-model)
-7. [API](#api)
-8. [Engineering decisions](#engineering-decisions)
-9. [Reliability and security](#reliability-and-security)
-10. [Project structure](#project-structure)
-11. [Getting started](#getting-started)
-12. [Testing](#testing)
-13. [Deploying](#deploying)
-14. [Roadmap](#roadmap)
+7. [Data model](#data-model)
+8. [API](#api)
+9. [Engineering decisions](#engineering-decisions)
+10. [Reliability and security](#reliability-and-security)
+11. [Project structure](#project-structure)
+12. [Getting started](#getting-started)
+13. [Testing](#testing)
+14. [Deploying](#deploying)
+15. [Roadmap](#roadmap)
 
 ---
 
@@ -73,6 +75,21 @@ brought revenue, and why deals were lost.
 
 > **Try it in one click.** The login page has **Explore as a manager** and **Explore as a sales agent**.
 > Both open a full demo workspace with 18 months of data, rebuilt every night.
+
+---
+
+## The hard parts
+
+The five problems that took the most thought, and where to look for each. Every one is proven by
+integration tests against a real PostgreSQL database, not mocks.
+
+| Problem | How Flash solves it | Where |
+|---|---|---|
+| **Many companies, one database.** One forgotten `where` clause would show one company's leads to another. | Routes never write the workspace filter by hand. They start from a scope helper (`leadScope(user)`): this workspace, and only your own records unless your role says otherwise. Anything outside it answers **404**, so another workspace's ids can't even be confirmed to exist. | [`src/lib/auth/`](src/lib/auth) · [permissions](#workspaces-sign-in-and-permissions) |
+| **Live updates that can't leak data.** Every open tab should update when a teammate changes something, without the socket becoming a second, unchecked API. | A socket event carries only a topic ("leads changed"), never data. The tab refetches through the normal API with its own permissions. `server.ts` announces every successful write by itself, so **no route contains realtime code**. | [`src/lib/realtime/`](src/lib/realtime) · [real time](#real-time-updates-and-notifications) |
+| **Retries that never act twice.** Background jobs retry on failure; a naive retry sends the welcome email again or imports a row twice. | Automations **claim a unique `(rule, event)` row** before acting, so a retried job skips the rules it already ran. Imports save each batch **and** its progress counter in one transaction, so a retry resumes exactly where it stopped. | [`automations.test.ts`](tests/integration/automations.test.ts) · [`imports.test.ts`](tests/integration/imports.test.ts) |
+| **Things happening at the same moment.** Two leads arrive together; two people edit one record. | Round-robin turns are taken with an atomic `increment`, so two leads never land on the same person by accident. Meeting reminders are claimed with a conditional update. Custom-field edits merge with Postgres `jsonb \|\|`, so edits to different fields never overwrite each other. Duplicate detection is a **database trigger**, so every write path is covered. | [reliability](#reliability-and-security) · [duplicates](#duplicates-and-merging) |
+| **Payments that can't be faked.** The browser says "paid", Razorpay's webhook says "paid", or only one of them ever arrives. | The server never trusts the browser: it asks Razorpay for the order and payment, checks the workspace and amount, captures the money, and switches Pro on **once**, whichever confirmation arrives first. A forged webhook signature is ignored. | [`src/lib/billing/`](src/lib/billing) · [`payments.test.ts`](tests/integration/payments.test.ts) |
 
 ---
 
@@ -113,7 +130,7 @@ brought revenue, and why deals were lost.
 ### Automation and email
 - **When → If → Then rules** on 7 triggers: a lead is added, moves stage or is lost; a deal is created, moves stage, is won or is lost
 - **Actions:** assign (taking turns), send a template, create a task, notify people, move to a stage
-- **Email** from any lead, deal or contact, sent through a queue **from each person's own Gmail** (connected in Profile)
+- **Email** from any lead, deal or contact, sent through a queue **from the team's mailbox** (connected once by an admin), with each sender's name on it
 - **WhatsApp** button on every phone number: opens the chat with a template already typed
 - **Templates** with placeholders (`{{lead.firstName}}`, `{{me.name}}`)
 - **Open tracking:** "Rahul opened your email" arrives live
@@ -172,9 +189,10 @@ brought revenue, and why deals were lost.
 | **Data fetching** | **TanStack React Query 5** and axios | Caching, paging, and one-line refetches when a live update arrives |
 | **Forms** | react-hook-form | Fast forms with the same Zod rules as the server |
 | **UI** | **Tailwind CSS 4**, Tabler icons, sonner toasts, **GSAP**, three.js | A light design system with tokens in one CSS file; smooth, transform-only motion |
-| **Email** | **Nodemailer** over SMTP | Each person's own mailbox (Gmail app password, stored AES-256-GCM encrypted); no Google approval needed |
+| **Email** | **Nodemailer** over SMTP | One team mailbox per workspace, connected by an admin (Gmail app password, stored AES-256-GCM encrypted); no Google approval needed |
 | **Files** | Papaparse | CSV import and export, with spreadsheet-formula escaping |
-| **Auth** | JWT in an httpOnly cookie, bcrypt | No third party; the same cookie signs in the WebSocket |
+| **Auth** | JWT in an httpOnly cookie, bcrypt, emailed password-reset links | No third party; the same cookie signs in the WebSocket |
+| **Payments** | **Razorpay** Standard Checkout and a signed webhook | Orders checked on the server; Pro switches on once, whether the browser or the webhook confirms first |
 | **Tests and CI** | **Vitest** against a real PostgreSQL, **GitHub Actions** | Tests the real routes, queries and constraints, on every pull request |
 
 ---
@@ -201,7 +219,7 @@ flowchart LR
 
     PG[("PostgreSQL<br/>Prisma 7")]
     R[("Redis<br/>queues + rate limits")]
-    SMTP["SMTP<br/>(each person's Gmail)"]
+    SMTP["SMTP<br/>(the team's mailbox)"]
 
     B -- "HTTPS /api/*" --> NEXT
     B <-- "WebSocket: live events" --> IO
@@ -219,7 +237,7 @@ flowchart LR
 ### A request, start to finish
 
 Every API route follows the same steps, and **nothing reaches the database without the workspace
-scope**. After a successful write, the server tells everyone else in the workspace what changed
+scope**. After a successful write, the server tells everyone in the workspace what changed
 (only the topic, never the data), and their open pages refetch through the same permission checks.
 
 ```mermaid
@@ -232,14 +250,14 @@ sequenceDiagram
     participant IO as Socket.IO
     participant B as Rohan's tab
 
-    A->>S: PUT /api/leads/42 (cookie + X-Socket-Id)
+    A->>S: PUT /api/leads/42 (cookie)
     S->>R: Next.js handles the route
     R->>R: who is this? (JWT cookie)<br/>may they? (permission)<br/>valid? (Zod)
     R->>DB: update ... where id = 42 AND organizationId = 7<br/>(+ only their own leads, without lead:all)
     DB-->>R: updated lead
     R-->>A: 200 JSON
     S->>IO: response finished → "leads changed" in org:7
-    IO-->>B: event "changed", topic "leads" (skips Priya's tab)
+    IO-->>B: event "changed", topic "leads" (Priya's other views hear it too)
     B->>S: refetch /api/leads (same permission checks)
 ```
 
@@ -282,7 +300,7 @@ cookie, then joins two **rooms**: `org:<id>` (everyone in the workspace) and `us
 
 | Event | Sent to | What the tab does |
 |---|---|---|
-| `changed { topic }` | the workspace, except the tab that made the change | refetches only what that topic touches ("leads" refreshes lead lists, boards, panels, the dashboard) |
+| `changed { topic }` | the whole workspace, including the tab that made the change (so its other views stay current) | refetches only what that topic touches ("leads" refreshes lead lists, boards, panels, the dashboard) |
 | `notification` | one person | adds it to the bell and shows a toast |
 | `import-progress` / `bulk-progress` | the person who started it | moves the progress bar |
 
@@ -449,12 +467,14 @@ flowchart LR
     S --> O["customer opens it → pixel<br/>→ 'Opened' + live notification"]
 ```
 
-- **Sending from your own address.** Each person connects their own mailbox in Settings → Profile
-  (their address and an app password, any provider). Flash logs in to check it before saving, keeps
-  the password AES-256-GCM encrypted, and never sends it back to the browser. Emails then go out
-  from Priya's own Gmail, so replies land in her inbox and nobody sends from anyone else's account.
-  Until someone connects, their Emails tab asks them to; a revoked password fails at once with
-  "Reconnect it in Profile". (Gmail's API would need Google's app review; an app password doesn't.)
+- **One team email.** An admin connects the workspace's mailbox once in Settings → Workspace (its
+  address and an app password, any provider), like sales@yourcompany.com. Flash logs in to check it
+  before saving, keeps the password AES-256-GCM encrypted, and never sends it back to the browser.
+  Everyone sends from it with their own name on each email ("Priya Sharma (Acme)"); agents can't
+  connect mailboxes of their own.
+  Until an admin connects one, the Emails tab says so; a revoked password fails at once and asks
+  for it to be reconnected in Settings → Workspace. (Gmail's API would need Google's app review; an
+  app password doesn't.)
 - **WhatsApp.** A button next to every phone number opens a `wa.me` chat with a template's text
   already typed, and notes it on the timeline. No API, no cost.
 - **Templates** fill in `{{lead.firstName}}`, `{{lead.company}}`, `{{deal.title}}`, `{{me.name}}` and
@@ -491,7 +511,7 @@ queries in parallel. Only won deals' dates and amounts come back as rows, for th
 ### Demo mode
 
 `/api/auth/demo` signs a visitor straight into a demo workspace: 6 people,
-about 420 leads and 300 deals over 18 months, plus tasks, meetings, notes, emails, templates and a
+about 420 leads and 300 deals over 18 months, plus tasks, meetings, notes, emails, templates and
 two sample automations (drag a deal over ₹1,00,000 to Won and the bell rings). A **BullMQ job scheduler** rebuilds it every night at 03:00 IST. Demo accounts
 can't change passwords or delete the workspace, and never send real email, so it stays the same for
 every visitor.
@@ -500,7 +520,7 @@ every visitor.
 
 ## Data model
 
-31 models. The core:
+37 models. The core:
 
 ```mermaid
 erDiagram
@@ -509,7 +529,7 @@ erDiagram
     Role ||--o{ RolePermission : grants
     Permission ||--o{ RolePermission : "is granted by"
     User }o--|| Role : has
-    User ||--o| EmailAccount : "sends through"
+    Organization ||--o| EmailAccount : "team mailbox"
 
     Organization ||--o{ Lead : owns
     Organization ||--o{ Contact : owns
@@ -545,7 +565,7 @@ erDiagram
 
 ## API
 
-102 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
+103 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |
@@ -555,10 +575,12 @@ of them check sign-in, permission, input (Zod) and workspace scope.
 | **Email** | `emails` (list and send), `email-templates`, `whatsapp` (note an opened chat) |
 | **Automation** | `automations` (rules, on/off), `automations/:id/runs` (the run log) |
 | **Capture** | `lead-forms` (web forms and integrations), `lead-forms/:id/deliveries`, `imports` (+ `problems`, `sample`), `bulk-jobs` |
-| **Workspace** | `workspace` (its currency), `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
-| **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `me`, `me/password`, `me/email-account` (connect your mailbox), `notifications` |
+| **Workspace** | `workspace` (its currency), `workspace/email-account` (the team mailbox), `onboarding`, `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
+| **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `auth/forgot-password`, `auth/reset-password`, `auth/back` (end "log in as"), `me`, `me/password`, `notifications` |
+| **Billing** | `billing` (plan and status), `billing/order` (start a Razorpay payment), `billing/verify` (confirm it) |
+| **Site admin** | `site-admin/workspaces`, `site-admin/users` (every company and user on the site) |
 | **Insight** | `dashboard`, `my-day`, `search` |
-| **Public (no login)** | `public/forms/:key` (web forms), `public/leads/:key` (integration webhooks), `public/emails/:token/open` (open tracking), `health` |
+| **Public (no login)** | `public/forms/:key` (web forms), `public/leads/:key` (integration webhooks), `public/emails/:token/open` (open tracking), `public/razorpay` (payment webhook), `health` |
 
 ---
 
@@ -574,7 +596,8 @@ of them check sign-in, permission, input (Zod) and workspace scope.
 | **Rate limits in Redis that fail open** | Shared across servers and restarts. If Redis is down for a minute, forms keep working instead of the limiter taking the site down |
 | **One webhook that reads many payload shapes** | Plain JSON, Google Ads and IndiaMART all become one shape, with field names guessed like the CSV importer does. One feature covers dozens of tools |
 | **Integrations are web forms of another kind** (`LeadForm.kind = WEBHOOK`) | They get the source, owner, rotation and capture rules for free; only a payload reader and a log are new |
-| **Email over SMTP from each person's own mailbox** (app password, encrypted) | Free, needs no domain or Google app review, replies go straight to the sender, and nobody shares one account |
+| **Email over SMTP from one team mailbox an admin connects** (app password, encrypted) | Free, needs no domain or Google app review; one company address, replies in one shared inbox, and agents can't send from personal accounts |
+| **One price per workspace, unlimited users** (7-day trial, then Pro monthly or yearly), not per seat | Simplest to understand and sell to small teams, and nothing to count. Plans live in one file (`src/lib/billing/plans.ts`), which the app and the pricing page both read; per-seat or team-size plans would add a user limit per plan, checked where members are added and invited, with an "upgrade" prompt |
 | **Template placeholders filled in the browser** | The sender sees and can edit the exact text before it goes |
 | **Page state in the URL** | Refresh, Back and shared links all work |
 | Rule conditions and form settings as **JSON checked by Zod** | A new action type or form option needs no migration, and old data reads back with defaults |
@@ -601,7 +624,7 @@ crm/
 ├── server.ts                 Next.js + Socket.IO + job workers, on one port
 ├── prisma/
 │   ├── schema.prisma         every model, commented
-│   ├── migrations/           55 migrations, applied in order
+│   ├── migrations/           58 migrations, applied in order
 │   ├── seed.ts               permissions and default stages
 │   └── demo.ts               builds the demo workspace (npm run db:demo)
 ├── src/
@@ -624,9 +647,10 @@ crm/
 │       ├── leads/            capture, duplicates, webhook payloads, stages, sources
 │       ├── emails/           sending, templates
 │       ├── automations/      the rule engine
+│       ├── billing/          plans, the trial lock, Razorpay payments
 │       ├── demo/             the demo workspace
 │       └── validations/      one Zod file per resource
-└── tests/integration/        28 files, 146 tests, against a real Postgres
+└── tests/integration/        41 files, 196 tests, against a real Postgres
 ```
 
 **Conventions:**
@@ -669,9 +693,12 @@ Open the login page and click **Open the demo**, or sign in as `johndoe@flash-de
 | `REDIS_URL` | yes | job queues and rate limits |
 | `APP_URL` | in production | the site's public address, for link previews and email open tracking |
 | `DEMO_FORM_KEY` | optional | the marketing site's "Book a demo" form sends its leads into this web form |
+| `SITE_ADMIN_EMAILS` | optional | comma-separated emails that see every workspace and can log in as anyone |
+| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASS` · `SMTP_FROM` | optional | Flash's own mailbox, for password-reset links; without it the link is printed in the terminal |
+| `RAZORPAY_KEY_ID` · `RAZORPAY_KEY_SECRET` · `RAZORPAY_WEBHOOK_SECRET` | optional | online payment for Pro; without them a plan request goes to a site admin |
 | `TEST_DATABASE_URL` | optional | the database `npm test` uses (default: local `crm_test`) |
 
-Email needs no settings: each person connects their own mailbox in Settings → Profile.
+Emails to leads need no settings here: an admin connects the team's mailbox in Settings → Workspace.
 
 ### Scripts
 
@@ -687,7 +714,8 @@ Email needs no settings: each person connects their own mailbox in Settings → 
 
 ## Testing
 
-**146 integration tests in 28 files**, run with Vitest against a real PostgreSQL database. They call
+**205 tests**: 196 integration tests in 41 files, run with Vitest against a real PostgreSQL database,
+plus unit tests for the permission checks. They call
 the real route handlers, so permissions, workspace isolation, database triggers and constraints are
 all tested, not mocked. Some of what they prove:
 
@@ -698,6 +726,7 @@ all tested, not mocked. Some of what they prove:
 - Google Ads and IndiaMART payloads become the right lead; bad ones are rejected and logged
 - a retried CSV import carries on from where it stopped and adds nobody twice
 - the open-tracking pixel marks an email opened once, and a made-up token changes nothing
+- a genuine payment switches Pro on once; a smaller amount, another workspace's order or a forged webhook doesn't
 
 ```bash
 createdb crm_test
@@ -719,7 +748,9 @@ live in it. That rules out serverless-only hosting. This repo deploys **for free
 | App (Next.js + Socket.IO + workers) | **Render** free web service | sleeps after 15 idle minutes; a free uptime ping keeps it awake |
 | PostgreSQL | **Neon** free plan | doesn't expire (Render's free database is deleted after 30 days) |
 | Redis | **Render Key Value** free | inside Render, no per-command billing (BullMQ talks to Redis constantly) |
-| Email | each person's own **Gmail** (or any mailbox) | connected in Profile with an app password; nothing to set up on the server |
+| Email to leads | the team's own mailbox (Gmail or any) | connected by an admin in Settings → Workspace with an app password; nothing to set up on the server |
+| Password-reset email | a Gmail made for Flash | `SMTP_*` variables |
+| Payments | **Razorpay** (test keys are free) | `RAZORPAY_*` variables; webhook at `/api/public/razorpay` |
 
 `render.yaml` is a **Render Blueprint** that describes the app and its Redis, so Render sets them
 both up from the repo:
@@ -748,7 +779,6 @@ both up from the repo:
 - **Speed-to-lead alerts:** nobody has contacted a new lead within X hours, so the manager hears about it
 - A **booking link** where a visitor picks a free slot and gets a lead and a meeting
 - **Facebook and Instagram Lead Ads**, built in
-- Products and quotes on deals
 
 ---
 

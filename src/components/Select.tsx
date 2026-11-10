@@ -27,11 +27,13 @@ interface SelectProps {
     /** defaults to on once there are more than 8 options */
     searchable?: boolean;
     className?: string;
+    startOpen?: boolean;
+    onClose?: () => void;
 }
 
 const SEARCH_THRESHOLD = 8;
 
-export function Select({ value, onChange, options, placeholder, disabled, searchable, className }: SelectProps) {
+export function Select({ value, onChange, options, placeholder, disabled, searchable, className, startOpen, onClose }: SelectProps) {
     const selected = options.find((option) => option.value === value);
     const showSearch = searchable ?? options.length > SEARCH_THRESHOLD;
 
@@ -41,6 +43,8 @@ export function Select({ value, onChange, options, placeholder, disabled, search
             buttonClassName={`flex h-8 w-full items-center justify-between gap-1 rounded-lg border border-line bg-surface px-2 text-left outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft ${className ?? ""}`}
             panelClassName="max-h-64 overflow-y-auto p-1"
             matchWidth
+            startOpen={startOpen}
+            onClose={onClose}
             label={
                 <>
                     <span className={`min-w-0 flex-1 truncate ${selected ? "" : "text-light"}`}>

@@ -9,6 +9,7 @@ import { Accent, CONTAINER, Eyebrow, Heading } from "./Eyebrow";
 import { Button } from "./Button";
 import { DashArt, blobs } from "./DashArt";
 import { Orb } from "./Orb";
+import { PRO_PLANS, TRIAL_DAYS } from "@/lib/billing/plans";
 
 const FAQS = [
     {
@@ -41,7 +42,7 @@ const FAQS = [
     },
     {
         q: "What does it cost?",
-        a: "Flash is free for up to 3 users. The Team plan is ₹999 per user, per month, or ₹799 when billed yearly. No setup fees and no minimum number of seats.",
+        a: `Try everything free for ${TRIAL_DAYS} days, no card needed. Then Pro is ₹${PRO_PLANS.MONTHLY.price.toLocaleString("en-IN")} a month, or ₹${PRO_PLANS.YEARLY.price.toLocaleString("en-IN")} a year (two months free), for your whole team: add as many people as you like, the price stays the same. No setup fees.`,
     },
 ];
 

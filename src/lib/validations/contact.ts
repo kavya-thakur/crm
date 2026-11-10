@@ -32,6 +32,8 @@ export const bulkContactChangesSchema = createContactSchema
 export const listContactsQuerySchema = paginationSchema.extend({
     search: z.string().trim().max(100).optional(),
     companyId: idParamSchema.optional(),
+    // the company they're at, by name (the list's Company filter), or "none" for no company
+    company: z.string().trim().max(200).optional(),
     // who created it / who changed it last: "me" or a user's id
     createdBy: personParamSchema.optional(),
     updatedBy: personParamSchema.optional(),

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { getCurrentUser } from "./getCurrentUser";
+import { viewNeededFor } from "@/lib/validations/roles";
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
@@ -127,4 +128,14 @@ export async function findManageableRole(user: CurrentUser, roleId: number) {
         assertHoldsPermissions(user, role.permissions.map(({ permissionId }) => permissionId))
     }
     return role
+}
+
+// A role's permissions with the View ones they need added (lead:create brings lead:read), so a
+// saved role is never one whose people can create leads but not open the Leads page
+export async function withViewPermissions(permissionIds: number[]) {
+    const chosen = await prisma.permission.findMany({ where: { id: { in: permissionIds } }, select: { name: true } });
+    const needed = [...new Set(chosen.map((permission) => viewNeededFor(permission.name)).filter((name): name is string => name !== null))];
+    if (needed.length === 0) return permissionIds;
+    const views = await prisma.permission.findMany({ where: { name: { in: needed } }, select: { id: true } });
+    return [...new Set([...permissionIds, ...views.map((permission) => permission.id)])];
 }

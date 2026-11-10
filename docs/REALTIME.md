@@ -139,9 +139,13 @@ How the pieces do it:
 - **Only the topic travels.** The other tabs refetch through the normal API, which applies
   permissions as always. An agent who only sees their own leads still only sees their own
   leads. The socket can't leak data because it doesn't carry any.
-- **The tab that made the change is skipped.** Each tab sends its socket id on API calls
-  (`X-Socket-Id` header, set in `LiveUpdates`), and the server uses `.except(thatId)`. That
-  tab already refreshed itself in its own `onSuccess`.
+- **The tab that made the change hears it too.** Its own `onSuccess` refreshes what it changed;
+  the message refreshes everything else that depends on it there (the dashboard, My day, a
+  company's totals). That matters because fetched data is kept for 5 minutes (`staleTime` in
+  `QueryProvider`) instead of being fetched on every visit: the live messages are what keep it
+  current, and after the connection drops and comes back, everything is fetched again. Pages
+  themselves are kept for 30 seconds in the browser (`staleTimes.dynamic` in `next.config.ts`),
+  and a role, member or billing change calls `router.refresh()`, which drops them.
 - **Topic → what to refetch** lives in one map in `LiveUpdates.tsx` (`REFRESH`): a change to
   `tasks` refetches the task lists, the lead/deal/contact panels (their task tabs) and the
   dashboard.

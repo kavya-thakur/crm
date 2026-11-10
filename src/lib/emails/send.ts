@@ -66,18 +66,19 @@ export async function queueEmail(email: {
     return saved;
 }
 
-// Whether this person can send email from the CRM: they've connected a mailbox (the demo
-// workspace always can, since it never really sends)
-export async function canSendEmail(user: { id: number; organization: { slug: string } }) {
-    return isDemoWorkspace(user) || (await prisma.emailAccount.count({ where: { userId: user.id } })) > 0;
+// Whether the CRM can send email for this workspace: an admin has connected the team's mailbox
+// (the demo workspace always can, since it never really sends)
+export async function canSendEmail(user: { organizationId: number; organization: { slug: string } }) {
+    if (isDemoWorkspace(user)) return true;
+    return (await prisma.emailAccount.count({ where: { organizationId: user.organizationId } })) > 0;
 }
 
-export const NOT_CONNECTED = "Connect your email in Settings → Profile to send emails from Flash";
+export const NOT_CONNECTED = "No email is connected yet. An admin connects the team's email in Settings → Workspace.";
 
 export async function sendEmail(emailId: number) {
     const email = await prisma.email.findUnique({
         where: { id: emailId },
-        include: { sentBy: { select: { name: true, emailAccount: true } }, organization: { select: { slug: true } } },
+        include: { sentBy: { select: { name: true } }, organization: { select: { slug: true, name: true, emailAccount: true } } },
     });
     // gone (its lead was deleted), or already dealt with (a retry after it went out)
     if (!email || email.status !== "QUEUED") return;
@@ -89,14 +90,16 @@ export async function sendEmail(emailId: number) {
         return;
     }
 
-    // disconnected (or the sender has left) since it was written: nothing to retry
-    const account = email.sentBy?.emailAccount;
+    // the team's mailbox; disconnected since it was written: nothing to retry
+    const account = email.organization.emailAccount;
     if (!account) return failEmail(email.id, NOT_CONNECTED);
+    // it says who wrote it: "Priya Sharma (Acme)" <sales@acme.com>
+    const fromName = email.sentBy ? `${email.sentBy.name} (${email.organization.name})` : email.organization.name;
 
     const login = { email: account.email, host: account.host, port: account.port, password: decryptSecret(account.passwordEncrypted) };
     try {
         await smtpFor(login).sendMail({
-            from: { name: email.sentBy!.name, address: account.email },
+            from: { name: fromName, address: account.email },
             to: email.to,
             subject: email.subject,
             text: email.body,
@@ -104,7 +107,7 @@ export async function sendEmail(emailId: number) {
         });
     } catch (error) {
         // a revoked app password won't work on the next try either; anything else (a blip) is retried
-        if ((error as { code?: string }).code === "EAUTH") return failEmail(email.id, `${mailboxProblem(error)} Reconnect it in Settings → Profile.`);
+        if ((error as { code?: string }).code === "EAUTH") return failEmail(email.id, `${mailboxProblem(error)} An admin reconnects it in Settings → Workspace.`);
         throw error;
     }
 

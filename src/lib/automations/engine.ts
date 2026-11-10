@@ -341,9 +341,11 @@ async function sendTemplate(templateId: number, rule: AutomationRule, event: Aut
     }
 
     const sender = record.owner ?? (await actingPerson(rule));
-    // it goes out from the sender's own mailbox
+    // it goes out from the team's mailbox, with the sender's name on it
     const workspace = await prisma.organization.findUniqueOrThrow({ where: { id: rule.organizationId }, select: { slug: true } });
-    if (!(await canSendEmail({ id: sender.id, organization: workspace }))) return `No email sent: ${sender.name} hasn't connected an email account`;
+    if (!(await canSendEmail({ organizationId: rule.organizationId, organization: workspace }))) {
+        return "No email sent: no email is connected (an admin connects the team's email in Settings → Workspace)";
+    }
     const values = await templateValues(record, sender);
 
     await queueEmail({

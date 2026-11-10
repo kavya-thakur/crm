@@ -28,8 +28,9 @@ export default function RegisterPage() {
     const registerMutation = useMutation({
         mutationFn: (values: RegisterFormValues) => api.post("/auth/register", values),
         // The API sets the auth cookie, so the user is already signed in here; the workspace
-        // gets its name in onboarding
-        onSuccess: () => router.replace("/onboarding"),
+        // gets its name in onboarding. From "Buy Pro" on the pricing page (?plan=pro), onboarding
+        // then goes on to Billing instead of the dashboard.
+        onSuccess: () => router.replace(new URLSearchParams(window.location.search).get("plan") === "pro" ? "/onboarding?plan=pro" : "/onboarding"),
     });
 
     // e.g. "Email is already registered" from the API

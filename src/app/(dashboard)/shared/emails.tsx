@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconAlertCircle, IconChevronDown, IconMail, IconMailOpened, IconPencil, IconSend } from "@tabler/icons-react";
+import { IconAlertCircle, IconChevronDown, IconMail, IconMailOff, IconMailOpened, IconPencil, IconSend } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { fillTemplate, type TemplateValues } from "@/lib/emails/templates";
@@ -36,20 +36,59 @@ export interface EmailTemplate {
     body: string;
 }
 
-// The templates, plus who's sending (for {{me.name}} and friends) and from which mailbox
-// (sendsFrom is null until they connect one in Settings > Profile)
+// Who's sending (for {{me.name}} and friends), and the team's mailbox it goes out from
+export interface EmailSender {
+    name: string;
+    email: string;
+    workspace: string;
+    // null until an admin sets up the team's email
+    sendsFrom: string | null;
+    // may set it up (Settings > Workspace); and who to ask, for everyone else
+    canSetUpEmail: boolean;
+    askToSetUp: string | null;
+}
+
+// The templates, plus who's sending and from which mailbox
 export function useEmailTemplates() {
     return useQuery({
         queryKey: ["emailTemplates"],
         queryFn: () =>
             api
-                .get<{ data: EmailTemplate[]; me: { name: string; email: string; workspace: string; sendsFrom: string | null } }>("/email-templates")
+                .get<{ data: EmailTemplate[]; me: EmailSender }>("/email-templates")
                 .then((res) => res.data),
     });
 }
 
 const inputClassName =
     "h-8 w-full rounded-lg border border-line bg-surface px-2 outline-none placeholder:text-light focus:border-accent focus:ring-3 focus:ring-accent-soft";
+
+/**
+ * "Email isn't set up yet": nobody can send until an admin connects the team's email. Admins get
+ * the way to do it; everyone else, who to ask. On the Emails tab and in Profile.
+ */
+export function EmailNotSetUp({ sender }: { sender: Pick<EmailSender, "canSetUpEmail" | "askToSetUp"> }) {
+    return (
+        <div role="status" className="flex items-start gap-3 rounded-xl border border-[#ffd19a] bg-[#fff7ed] px-4 py-3">
+            <IconMailOff size={18} className="mt-0.5 shrink-0 text-[#ef5f00]" />
+            <div className="min-w-0 flex-1">
+                <p className="font-medium text-ink">Email isn&apos;t set up yet</p>
+                <p className="mt-0.5 text-sm text-muted">
+                    {sender.canSetUpEmail
+                        ? "Nobody in the team can send emails from Flash until you connect the team's email, like sales@yourcompany.com. Everyone then sends from it, with their own name on each email."
+                        : `You can't send emails from Flash until an admin sets up the team's email.${sender.askToSetUp ? ` Ask ${sender.askToSetUp} to set it up.` : ""}`}
+                </p>
+                {sender.canSetUpEmail && (
+                    <Link
+                        href="/settings/workspace"
+                        className="mt-2 inline-flex h-8 items-center rounded-lg bg-accent px-3 text-sm font-medium text-on-accent hover:bg-accent-hover"
+                    >
+                        Set up team email
+                    </Link>
+                )}
+            </div>
+        </div>
+    );
+}
 
 /**
  * The Emails tab of a lead or deal: write one (from scratch or a template) and see every email
@@ -70,14 +109,8 @@ export function EmailsTab({ entity, recordId, to, values }: { entity: EmailEntit
 
     return (
         <div className="flex flex-col gap-3">
-            {notConnected ? (
-                <p className="flex flex-wrap items-center gap-x-1 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-muted">
-                    <IconMail size={15} className="text-faint" />
-                    To send emails, connect your own email first. They go out from your address, so replies come to you.
-                    <Link href="/settings/profile" className="font-medium text-accent hover:underline">
-                        Connect in Profile
-                    </Link>
-                </p>
+            {notConnected && templatesQuery.data ? (
+                <EmailNotSetUp sender={templatesQuery.data.me} />
             ) : writing ? (
                 <Composer entity={entity} link={link} defaultTo={to ?? ""} values={values} onDone={() => setWriting(false)} />
             ) : (

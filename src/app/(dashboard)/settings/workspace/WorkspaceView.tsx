@@ -9,8 +9,10 @@ import { Select } from "@/components/Select";
 import { SectionIcon } from "@/components/SectionIcon";
 import { Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
+import { MailboxSettings } from "../../shared/mailbox";
 
-// Settings > Workspace: settings for the whole workspace. For now, the currency amounts are shown in.
+// Settings > Workspace: settings for the whole workspace: the currency amounts are shown in, and the
+// team's shared email address
 export default function WorkspaceView({ name, currency, demo }: { name: string; currency: string; demo: boolean }) {
     const [picked, setPicked] = useState(currency);
 
@@ -73,6 +75,15 @@ export default function WorkspaceView({ name, currency, demo }: { name: string; 
                             </div>
                         )}
                         <p className="mt-2 text-sm text-faint">Looks like: {formatMoneyIn(250000, picked)}</p>
+                    </section>
+
+                    <section className="mt-10">
+                        <h2 className="font-semibold">Team email</h2>
+                        <p className="mt-0.5 mb-3 text-muted">
+                            The address every email to a lead goes out from, like sales@yourcompany.com. Everyone in the team sends from it with their own
+                            name on it (&ldquo;Priya Sharma ({name})&rdquo;), and replies come back to it. Only admins can connect or change it.
+                        </p>
+                        <MailboxSettings demo={demo} />
                     </section>
                 </div>
             </div>

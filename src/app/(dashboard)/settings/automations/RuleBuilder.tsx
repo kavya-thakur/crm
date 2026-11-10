@@ -10,6 +10,7 @@ import { MultiSelect, Select } from "@/components/Select";
 import { toast } from "@/components/Toast";
 import { fieldFits, kindOf, type AutomationAction, type AutomationCondition, type AutomationTrigger, type RecordKind } from "@/lib/validations/automations";
 import type { CustomFieldDef } from "../../shared/customFields";
+import { useEmailTemplates } from "../../shared/emails";
 
 /*
  * The side panel for making or editing an automation rule, in three blocks:
@@ -366,9 +367,10 @@ function ActionFields({ action, kind, choices, onChange }: { action: AutomationA
                         placeholder="Pick a template"
                     />
                     <p className="mt-1 text-sm text-faint">
-                        Sent to {kind === "lead" ? "the lead's email" : "the email of the lead the deal came from"}, from the owner&apos;s own connected email, so
-                        replies go to them. Skipped if there&apos;s no address, or the owner hasn&apos;t connected their email.
+                        Sent to {kind === "lead" ? "the lead's email" : "the email of the lead the deal came from"}, from the team&apos;s email with the owner&apos;s
+                        name on it. Skipped if there&apos;s no address.
                     </p>
+                    <TeamEmailWarning />
                 </>
             ) : (
                 <p className="text-sm text-faint">No email templates yet. Make one in Settings → Email templates first.</p>
@@ -460,5 +462,16 @@ function RemoveButton({ label, onClick }: { label: string; onClick: () => void }
         <button type="button" aria-label={label} onClick={onClick} className="flex size-7 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-fill hover:text-ink">
             <IconX size={14} />
         </button>
+    );
+}
+
+// An email step that can't send yet: the team's email isn't set up (Settings > Workspace)
+function TeamEmailWarning() {
+    const me = useEmailTemplates().data?.me;
+    if (!me || me.sendsFrom) return null;
+    return (
+        <p role="status" className="mt-2 rounded-lg bg-[#fff7ed] px-3 py-2 text-sm text-[#ab4800]">
+            The team&apos;s email isn&apos;t set up yet, so this step won&apos;t send anything until {me.canSetUpEmail ? "you set it up in Settings → Workspace" : "an admin sets it up"}.
+        </p>
     );
 }

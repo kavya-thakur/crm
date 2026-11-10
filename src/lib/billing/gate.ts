@@ -92,12 +92,15 @@ export type BillingSummary = Awaited<ReturnType<typeof billingSummary>>;
 
 /**
  * Switches Pro on for a month or a year: after an online payment, or by a site admin who took the
- * payment another way. A renewal adds on to a period still running. Pass a transaction to make it
+ * payment another way. A renewal adds on to a period still running, and buying during the free
+ * trial adds on to the trial's days left. Pass a transaction to make it
  * part of one (the payment's record and this, together).
  */
 export async function activatePro(organizationId: number, cycle: BillingCycle, db: Pick<Prisma.TransactionClient, "organization"> = prisma) {
-    const workspace = await db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, paidUntil: true } });
-    const paidUntil = paidUntilAfter(cycle, workspace.plan === "PRO" ? workspace.paidUntil : null);
+    const workspace = await db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, paidUntil: true, trialEndsAt: true } });
+    // it starts when what's running now ends: a paid period, or the free trial (buying on day 2 of
+    // the trial doesn't throw away the 5 days left)
+    const paidUntil = paidUntilAfter(cycle, workspace.plan === "PRO" ? workspace.paidUntil : workspace.trialEndsAt);
     await db.organization.update({
         where: { id: organizationId },
         data: { plan: "PRO", billingCycle: cycle, paidUntil, planRequest: null, planRequestedAt: null },

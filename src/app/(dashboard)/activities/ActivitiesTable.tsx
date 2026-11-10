@@ -146,7 +146,7 @@ export default function ActivitiesTable({
                 <thead>
                     <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:h-8 [&>th]:border-r [&>th]:border-b [&>th]:border-line-light [&>th]:bg-surface [&>th]:px-2 [&>th]:text-left [&>th]:font-medium [&>th]:text-faint">
                         <th className="left-0 z-20! w-8 px-0!" />
-                        <th className="left-8 z-20! w-72">
+                        <th className="md:left-8 z-20! w-72">
                             <span className="flex items-center gap-1">
                                 <IconCalendarEvent size={16} />
                                 Title
@@ -187,7 +187,7 @@ export default function ActivitiesTable({
                                         className="mx-auto size-6"
                                     />
                                 </td>
-                                <td className="sticky left-8 z-1 px-1!">
+                                <td className="md:sticky md:left-8 z-1 px-1!">
                                     <button
                                         type="button"
                                         onClick={() => onOpen(activity.id)}

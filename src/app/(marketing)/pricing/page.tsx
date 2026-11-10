@@ -7,35 +7,53 @@ import { FaqSection } from "../components/FaqSection";
 import { Footer } from "../components/Footer";
 import { CONTAINER, Eyebrow } from "../components/Eyebrow";
 import { pageMetadata } from "../metadata";
+import { PRO_PLANS, TRIAL_DAYS } from "@/lib/billing/plans";
 
-export const metadata = pageMetadata("/pricing", "Pricing", "Flash is free for up to 3 users. The Team plan is ₹999 per user, per month.");
+export const metadata = pageMetadata(
+    "/pricing",
+    "Pricing",
+    `Try Flash free for ${TRIAL_DAYS} days. Pro is ₹${PRO_PLANS.MONTHLY.price.toLocaleString("en-IN")} a month or ₹${PRO_PLANS.YEARLY.price.toLocaleString("en-IN")} a year for your whole team, with unlimited users.`,
+);
 
-// Each row: what it is, then Free / Team / Business. true = included, false = not, text = a limit
+const price = (amount: number) => `₹${amount.toLocaleString("en-IN")}`;
+
+// Each row: what it is, then Free trial / Pro / Business. true = included, false = not, text = what it is.
+// The trial has everything Pro has; Business adds help getting set up.
 const GROUPS: { title: string; rows: [string, ...(boolean | string)[]][] }[] = [
+    {
+        title: "Plan",
+        rows: [
+            ["Price", "Free", `${price(PRO_PLANS.MONTHLY.price)} / month or ${price(PRO_PLANS.YEARLY.price)} / year`, "Custom"],
+            ["How long", `${TRIAL_DAYS} days`, "Monthly or yearly", "Yearly"],
+            ["Users", "Unlimited", "Unlimited", "Unlimited"],
+        ],
+    },
     {
         title: "Workspace",
         rows: [
-            ["Users", "Up to 3", "Unlimited", "Unlimited"],
-            ["Leads, deals and contacts", true, true, true],
-            ["Kanban boards and tables", true, true, true],
+            ["Leads, deals, contacts and companies", true, true, true],
+            ["Kanban boards, tables and a calendar", true, true, true],
+            ["Imports and exports", true, true, true],
             ["Global search (⌘K)", true, true, true],
         ],
     },
     {
         title: "Selling together",
         rows: [
-            ["Tasks and scheduled activities", true, true, true],
-            ["Notes with @mentions", true, true, true],
-            ["Full timeline on every record", false, true, true],
-            ["Web forms that create leads", false, true, true],
+            ["Tasks, calls and meetings", true, true, true],
+            ["Automations", true, true, true],
+            ["Team email and WhatsApp", true, true, true],
+            ["Web forms and lead integrations", true, true, true],
+            ["Products and quotes", true, true, true],
         ],
     },
     {
         title: "Control",
         rows: [
-            ["Roles and permissions", false, true, true],
-            ["Custom fields", false, true, true],
-            ["Custom pipeline stages and lead sources", false, true, true],
+            ["Roles and permissions", true, true, true],
+            ["Custom fields and pipeline stages", true, true, true],
+            ["Full history on every record", true, true, true],
+            ["Recycle bin", true, true, true],
         ],
     },
     {
@@ -68,7 +86,7 @@ export default async function PricingPage() {
             <Nav loggedIn={!!user} primaryHref={primaryHref} primaryLabel={primaryLabel} />
 
             <main>
-                <PricingSection as="h1" />
+                <PricingSection as="h1" loggedIn={!!user} />
 
                 <section className={`${CONTAINER} max-w-300 pt-20 pb-30 font-(family-name:--font-host-grotesk)`}>
                     <Eyebrow>Compare plans</Eyebrow>
@@ -78,7 +96,7 @@ export default async function PricingPage() {
                             <thead>
                                 <tr className="border-b border-[#1c1c1c]/10 text-left">
                                     <th className="w-[40%] py-4 font-normal text-[#1c1c1c]/50">Features</th>
-                                    {["Free", "Team", "Business"].map((plan) => (
+                                    {["Free trial", "Pro", "Business"].map((plan) => (
                                         <th key={plan} className="py-4 text-center text-[17px] font-semibold tracking-[-0.03em]">
                                             {plan}
                                         </th>

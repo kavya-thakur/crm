@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { io } from "socket.io-client";
 
-import { api } from "@/lib/api/client";
 import { toast } from "@/components/Toast";
 import { trackBulkJob, type BulkProgress } from "./BackgroundJobs";
 
@@ -72,16 +71,13 @@ export function LiveUpdates() {
         let connectedBefore = false;
 
         socket.on("connect", () => {
-            // the API is told which tab made a change, so this tab isn't told about its own changes
-            api.defaults.headers.common["X-Socket-Id"] = socket.id;
-
-            // back after losing the connection (sleep, wifi): anything could have changed meanwhile
-            if (connectedBefore) void queryClient.invalidateQueries();
+            // back after losing the connection (sleep, wifi): anything could have changed meanwhile,
+            // so every list and the page itself (kept for 30 s, next.config.ts) are fetched again
+            if (connectedBefore) {
+                void queryClient.invalidateQueries();
+                router.refresh();
+            }
             connectedBefore = true;
-        });
-
-        socket.on("disconnect", () => {
-            delete api.defaults.headers.common["X-Socket-Id"];
         });
 
         socket.on("changed", ({ topic }: { topic: string }) => {
@@ -107,7 +103,6 @@ export function LiveUpdates() {
 
         return () => {
             socket.disconnect();
-            delete api.defaults.headers.common["X-Socket-Id"];
         };
     }, [queryClient, router]);
 

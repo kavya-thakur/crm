@@ -7,6 +7,8 @@ const PERMISSIONS = [
     "lead:create", "lead:read", "lead:update", "lead:delete", "lead:all",
     "deal:create", "deal:read", "deal:update", "deal:delete", "deal:all",
     "contact:create", "contact:read", "contact:update", "contact:delete", "contact:all",
+    "user:create", "user:read", "user:update", "user:delete",
+    "role:create", "role:read", "role:update", "role:delete",
     "task:all", "activity:all",
     "pipeline:manage",
     "lead-stages:manage",

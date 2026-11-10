@@ -16,6 +16,8 @@ interface DropdownProps {
     panelClassName?: string;
     /** make the menu exactly as wide as its button, like a form select */
     matchWidth?: boolean;
+    /** open as soon as it appears, e.g. an inline editor that's just been switched on */
+    startOpen?: boolean;
     // gets close() so an item can shut the menu after it runs
     children: (close: () => void) => ReactNode;
 }
@@ -27,7 +29,7 @@ interface DropdownProps {
 // a select inside the filter panel, an editor on a board card at the bottom of a column.
 // Inside a native <dialog> (Modal, SidePanel) it stays in place, since anything on <body>
 // would sit behind the dialog.
-export function Dropdown({ label, buttonClassName, align = "left", openUp = false, disabled, onClose, panelClassName, matchWidth, children }: DropdownProps) {
+export function Dropdown({ label, buttonClassName, align = "left", openUp = false, disabled, onClose, panelClassName, matchWidth, startOpen, children }: DropdownProps) {
     const [open, setOpen] = useState(false);
     // Stays true through the close animation — open itself flips first so the
     // tween direction is right, then this unmounts the panel once it's done.
@@ -48,6 +50,14 @@ export function Dropdown({ label, buttonClassName, align = "left", openUp = fals
         setRendered(true);
         setOpen(true);
     };
+
+    // startOpen: opens as soon as it appears, with the button focused so Esc closes it
+    useEffect(() => {
+        if (!startOpen) return;
+        buttonRef.current?.focus();
+        openMenu();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // The floating menu's fixed position: under the button (or above it, when flipped),
     // lined up with its left or right edge, but always on screen. On a phone the button can be
