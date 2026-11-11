@@ -921,8 +921,10 @@ model EmailAccount {
   organizationId    Int      @unique
   // "sales@company.com": the address emails are sent from, and the SMTP login
   email             String
-  host              String
-  port              Int
+  // the SMTP server; both empty for a Gmail connected with Google (sent through Gmail's API)
+  host              String?
+  port              Int?
+  // encrypted: the SMTP app password, or for Google the refresh token Google gave
   passwordEncrypted String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

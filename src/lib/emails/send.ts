@@ -5,6 +5,7 @@ import { isDemoWorkspace } from "@/lib/demo/workspace";
 import { broadcastChange, notify } from "@/lib/realtime/notify";
 import { emailsQueue } from "@/lib/jobs/queues";
 import { decryptSecret, mailboxProblem, smtpFor } from "@/lib/emails/account";
+import { sendWithGmail } from "@/lib/emails/google";
 
 /*
  * Sending the CRM's emails. Each person connects their own mailbox in Settings > Profile
@@ -96,18 +97,23 @@ export async function sendEmail(emailId: number) {
     // it says who wrote it: "Priya Sharma (Acme)" <sales@acme.com>
     const fromName = email.sentBy ? `${email.sentBy.name} (${email.organization.name})` : email.organization.name;
 
-    const login = { email: account.email, host: account.host, port: account.port, password: decryptSecret(account.passwordEncrypted) };
+    const mail = {
+        from: { name: fromName, address: account.email },
+        to: email.to,
+        subject: email.subject,
+        text: email.body,
+        html: toHtml(email.body, email.trackingToken),
+    };
     try {
-        await smtpFor(login).sendMail({
-            from: { name: fromName, address: account.email },
-            to: email.to,
-            subject: email.subject,
-            text: email.body,
-            html: toHtml(email.body, email.trackingToken),
-        });
+        // no server: a Gmail connected with Google, sent through Gmail's API (src/lib/emails/google.ts)
+        if (account.host && account.port) await smtpFor({ email: account.email, host: account.host, port: account.port, password: decryptSecret(account.passwordEncrypted) }).sendMail(mail);
+        else await sendWithGmail(decryptSecret(account.passwordEncrypted), mail);
     } catch (error) {
-        // a revoked app password won't work on the next try either; anything else (a blip) is retried
-        if ((error as { code?: string }).code === "EAUTH") return failEmail(email.id, `${mailboxProblem(error)} An admin reconnects it in Settings → Workspace.`);
+        // a revoked app password or Google access won't work on the next try either; anything else (a blip) is retried
+        if ((error as { code?: string }).code === "EAUTH") {
+            const why = account.host ? mailboxProblem(error) : (error as Error).message;
+            return failEmail(email.id, `${why} An admin reconnects it in Settings → Workspace.`);
+        }
         throw error;
     }
 

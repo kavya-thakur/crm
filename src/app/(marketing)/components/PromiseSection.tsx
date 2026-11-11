@@ -20,14 +20,14 @@ const PROMISES = [
 // Where getorchestra.com shows customer quotes, we show the kind of wins a team sees
 // in Flash every day. Flash has no customers to quote yet.
 const WINS = [
-    { who: "Priya", what: "moved Acme Industries to Won", detail: "₹4,80,000", color: "#059669", when: "2m ago" },
-    { who: "Rahul", what: "logged a call with Globex Corp", detail: "12 min · follow up Tue", color: "#0284c7", when: "8m ago" },
-    { who: "Meera", what: "was assigned 4 new website leads", detail: "Lead source: Website", color: "#7c3aed", when: "15m ago" },
-    { who: "Arjun", what: "sent the proposal to Hooli Cloud", detail: "₹1,25,000 · Proposal", color: "#ca8a04", when: "32m ago" },
-    { who: "Priya", what: "mentioned you on Initech Systems", detail: "“@you can you join Thursday's demo?”", color: "#4a38f5", when: "1h ago" },
-    { who: "Rahul", what: "closed Contoso Ltd", detail: "₹3,10,000 · Won", color: "#059669", when: "2h ago" },
-    { who: "Meera", what: "booked a meeting with Vandelay Imports", detail: "Fri 3:00 PM · 3 attendees", color: "#0284c7", when: "3h ago" },
-    { who: "Arjun", what: "qualified Umbrella Co", detail: "₹2,10,000 · Qualified", color: "#7c3aed", when: "4h ago" },
+    { who: "Olivia", what: "moved Acme Industries to Won", detail: "₹4,80,000", color: "#059669", when: "2m ago" },
+    { who: "Ethan", what: "logged a call with Globex Corp", detail: "12 min · follow up Tue", color: "#0284c7", when: "8m ago" },
+    { who: "Aanya", what: "was assigned 4 new website leads", detail: "Lead source: Website", color: "#7c3aed", when: "15m ago" },
+    { who: "Vihaan", what: "sent the proposal to Hooli Cloud", detail: "₹1,25,000 · Proposal", color: "#ca8a04", when: "32m ago" },
+    { who: "Olivia", what: "mentioned you on Initech Systems", detail: "“@you can you join Thursday's demo?”", color: "#4a38f5", when: "1h ago" },
+    { who: "Ethan", what: "closed Contoso Ltd", detail: "₹3,10,000 · Won", color: "#059669", when: "2h ago" },
+    { who: "Aanya", what: "booked a meeting with Vandelay Imports", detail: "Fri 3:00 PM · 3 attendees", color: "#0284c7", when: "3h ago" },
+    { who: "Vihaan", what: "qualified Umbrella Co", detail: "₹2,10,000 · Qualified", color: "#7c3aed", when: "4h ago" },
 ];
 
 const EDGE_FADE = "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)";

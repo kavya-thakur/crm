@@ -38,21 +38,21 @@ const STAGES = {
 
 // Made-up leads, only to show what the product looks like
 const ROWS = [
-    { name: "Acme Industries", stage: STAGES.qualified, owner: "Priya", source: "Website", created: "Nov 2" },
-    { name: "Globex Corporation", stage: STAGES.proposal, owner: "Rahul", source: "Referral", created: "Nov 1" },
-    { name: "Northwind Traders", stage: STAGES.new, owner: "Priya", source: "Cold call", created: "Oct 30" },
-    { name: "Contoso Ltd", stage: STAGES.won, owner: "Meera", source: "Website", created: "Oct 29" },
-    { name: "Initech Systems", stage: STAGES.contacted, owner: "Arjun", source: "Event", created: "Oct 28" },
-    { name: "Umbrella Logistics", stage: STAGES.qualified, owner: "Rahul", source: "Referral", created: "Oct 27" },
-    { name: "Stark Components", stage: STAGES.proposal, owner: "Meera", source: "Website", created: "Oct 26" },
-    { name: "Wayne Supplies", stage: STAGES.new, owner: "Arjun", source: "Event", created: "Oct 24" },
-    { name: "Hooli Cloud", stage: STAGES.contacted, owner: "Priya", source: "Cold call", created: "Oct 23" },
-    { name: "Vandelay Imports", stage: STAGES.qualified, owner: "Meera", source: "Referral", created: "Oct 22" },
-    { name: "Soylent Foods", stage: STAGES.won, owner: "Rahul", source: "Website", created: "Oct 21" },
-    { name: "Pied Piper Labs", stage: STAGES.new, owner: "Arjun", source: "Website", created: "Oct 20" },
-    { name: "Massive Dynamic", stage: STAGES.proposal, owner: "Priya", source: "Event", created: "Oct 18" },
-    { name: "Cyberdyne Retail", stage: STAGES.contacted, owner: "Meera", source: "Cold call", created: "Oct 17" },
-    { name: "Gringotts Finance", stage: STAGES.qualified, owner: "Arjun", source: "Referral", created: "Oct 15" },
+    { name: "Acme Industries", stage: STAGES.qualified, owner: "Olivia", source: "Website", created: "Nov 2" },
+    { name: "Globex Corporation", stage: STAGES.proposal, owner: "Ethan", source: "Referral", created: "Nov 1" },
+    { name: "Northwind Traders", stage: STAGES.new, owner: "Olivia", source: "Cold call", created: "Oct 30" },
+    { name: "Contoso Ltd", stage: STAGES.won, owner: "Aanya", source: "Website", created: "Oct 29" },
+    { name: "Initech Systems", stage: STAGES.contacted, owner: "Vihaan", source: "Event", created: "Oct 28" },
+    { name: "Umbrella Logistics", stage: STAGES.qualified, owner: "Ethan", source: "Referral", created: "Oct 27" },
+    { name: "Stark Components", stage: STAGES.proposal, owner: "Aanya", source: "Website", created: "Oct 26" },
+    { name: "Wayne Supplies", stage: STAGES.new, owner: "Vihaan", source: "Event", created: "Oct 24" },
+    { name: "Hooli Cloud", stage: STAGES.contacted, owner: "Olivia", source: "Cold call", created: "Oct 23" },
+    { name: "Vandelay Imports", stage: STAGES.qualified, owner: "Aanya", source: "Referral", created: "Oct 22" },
+    { name: "Soylent Foods", stage: STAGES.won, owner: "Ethan", source: "Website", created: "Oct 21" },
+    { name: "Pied Piper Labs", stage: STAGES.new, owner: "Vihaan", source: "Website", created: "Oct 20" },
+    { name: "Massive Dynamic", stage: STAGES.proposal, owner: "Olivia", source: "Event", created: "Oct 18" },
+    { name: "Cyberdyne Retail", stage: STAGES.contacted, owner: "Aanya", source: "Cold call", created: "Oct 17" },
+    { name: "Gringotts Finance", stage: STAGES.qualified, owner: "Vihaan", source: "Referral", created: "Oct 15" },
 ];
 
 const LIGHTS = ["#FF5F57", "#FEBC2E", "#28C840"];

@@ -42,11 +42,11 @@ function Tag({ children, tone = "bg-[#1c1c1c]/6 text-[#1c1c1c]/70" }: { children
 // --- Capture: five places leads come from, all flowing into one lead card ---
 
 const SOURCES = [
-    { icon: IconForms, label: "Website contact form", name: "Riya Sharma", campaign: "diwali-sale", owner: "Priya Sharma" },
-    { icon: IconBrandGoogle, label: "Google Ads", name: "Arjun Mehta", campaign: "search-brand", owner: "Rohan Iyer" },
-    { icon: IconBuildingStore, label: "IndiaMART", name: "Kabir Singh", campaign: null, owner: "Sneha Kapoor" },
-    { icon: IconFileSpreadsheet, label: "leads.csv", name: "Isha Rao", campaign: null, owner: "Aarav Mehta" },
-    { icon: IconWebhook, label: "Zapier", name: "Meera Nair", campaign: "fb-lead-ads", owner: "Vikram Singh" },
+    { icon: IconForms, label: "Website contact form", name: "Sophia Bennett", campaign: "diwali-sale", owner: "Olivia Hart" },
+    { icon: IconBrandGoogle, label: "Google Ads", name: "Aarav Malhotra", campaign: "search-brand", owner: "Ethan Cole" },
+    { icon: IconBuildingStore, label: "IndiaMART", name: "James Whitaker", campaign: null, owner: "Aanya Kapoor" },
+    { icon: IconFileSpreadsheet, label: "leads.csv", name: "Isabella Reed", campaign: null, owner: "Vihaan Mehra" },
+    { icon: IconWebhook, label: "Zapier", name: "Myra Khanna", campaign: "fb-lead-ads", owner: "Mason Reid" },
 ];
 
 export function CapturePicture() {
@@ -132,7 +132,7 @@ export function EmailPicture() {
             <div className={`${CARD} absolute inset-x-[6%] top-[8%] p-5`}>
                 <div className="flex items-center justify-between">
                     <p className="flex items-center gap-2 text-[14px] font-semibold">
-                        <IconMail size={16} /> Email Rahul Verma
+                        <IconMail size={16} /> Email Daniel Foster
                     </p>
                     <span key={status.label} className={`animate-[fade-in_0.4s_ease-out] rounded-full px-2 py-0.5 text-[12px] font-medium ${status.tone}`}>
                         {status.label}
@@ -144,9 +144,9 @@ export function EmailPicture() {
                 </div>
                 <p className="mt-3 text-[13px] font-medium">Following up on our call, {field("{{lead.company}}", "Acme Logistics")}</p>
                 <div className="mt-3 flex flex-col gap-2 text-[13px] leading-relaxed text-[#1c1c1c]/70">
-                    <p>Hi {field("{{lead.firstName}}", "Rahul")},</p>
+                    <p>Hi {field("{{lead.firstName}}", "Daniel")},</p>
                     <p>Thanks for your time today. I&apos;ve put together the next steps we talked about, and I&apos;m happy to answer any questions.</p>
-                    <p>{field("{{me.name}}", "Priya Sharma")}</p>
+                    <p>{field("{{me.name}}", "Olivia Hart")}</p>
                 </div>
             </div>
 
@@ -158,7 +158,7 @@ export function EmailPicture() {
                     <IconBell size={18} />
                 </span>
                 <div>
-                    <p className="text-[13px] font-semibold">Rahul Verma opened your email</p>
+                    <p className="text-[13px] font-semibold">Daniel Foster opened your email</p>
                     <p className="text-[12px] text-[#1c1c1c]/50">Just now</p>
                 </div>
             </div>
@@ -173,7 +173,7 @@ export function DuplicateCard() {
         <div className={`${APP} flex max-w-80 items-start gap-2 rounded-xl border border-[#f5d090] bg-[#fff8eb] p-3 text-[13px] text-[#8a5a00] shadow-[0_24px_50px_-20px_rgb(28_28_28/0.35)]`}>
             <IconAlertTriangle size={16} className="mt-0.5 shrink-0" />
             <p>
-                <span className="font-medium">Kabir from Horizon Realty</span> is already an open lead with the same phone number
+                <span className="font-medium">James from Horizon Realty</span> is already an open lead with the same phone number
             </p>
         </div>
     );
@@ -221,7 +221,7 @@ export function MentionCard() {
                 <IconBell size={18} />
             </span>
             <div>
-                <p className="text-[13px] font-semibold">Priya mentioned you on Riya Sharma</p>
+                <p className="text-[13px] font-semibold">Olivia mentioned you on Sophia Bennett</p>
                 <p className="text-[12px] text-[#1c1c1c]/50">2 min ago</p>
             </div>
         </div>
@@ -236,7 +236,7 @@ export function LiveCard() {
                 <span className="relative size-2.5 rounded-full bg-[#30a46c]" />
             </span>
             <p className="text-[13px] font-medium">
-                <span className="font-semibold">Rohan</span> moved Umbra Studios: Renewal to <Tag tone="bg-[#e6f6eb] text-[#218358]">Won</Tag>
+                <span className="font-semibold">Ethan</span> moved Umbra Studios: Renewal to <Tag tone="bg-[#e6f6eb] text-[#218358]">Won</Tag>
             </p>
         </div>
     );

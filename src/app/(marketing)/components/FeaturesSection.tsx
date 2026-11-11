@@ -172,12 +172,12 @@ function BoardPicture() {
             name: "New",
             color: "#64748b",
             deals: [
-                { name: "Initech", amount: "₹75,000", owner: "Arjun" },
-                { name: "Umbrella Co", amount: "₹2,10,000", owner: "Meera" },
+                { name: "Initech", amount: "₹75,000", owner: "Vihaan" },
+                { name: "Umbrella Co", amount: "₹2,10,000", owner: "Aanya" },
             ],
         },
-        { name: "Qualified", color: "#7c3aed", deals: [{ name: "Acme Industries", amount: "₹4,80,000", owner: "Priya" }] },
-        { name: "Won", color: "#059669", deals: [{ name: "Contoso Ltd", amount: "₹3,10,000", owner: "Rahul" }] },
+        { name: "Qualified", color: "#7c3aed", deals: [{ name: "Acme Industries", amount: "₹4,80,000", owner: "Olivia" }] },
+        { name: "Won", color: "#059669", deals: [{ name: "Contoso Ltd", amount: "₹3,10,000", owner: "Ethan" }] },
     ];
 
     return (
@@ -208,7 +208,7 @@ function BoardPicture() {
                 ))}
 
                 <span data-moving-deal className="absolute top-6 left-0 h-19 w-[calc((100%-16px)/3)] rounded-lg border-[1.5px] border-[#4a38f5] bg-white p-2">
-                    <DealCard deal={{ name: "Hooli Cloud", amount: "₹1,25,000", owner: "Arjun" }} />
+                    <DealCard deal={{ name: "Hooli Cloud", amount: "₹1,25,000", owner: "Vihaan" }} />
                     <span data-won-tick className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-[#059669] text-white">
                         <IconCheck size={10} stroke={3} />
                     </span>
@@ -226,19 +226,19 @@ const ROW = 36;
 
 // Who's in the table, and the rows each of them visits, in order
 const TEAM = [
-    { name: "Priya", color: "#f5c400", rows: [0, 3, 1] },
-    { name: "Rahul", color: "#ff8a4c", rows: [2, 4, 0] },
-    { name: "Meera", color: "#d65cf0", rows: [4, 1, 3] },
+    { name: "Olivia", color: "#f5c400", rows: [0, 3, 1] },
+    { name: "Ethan", color: "#ff8a4c", rows: [2, 4, 0] },
+    { name: "Aanya", color: "#d65cf0", rows: [4, 1, 3] },
 ];
 
 const cursorLeft = (person: number, step: number) => `${[16, 48, 30][(person + step) % 3]}%`;
 
 const LEADS = [
-    { name: "Acme Industries", stage: "Qualified", color: "#7c3aed", owner: "Priya" },
-    { name: "Globex Corp", stage: "Proposal", color: "#ca8a04", owner: "Rahul" },
-    { name: "Initech Systems", stage: "New", color: "#64748b", owner: "Arjun" },
-    { name: "Hooli Cloud", stage: "Qualified", color: "#7c3aed", owner: "Meera" },
-    { name: "Vandelay Imports", stage: "Contacted", color: "#0284c7", owner: "Priya" },
+    { name: "Acme Industries", stage: "Qualified", color: "#7c3aed", owner: "Olivia" },
+    { name: "Globex Corp", stage: "Proposal", color: "#ca8a04", owner: "Ethan" },
+    { name: "Initech Systems", stage: "New", color: "#64748b", owner: "Vihaan" },
+    { name: "Hooli Cloud", stage: "Qualified", color: "#7c3aed", owner: "Aanya" },
+    { name: "Vandelay Imports", stage: "Contacted", color: "#0284c7", owner: "Olivia" },
 ];
 
 function TeamPicture() {
@@ -297,7 +297,7 @@ function TeamPicture() {
 function CommandPicture() {
     const items: { icon: Icon; label: string; keys: string }[] = [
         { icon: IconTargetArrow, label: "Acme Industries", keys: "Lead" },
-        { icon: IconAddressBook, label: "Riya Sharma · Acme", keys: "Contact" },
+        { icon: IconAddressBook, label: "Sophia Bennett · Acme", keys: "Contact" },
         { icon: IconCurrencyRupee, label: "Acme Industries · ₹4,80,000", keys: "Deal" },
         { icon: IconPhoneCall, label: "Demo call with Acme", keys: "Call" },
     ];
