@@ -23,19 +23,19 @@ type Lead = { name: string; site: number; owner: string };
 
 // One arrives per loop, from each site in turn, and goes to the next teammate in the rotation
 const ARRIVALS: Lead[] = [
-    { name: "Riya Sharma", site: 0, owner: "Priya" },
-    { name: "Sara Khan", site: 1, owner: "Rahul" },
-    { name: "Arjun Mehta", site: 2, owner: "Meera" },
-    { name: "Ishaan Roy", site: 0, owner: "Priya" },
-    { name: "Tara Menon", site: 1, owner: "Rahul" },
-    { name: "Kabir Das", site: 2, owner: "Meera" },
+    { name: "Sophia Bennett", site: 0, owner: "Olivia" },
+    { name: "Noah Carter", site: 1, owner: "Ethan" },
+    { name: "Aarav Malhotra", site: 2, owner: "Aanya" },
+    { name: "Isabella Reed", site: 0, owner: "Olivia" },
+    { name: "Zara Sethi", site: 1, owner: "Ethan" },
+    { name: "James Whitaker", site: 2, owner: "Aanya" },
 ];
 
 // Already in the list, newest first
 const START: Lead[] = [
-    { name: "Vikram Rao", site: 2, owner: "Meera" },
-    { name: "Neha Gupta", site: 1, owner: "Rahul" },
-    { name: "Ananya Iyer", site: 0, owner: "Priya" },
+    { name: "Myra Khanna", site: 2, owner: "Aanya" },
+    { name: "Lucas Hayes", site: 1, owner: "Ethan" },
+    { name: "Amelia Brooks", site: 0, owner: "Olivia" },
 ];
 
 const FACTS = ["Works on any website, no plugin", "Spam-trapped and rate-limited", "Shared out in turn across your team"];

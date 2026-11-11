@@ -7,9 +7,18 @@ already typed. Everything here is free.
 ## One team email, connected by an admin
 
 In **Settings → Workspace → Team email**, an admin (`workspace:manage`) connects one mailbox for the
-whole workspace, like `sales@yourcompany.com`: its address and an **app password** (Gmail: turn on
-2-Step Verification, then make one at myaccount.google.com/apppasswords). Gmail is the default;
-Outlook, Zoho, Hostinger or any other provider works by changing the server (port 465 or 587).
+whole workspace, like `sales@yourcompany.com`, with **Connect with Google** (Gmail and Google
+Workspace): the admin picks the account on Google's page, nothing to paste. Emails go out through
+**Gmail's API** (HTTPS), so this works on hosts that block mail ports, like Render's free plan. See
+"Connect with Google" below. **Change** goes through Google again (the new account replaces the old);
+**Disconnect** deletes the saved key.
+
+- **App passwords (SMTP), off the screen since 2026-11-11.** It used to be the only way: an address
+  and an app password, any provider (Outlook, Zoho, Hostinger) by changing the server (465 or 587).
+  Render's free plan blocks SMTP, so on the live site it always failed; the form was removed from
+  Settings. The rest stays: `PUT /api/workspace/email-account` still accepts one, and a mailbox
+  connected that way still sends (`send.ts`), so it can come back on a host that allows SMTP.
+  Outlook/Zoho users can't connect for now (a "Connect with Microsoft" would be the next step).
 
 - **Everyone sends from it**, with nothing to set up, and with their own name on each email:
   `"Priya Sharma (Acme)" <sales@acme.com>`. Replies come back to that shared inbox. Automations too.
@@ -30,8 +39,36 @@ Outlook, Zoho, Hostinger or any other provider works by changing the server (por
 - **Revoked later?** If the provider refuses the password, the email fails at once (no pointless
   retries) with "An admin reconnects it in Settings → Workspace", and the sender is notified.
 
-Why not "Sign in with Google"? Sending through Gmail's API needs Google's app verification, and
-until then only 100 named test users can sign in. An app password needs no approval.
+## Connect with Google
+
+```
+Settings → "Connect with Google" ── GET /api/workspace/email-account/google
+        │  admin only; sets a random `state` cookie (10 min, path = the callback)
+        ▼
+Google: "Flash wants to send email on your behalf" ── Allow
+        ▼
+GET …/google/callback?code&state ── state matches the cookie? (else: "try again")
+        │  code → Google's token endpoint → refresh token + id token (the Gmail address)
+        │  scope must include gmail.send (Google lets people untick it)
+        ▼
+EmailAccount { email, host: null, port: null, passwordEncrypted: encrypted refresh token }
+        ▼
+Back to Settings with ?google=connected (or the reason), shown as a toast
+```
+
+Each send (`sendWithGmail` in `src/lib/emails/google.ts`): the refresh token gets an access token,
+Nodemailer *builds* the email (no SMTP), and it goes to `gmail/v1/users/me/messages/send` as base64url.
+It shows in that Gmail's Sent folder. If the admin takes the access back (or changes their Google
+password), Google answers `invalid_grant`: the email fails at once with "Google no longer lets Flash
+send from this Gmail. An admin reconnects it in Settings → Workspace."
+
+Setup: a Google Cloud project with the Gmail API on, the `gmail.send` scope, the app **published**
+(in Testing, Google ends the connection after 7 days), and a "Web application" OAuth client whose
+redirect URI is `<APP_URL>/api/workspace/email-account/google/callback`. Its id and secret go in
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Until Google verifies the app, the admin sees "Google
+hasn't verified this app" once (Advanced → Go to Flash), and at most 100 Google accounts can connect.
+The id token's email is read without checking its signature: it comes straight from Google's token
+endpoint over HTTPS, never from the browser.
 
 `APP_URL` (the deployed site's address) is the only setting: it turns on open tracking.
 

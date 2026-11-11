@@ -72,7 +72,7 @@ export function Hero({ loggedIn, primaryHref, primaryLabel }: { loggedIn: boolea
                             side="left"
                             icon={<IconUserCheck size={34} className="shrink-0 rounded-xl bg-[#edf2fe] p-2 text-[#3e63dd]" />}
                             title="Lead assigned"
-                            detail="Acme Industries → Priya"
+                            detail="Acme Industries → Olivia"
                         />
                         <UpdateCard
                             side="right"

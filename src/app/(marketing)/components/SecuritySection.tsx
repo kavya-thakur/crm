@@ -188,7 +188,7 @@ function SealedPicture() {
                     <p className={`mt-1 ${MONO} text-[10px] text-[#1c1c1c]/40`}>your workspace</p>
                     <div className="relative mt-3 flex flex-col gap-1.5">
                         <span data-scan className="absolute inset-x-0 top-0 h-7 rounded-md bg-[#4a38f5]/12 opacity-0" />
-                        {["Riya Sharma", "Hooli Cloud", "Kitepay"].map((record) => (
+                        {["Sophia Bennett", "Hooli Cloud", "Kitepay"].map((record) => (
                             <span key={record} className="relative flex h-7 items-center truncate rounded-md border border-[#1c1c1c]/6 px-2 text-[11px]">
                                 {record}
                             </span>
@@ -315,12 +315,12 @@ const ENTRY = 56; // a timeline row is 48px tall, plus an 8px gap
 const VISIBLE = 3;
 
 const LOG: { icon: Icon; tone: string; who: string; did: string; detail: string }[] = [
-    { icon: IconLayoutKanban, tone: "bg-[#ede9fe] text-[#6d28d9]", who: "Priya", did: "moved a deal", detail: "Hooli Cloud → Negotiation" },
-    { icon: IconUserCheck, tone: "bg-[#edf2fe] text-[#3a5bc7]", who: "Meera", did: "assigned a lead", detail: "Acme Industries → Rahul" },
-    { icon: IconCurrencyRupee, tone: "bg-[#e6f6eb] text-[#218358]", who: "Rahul", did: "changed the value", detail: "₹1,00,000 → ₹1,25,000" },
-    { icon: IconNotes, tone: "bg-[#fff4d5] text-[#ab6400]", who: "Arjun", did: "added a note", detail: "Proposal sent, follow up Friday" },
-    { icon: IconCircleCheck, tone: "bg-[#e0f8f3] text-[#00826d]", who: "Priya", did: "completed a task", detail: "Send proposal to Initech" },
-    { icon: IconShieldLock, tone: "bg-[#fee9f6] text-[#c2298a]", who: "Meera", did: "changed a role", detail: "Rahul → Manager" },
+    { icon: IconLayoutKanban, tone: "bg-[#ede9fe] text-[#6d28d9]", who: "Olivia", did: "moved a deal", detail: "Hooli Cloud → Negotiation" },
+    { icon: IconUserCheck, tone: "bg-[#edf2fe] text-[#3a5bc7]", who: "Aanya", did: "assigned a lead", detail: "Acme Industries → Ethan" },
+    { icon: IconCurrencyRupee, tone: "bg-[#e6f6eb] text-[#218358]", who: "Ethan", did: "changed the value", detail: "₹1,00,000 → ₹1,25,000" },
+    { icon: IconNotes, tone: "bg-[#fff4d5] text-[#ab6400]", who: "Vihaan", did: "added a note", detail: "Proposal sent, follow up Friday" },
+    { icon: IconCircleCheck, tone: "bg-[#e0f8f3] text-[#00826d]", who: "Olivia", did: "completed a task", detail: "Send proposal to Initech" },
+    { icon: IconShieldLock, tone: "bg-[#fee9f6] text-[#c2298a]", who: "Aanya", did: "changed a role", detail: "Ethan → Manager" },
 ];
 
 function TimelinePicture() {

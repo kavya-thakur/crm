@@ -199,6 +199,13 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       mailbox (sales@company.com) for the whole workspace; everyone sends from it as "Priya Sharma
       (Acme)". Agents can't connect their own (per-person mailboxes removed; an owner's existing one
       became the team's). See [EMAIL.md](EMAIL.md)
+- [x] **Connect with Google** (2026-11-11, Settings → Workspace → Team email): the admin picks their
+      Gmail on Google's page instead of pasting an app password; emails go out through Gmail's API
+      over HTTPS, so they work on Render's free plan, which blocks SMTP. Refresh token kept encrypted
+      in `EmailAccount.passwordEncrypted` (host/port empty); taken-back access fails the email at once
+      with "reconnect". `src/lib/emails/google.ts`, needs `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+      The app-password form is off the Settings screen (it always failed on Render's free plan);
+      Google is the only way to connect for now, and Change goes through Google again
 - [x] **Import: check first, fix on screen, nothing dropped unseen** (2026-11-08). After matching
       columns, `/api/imports/check` reads every row (10,000 in ~0.2 s locally) through the same rules
       the import uses (`src/lib/imports/rows.ts`, shared with `leadImport.ts`), so what it says is what
@@ -225,7 +232,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       raw change kept in the entry's `metadata`. `src/lib/history.ts`. Stage moves and assignments
       already had entries; a deal's amount changing because its products changed doesn't add one
 - [x] **Forgot password** (2026-11-07): "Forgot password?" on sign-in emails a one-time link (an
-      hour; asking again replaces it) from Flash's own mailbox (`SMTP_*`, `src/lib/emails/system.ts`;
+      hour; asking again replaces it) from Flash's own mailbox (`SMTP_*` locally, Brevo's API with `BREVO_API_KEY` in production because Render's free plan blocks SMTP; `src/lib/emails/system.ts`;
       without it, the link is printed in the dev terminal). Only the link's sha256 is stored
       (`PasswordReset`). An email with no account gets "No account uses this email" and nothing is sent (2026-11-10; sign up already reveals it, so a vague answer only confused people); rate limited; the demo
       login is left alone; the link uses `APP_URL` in production, never the request's Host. The page
@@ -424,4 +431,5 @@ Newest first. The reason matters more than the choice.
 | 2026-10 | **Light-only, Twenty-style** UI (dashboard has its own look) | a calm, modern CRM look; one theme done well |
 | 2026-10 | Agent "deactivation" deferred | confusing to explain; revisit with a clear design |
 | 2026-10 | Integration tests on a real database, not mocks | the queries and permissions *are* the product |
+| 2026-11-11 | Team email: **Connect with Google** (Gmail API) next to app passwords, not instead of them | Render's free plan blocks SMTP, so app passwords only work locally or on a paid host; Gmail's API is HTTPS. Until Google verifies the app, people see an "unverified app" screen once and at most 100 Google accounts can connect, fine for now. Other providers still use app passwords |
 | 2026-11-10 | In the record tables the Name column is **pinned only from 768px up**; on phones it scrolls away | pinned, it took ~240px of a ~375px screen and left little room for the other fields |

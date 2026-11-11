@@ -565,7 +565,7 @@ erDiagram
 
 ## API
 
-105 route handlers under `src/app/api`, one folder per resource. All of them are JSON, and all
+107 route handlers under `src/app/api`, one folder per resource. All of them are JSON (except the two Google connect routes, which redirect), and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |
@@ -575,7 +575,7 @@ of them check sign-in, permission, input (Zod) and workspace scope.
 | **Email** | `emails` (list and send), `email-templates`, `whatsapp` (note an opened chat) |
 | **Automation** | `automations` (rules, on/off), `automations/:id/runs` (the run log) |
 | **Capture** | `lead-forms` (web forms and integrations), `lead-forms/:id/deliveries`, `imports` (+ `problems`, `sample`), `bulk-jobs` |
-| **Workspace** | `workspace` (its currency), `workspace/email-account` (the team mailbox), `onboarding`, `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
+| **Workspace** | `workspace` (its currency), `workspace/email-account` (the team mailbox, + `google`, `google/callback`), `onboarding`, `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
 | **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `auth/forgot-password`, `auth/reset-password`, `auth/back` (end "log in as"), `me`, `me/password`, `notifications` |
 | **Billing** | `billing` (plan and status), `billing/order` (start a Razorpay payment), `billing/verify` (confirm it) |
 | **Site admin** | `site-admin/overview` (counts, revenue, trials ending), `site-admin/workspaces` (+ `:id`: one company, record a payment, extend a trial), `site-admin/users`, `site-admin/payments` |
@@ -694,7 +694,9 @@ Open the login page and click **Open the demo**, or sign in as `johndoe@flash-de
 | `APP_URL` | in production | the site's public address, for link previews and email open tracking |
 | `DEMO_FORM_KEY` | optional | the marketing site's "Book a demo" form sends its leads into this web form |
 | `SITE_ADMIN_EMAILS` | optional | comma-separated emails that see every workspace and can log in as anyone |
-| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASS` · `SMTP_FROM` | optional | Flash's own mailbox, for password-reset links; without it the link is printed in the terminal |
+| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASS` · `SMTP_FROM` | optional | Flash's own mailbox, for password-reset links and billing reminders; without it the link is printed in the terminal |
+| `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | production | "Connect with Google" for the team mailbox (Gmail API, works where SMTP is blocked); a Google Cloud OAuth client, redirect URI `<APP_URL>/api/workspace/email-account/google/callback` |
+| `BREVO_API_KEY` | production | sends those emails through Brevo's API instead of SMTP (Render's free plan blocks mail ports); from `SMTP_USER`, verified as a Brevo sender |
 | `RAZORPAY_KEY_ID` · `RAZORPAY_KEY_SECRET` · `RAZORPAY_WEBHOOK_SECRET` | optional | online payment for Pro; without them a plan request goes to a site admin |
 | `TEST_DATABASE_URL` | optional | the database `npm test` uses (default: local `crm_test`) |
 
@@ -748,8 +750,8 @@ live in it. That rules out serverless-only hosting. This repo deploys **for free
 | App (Next.js + Socket.IO + workers) | **Render** free web service | sleeps after 15 idle minutes; a free uptime ping keeps it awake |
 | PostgreSQL | **Neon** free plan | doesn't expire (Render's free database is deleted after 30 days) |
 | Redis | **Render Key Value** free | inside Render, no per-command billing (BullMQ talks to Redis constantly) |
-| Email to leads | the team's own mailbox (Gmail or any) | connected by an admin in Settings → Workspace with an app password; nothing to set up on the server |
-| Password-reset email | a Gmail made for Flash | `SMTP_*` variables |
+| Email to leads | the team's own mailbox (Gmail or any) | an admin clicks **Connect with Google** in Settings → Workspace (Gmail API; `GOOGLE_*` variables). App passwords (SMTP) are off the screen: Render's free plan blocks SMTP |
+| Password-reset email | a Gmail made for Flash; Brevo (free, 300 a day) in production | `SMTP_*` variables, `BREVO_API_KEY` |
 | Payments | **Razorpay** (test keys are free) | `RAZORPAY_*` variables; webhook at `/api/public/razorpay` |
 
 `render.yaml` is a **Render Blueprint** that describes the app and its Redis, so Render sets them

@@ -61,7 +61,12 @@ export async function POST(req: NextRequest) {
 <p>Someone (hopefully you) asked to reset the password for ${escapeHtml(user.email)} on Flash.</p>
 <p><a href="${link}" style="display:inline-block;padding:10px 18px;border-radius:999px;background:#1c1c1c;color:#ffffff;text-decoration:none;font-weight:600">Choose a new password</a></p>
 <p style="color:#666">The link works once, for ${RESET_LINK_MINUTES} minutes. If it wasn't you, ignore this email: your password stays the same.</p>`,
+        }).catch((error) => {
+            // the provider refused or couldn't be reached: why goes in the server's log, the person gets a plain answer
+            console.error("Password reset email:", error);
+            return "failed" as const;
         });
+        if (sent === "failed") return NextResponse.json(NOT_SET_UP, { status: 503 });
 
         if (!sent) {
             if (!dev) {
