@@ -15,6 +15,7 @@ import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/utils/format";
 import { useCustomFields } from "../../shared/customFields";
 import { useEmailTemplates } from "../../shared/emails";
+import { stageName, usePipelines, type PipelineStage } from "../../deals/shared";
 import { OP_LABELS, RuleBuilder, TRIGGER_LABELS, conditionFields, type AutomationRule, type Choices } from "./RuleBuilder";
 
 interface ListedRule extends AutomationRule {
@@ -114,8 +115,9 @@ function useChoices(): Choices {
     });
     const pipelineStages = useQuery({
         queryKey: ["pipelineStage"],
-        queryFn: () => api.get<{ data: Stage[] }>("/pipeline-stages").then((res) => res.data.data),
+        queryFn: () => api.get<{ data: PipelineStage[] }>("/pipeline-stages").then((res) => res.data.data),
     });
+    const pipelines = usePipelines();
     const forms = useQuery({
         queryKey: ["leadForms"],
         queryFn: () => api.get<{ data: (Named & { kind: string })[] }>("/lead-forms").then((res) => res.data.data),
@@ -136,7 +138,8 @@ function useChoices(): Choices {
         people: toOptions(people.data),
         templates: toOptions(templates.data?.data),
         leadStages: (leadStages.data ?? []).map((stage) => ({ value: String(stage.id), label: stage.name, isConverted: Boolean(stage.isConverted) })),
-        pipelineStages: toOptions(pipelineStages.data),
+        pipelineStages: (pipelineStages.data ?? []).map((stage) => ({ value: String(stage.id), label: stageName(stage, pipelines.data) })),
+        pipelines: toOptions(pipelines.data),
         customFields: { lead: leadFields.data ?? [], deal: dealFields.data ?? [] },
     };
 }

@@ -87,7 +87,7 @@ Stored as JSON on `AutomationRule`, checked by `automationRuleSchema`
 - **Conditions** look at:
   - leads: `source`, `via` (only for new leads: the form or integration, or `manual`), `campaign`,
     `owner`, `stage`, `lostReason`, a lead custom field (`cf:<key>`)
-  - deals: `source` (its lead's), `owner`, `stage`, `amount`, `lostReason`, a deal custom field
+  - deals: `source` (its lead's), `owner`, `stage`, `pipeline`, `amount`, `lostReason`, a deal custom field
   - with `is`, `is not`, `contains`, `is more than` / `is less than` (numbers; "1,00,000" and "₹5000"
     are fine), `is empty`, `is filled in`. Text is compared ignoring case.
 - **Actions** (on a lead or a deal):

@@ -57,7 +57,7 @@ const SEE_EVERYONES = [
 
 // Changing how the workspace is set up, for everyone in it
 const SETUP = [
-    { name: "pipeline:manage", label: "Pipeline stages", hint: "Add, rename, recolour, reorder and remove the deals board's stages." },
+    { name: "pipeline:manage", label: "Pipelines", hint: "Add, rename and delete deal pipelines, and set up each one's stages." },
     { name: "lead-stages:manage", label: "Lead stages", hint: "The same for the leads board's stages." },
     { name: "lead-sources:manage", label: "Lead sources", hint: "The list of places leads come from." },
     { name: "custom-fields:manage", label: "Custom fields", hint: "Extra fields on leads, deals and contacts." },

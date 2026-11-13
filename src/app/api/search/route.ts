@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
                           expectedCloseDate: true,
                           lead: { select: { name: true } },
                           ...owner,
-                          pipelineStage: { select: { name: true, color: true } },
+                          pipelineStage: { select: { name: true, color: true, pipeline: { select: { name: true } } } },
                       },
                       orderBy: recentFirst,
                       take,

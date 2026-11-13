@@ -1,6 +1,6 @@
 import type { IncomingMessage, Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
-import { signedIn } from "@/lib/auth/jwt";
+import { signedBefore, signedIn } from "@/lib/auth/jwt";
 import { sendBillingReminders } from "@/lib/billing/reminders";
 import { prisma } from "@/lib/db/prisma";
 import { broadcastChange, notify, orgRoom, setSocketServer, userRoom } from "./notify";
@@ -32,9 +32,12 @@ export function startRealtime(httpServer: HttpServer) {
     // Like an Express middleware, but for the connection: no valid login, no socket
     io.use(async (socket, next) => {
         const session = signedIn(socket.handshake.headers.cookie);
-        // the token can outlive its user (removed from the workspace), so check they still exist
-        const user = session && (await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, organizationId: true } }));
-        if (!user) return next(new Error("Not signed in"));
+        if (!session) return next(new Error("Not signed in"));
+
+        // the token can outlive its user (removed from the workspace), so check they still exist,
+        // and that they haven't changed their password since this session signed in
+        const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, organizationId: true, passwordChangedAt: true } });
+        if (!user || signedBefore(session.signedAt, user.passwordChangedAt)) return next(new Error("Not signed in"));
         socket.data.user = user;
         next();
     });

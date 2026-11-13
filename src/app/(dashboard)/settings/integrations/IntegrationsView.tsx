@@ -76,7 +76,7 @@ export default function IntegrationsView({ seeAgents }: { seeAgents: boolean }) 
                         <div className="min-w-0 pt-0.5">
                             <h2 className="text-[17px] leading-6 font-semibold tracking-[-0.01em]">Lead integrations</h2>
                             <p className="mt-0.5 text-muted">
-                                Bring in leads from Google Ads, IndiaMART, Facebook (through Zapier, Make or Pabbly) or your own code. Each one gets a private
+                                Bring in leads from Google Ads, IndiaMART, your IVR, Facebook (through Zapier, Make or Pabbly) or your own code. Each one gets a private
                                 link: whatever it sends there becomes a lead here, tagged, assigned and with a task to reply, just like a web form. Someone
                                 who&apos;s already an open lead isn&apos;t added twice.
                             </p>
@@ -299,6 +299,15 @@ const GUIDES = [
             "If your IndiaMART account has the Push API (CRM integration), paste the link above as its push URL.",
             "Flash reads IndiaMART's own fields: SENDER_NAME, SENDER_MOBILE, SENDER_EMAIL, SENDER_COMPANY and QUERY_MESSAGE.",
             "No Push API? Connect IndiaMART through Pabbly or Make instead (the tab before this one).",
+        ],
+    },
+    {
+        id: "ivr",
+        label: "IVR & calls",
+        steps: [
+            "In your calling provider (Exotel, Knowlarity, MyOperator, Tata Smartflo...), find the call webhook or callback URL setting and paste the link above. Exotel: add a Passthru applet to the call flow with this link.",
+            "Each call becomes a lead from the caller's number (CallFrom, caller_number and the like). With no name, the number is used as the name until someone edits it.",
+            "The call's other details (recording link, duration, key pressed) are kept on the lead's timeline. A repeat caller who's already an open lead isn't added again.",
         ],
     },
 ] as const;

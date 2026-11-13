@@ -96,6 +96,15 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             },
         });
 
+        // a pipeline keeps at least one stage: its board needs a column, and a new deal a place to start
+        const stage = await prisma.pipelineStage.findFirst({
+            where: { id: id.data, organizationId: user.organizationId },
+            select: { pipeline: { select: { _count: { select: { stages: true } } } } },
+        });
+        if (stage && stage.pipeline._count.stages === 1) {
+            return NextResponse.json({ ok: false, message: "A pipeline needs at least one stage" }, { status: 409 });
+        }
+
         if (dealCount > 0) {
             return NextResponse.json(
                 {

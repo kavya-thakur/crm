@@ -22,6 +22,7 @@ import {
     IconListCheck,
     IconTargetArrow,
     IconThumbDown,
+    IconTimeline,
     IconTrendingUp,
     IconTrophy,
     IconUsersGroup,
@@ -37,6 +38,7 @@ import { Select } from "@/components/Select";
 import { Avatar } from "@/components/Avatar";
 import { PriorityBadge } from "../shared/tasks";
 import { ACTIVITY_TYPES, durationLabel, type ActivityType } from "../activities/shared";
+import { stageName, usePipelines, type Pipeline } from "../deals/shared";
 import type { TaskPriority } from "../tasks/shared";
 import { TrendChart, type TrendPoint } from "./TrendChart";
 import { TeamTable, type Team } from "./TeamTable";
@@ -66,7 +68,8 @@ interface Dashboard {
             byCampaign: { campaign: string; value: number; count: number }[];
         };
         lost: { count: number; previousCount: number; reasons: LostReason[] };
-        open: { value: number; count: number; weighted: number; stages: (Stage & { value: number })[] };
+        // with every pipeline shown, every pipeline's open stages, pipeline by pipeline
+        open: { value: number; count: number; weighted: number; stages: (Stage & { value: number; pipelineId: number })[] };
         closing: {
             total: number;
             value: number;
@@ -127,16 +130,26 @@ function greeting() {
 export default function DashboardView({ firstName, userId }: { firstName: string; userId: number }) {
     const [range, setRange] = useState<DashboardRange>("30d");
     const [agentId, setAgentId] = useState<number | null>(null);
+    // null is every pipeline
+    const [pipelineId, setPipelineId] = useState<number | null>(null);
 
     const dashboardQuery = useQuery({
-        queryKey: ["dashboard", range, agentId],
+        queryKey: ["dashboard", range, agentId, pipelineId],
         queryFn: () =>
-            api.get<{ data: Dashboard }>("/dashboard", { params: { range, ...(agentId && { agentId }) } }).then((res) => res.data.data),
+            api
+                .get<{ data: Dashboard }>("/dashboard", { params: { range, ...(agentId && { agentId }), ...(pipelineId && { pipelineId }) } })
+                .then((res) => res.data.data),
         // switching a filter keeps the old numbers on screen (dimmed) until the new ones land
         placeholderData: keepPreviousData,
     });
 
     const data = dashboardQuery.data;
+    // only someone who sees deals has pipelines to pick from
+    const pipelinesQuery = usePipelines(Boolean(data?.deals));
+    const pipelines = pipelinesQuery.data ?? [];
+    // the picked pipeline was deleted meanwhile: back to every pipeline (adjusting state while
+    // rendering, React's own pattern for this, so no request goes out for the deleted one)
+    if (pipelineId !== null && pipelinesQuery.data && !pipelines.some((pipeline) => pipeline.id === pipelineId)) setPipelineId(null);
     const agent = data?.team?.people.find((person) => person.id === agentId);
     const whose = agent ? `${agent.name.split(" ")[0]} is` : data?.scope === "team" ? "the team is" : "you're";
 
@@ -160,6 +173,19 @@ export default function DashboardView({ firstName, userId }: { firstName: string
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
+                            {data?.deals && pipelines.length > 1 && (
+                                <div className="w-52">
+                                    <Select
+                                        value={pipelineId ? String(pipelineId) : ""}
+                                        onChange={(value) => setPipelineId(value ? Number(value) : null)}
+                                        placeholder="All pipelines"
+                                        options={[
+                                            { value: "", label: "All pipelines", render: <span className="flex items-center gap-2"><IconTimeline size={16} className="text-faint" />All pipelines</span> },
+                                            ...pipelines.map((pipeline) => ({ value: String(pipeline.id), label: pipeline.name })),
+                                        ]}
+                                    />
+                                </div>
+                            )}
                             {data?.team && (
                                 <div className="w-52">
                                     <Select
@@ -197,7 +223,15 @@ export default function DashboardView({ firstName, userId }: { firstName: string
                     )}
                     {data && (
                         <div className={`transition-opacity duration-200 ${dashboardQuery.isPlaceholderData ? "opacity-60" : ""}`}>
-                            <Overview data={data} range={range} userId={userId} agentId={agentId} onPickAgent={setAgentId} />
+                            <Overview
+                                data={data}
+                                range={range}
+                                userId={userId}
+                                agentId={agentId}
+                                onPickAgent={setAgentId}
+                                // every pipeline's stages are shown together: their rows say which pipeline
+                                pipelines={pipelineId === null ? pipelines : undefined}
+                            />
                         </div>
                     )}
                 </div>
@@ -236,12 +270,14 @@ function Overview({
     userId,
     agentId,
     onPickAgent,
+    pipelines,
 }: {
     data: Dashboard;
     range: DashboardRange;
     userId: number;
     agentId: number | null;
     onPickAgent: (id: number | null) => void;
+    pipelines?: Pipeline[];
 }) {
     const rootRef = useRef<HTMLDivElement>(null);
     const { deals, leads, team } = data;
@@ -281,7 +317,7 @@ function Overview({
                 </Card>
             )}
 
-            {deals && <PipelineCard open={deals.open} className={leads ? "lg:col-span-2" : "lg:col-span-3"} />}
+            {deals && <PipelineCard open={deals.open} pipelines={pipelines} className={leads ? "lg:col-span-2" : "lg:col-span-3"} />}
             {leads && <LeadStagesCard leads={leads} period={period} className={deals ? "" : "lg:col-span-3"} />}
 
             {leads && <NewLeadsCard leads={leads} range={range} against={against} />}
@@ -448,7 +484,7 @@ function ClosingSoonCard({ closing }: { closing: Deals["closing"] }) {
 }
 
 // One bar per stage, in board order, its length the money sitting in that stage
-function PipelineCard({ open, className }: { open: Deals["open"]; className: string }) {
+function PipelineCard({ open, pipelines, className }: { open: Deals["open"]; pipelines?: Pipeline[]; className: string }) {
     const largest = Math.max(...open.stages.map((stage) => stage.value), 1);
 
     return (
@@ -467,7 +503,7 @@ function PipelineCard({ open, className }: { open: Deals["open"]; className: str
                     {open.stages.map((stage) => (
                         <BarRow
                             key={stage.id}
-                            name={stage.name}
+                            name={stageName(stage, pipelines)}
                             color={stage.color}
                             share={stage.value / largest}
                             figure={

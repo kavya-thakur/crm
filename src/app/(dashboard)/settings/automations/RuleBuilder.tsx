@@ -38,7 +38,9 @@ export interface Choices {
     people: Option[];
     templates: Option[];
     leadStages: (Option & { isConverted: boolean })[];
+    // "Renewals · Won" once there are two or more pipelines
     pipelineStages: Option[];
+    pipelines: Option[];
     customFields: Record<RecordKind, CustomFieldDef[]>;
 }
 
@@ -88,6 +90,8 @@ export function conditionFields(choices: Choices, trigger: AutomationTrigger): F
     const kind = kindOf(trigger);
     const fields: Field[] = [
         { key: "stage", label: "Stage", ops: PICK_OPS, values: kind === "lead" ? choices.leadStages : choices.pipelineStages },
+        // deals only (fieldFits), and only once there's more than one pipeline to tell apart
+        ...(choices.pipelines.length > 1 ? [{ key: "pipeline", label: "Pipeline", ops: PICK_OPS, values: choices.pipelines }] : []),
         { key: "source", label: kind === "lead" ? "Source" : "Source (of its lead)", ops: PICK_OPS, values: choices.sources },
         { key: "via", label: "Came in through", ops: ["is", "isNot"], values: [{ value: "manual", label: "Added by hand" }, ...choices.forms] },
         { key: "campaign", label: "Campaign", ops: TEXT_OPS },

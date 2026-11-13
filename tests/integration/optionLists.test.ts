@@ -9,8 +9,11 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { PUT as savePipelineStages } from "@/app/api/pipeline-stages/route";
 import { PUT as saveLeadSources } from "@/app/api/lead-sources/route";
 
+// the pipeline whose stages a test saves (?pipelineId=, as the settings page sends it); lead sources ignore it
+let pipelineQuery = "";
+
 function putRequest(body: object) {
-    return new NextRequest("http://localhost/api/pipeline-stages", {
+    return new NextRequest(`http://localhost/api/pipeline-stages${pipelineQuery}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -33,6 +36,7 @@ describe("PUT /api/pipeline-stages (save the whole list)", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
         const open = await createPipelineStage(organization.id, { name: "Open", order: 0 });
         const closed = await createPipelineStage(organization.id, { name: "Closed", order: 1 });
+        pipelineQuery = `?pipelineId=${open.pipelineId}`;
         return { organization, open, closed };
     }
 

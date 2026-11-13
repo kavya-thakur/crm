@@ -9,7 +9,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { quoteTotals } from "@/lib/deals/quote";
 import { hashPassword } from "@/lib/auth/password";
-import { DEFAULT_PIPELINE_STAGES } from "@/lib/deals/stages";
+import { createPipeline, DEFAULT_PIPELINE_STAGES } from "@/lib/deals/stages";
+import { STAGE_COLORS } from "@/lib/settings/stageColors";
 import { DEFAULT_LEAD_STAGES } from "@/lib/leads/stages";
 import { DEFAULT_LEAD_SOURCES } from "@/lib/leads/sources";
 import { LOST_REASONS } from "@/lib/leads/lostReasons";
@@ -47,6 +48,12 @@ const COMPANIES = [
     "Greenleaf Organics", "Horizon Realty", "Indus Motors", "Jasper Labs", "Kaveri Pharma", "Lotus Hotels",
     "Monsoon Media", "Nimbus Cloud", "Orchid Retail", "Pinnacle Infra", "Quartz Electronics", "Riverstone Schools",
     "Saffron Kitchens", "Tidewater Shipping", "Umbra Studios", "Vertex Telecom", "Willow Clinics", "Zenith Insurance",
+];
+const RENEWAL_STAGES = [
+    { name: "Renewal due", order: 0, color: STAGE_COLORS.amber },
+    { name: "Contacted", order: 1, color: STAGE_COLORS.sky },
+    { name: "Renewed", order: 2, color: STAGE_COLORS.green, isWon: true },
+    { name: "Cancelled", order: 3, color: STAGE_COLORS.red, isLost: true },
 ];
 const PRODUCTS = ["Annual licence", "Pilot rollout", "Team plan", "Enterprise upgrade", "Onboarding package", "Renewal", "Add-on seats"];
 
@@ -145,11 +152,13 @@ export async function buildDemoWorkspace() {
         }),
     ]);
 
-    await prisma.pipelineStage.createMany({ data: DEFAULT_PIPELINE_STAGES.map((stage) => ({ ...stage, ...org })) });
+    // two pipelines, so visitors see the switcher: new business, and renewals of what was sold
+    const sales = await createPipeline(prisma, { ...org, name: "New sales", order: 0 }, DEFAULT_PIPELINE_STAGES);
+    const renewals = await createPipeline(prisma, { ...org, name: "Renewals", order: 1 }, RENEWAL_STAGES);
+    const pipeline = sales.stages;
     await prisma.leadStage.createMany({ data: DEFAULT_LEAD_STAGES.map((stage) => ({ ...stage, ...org })) });
     await prisma.leadSource.createMany({ data: DEFAULT_LEAD_SOURCES.map((source) => ({ ...source, ...org })) });
-    const [pipeline, leadStages, sources] = await Promise.all([
-        prisma.pipelineStage.findMany({ where: org, orderBy: { order: "asc" } }),
+    const [leadStages, sources] = await Promise.all([
         prisma.leadStage.findMany({ where: org, orderBy: { order: "asc" } }),
         prisma.leadSource.findMany({ where: org, orderBy: { order: "asc" } }),
     ]);
@@ -283,6 +292,33 @@ export async function buildDemoWorkspace() {
         }),
         (data) => prisma.deal.createMany({ data }),
     );
+
+    // --- Renewals: last year's customers coming up for renewal; a few already renewed or cancelled ---
+    const [renewalDue, contacted, renewed, cancelled] = renewals.stages;
+    await prisma.deal.createMany({
+        data: Array.from({ length: 24 * SCALE }, () => {
+            const owner = weighted(people, (person) => person.skill);
+            const createdAt = daysFrom(now, -recentDaysAgo(90) - 1);
+            const roll = random();
+            const stage = roll < 0.4 ? renewalDue : roll < 0.75 ? contacted : roll < 0.92 ? renewed : cancelled;
+            const closed = stage.isWon || stage.isLost;
+            return {
+                ...org,
+                title: `${pick(COMPANIES)}: renewal`,
+                amount: Math.round((60_000 + random() * 340_000) / 5_000) * 5_000,
+                assignedToId: owner.user.id,
+                createdById: owner.user.id,
+                updatedById: owner.user.id,
+                createdAt,
+                updatedAt: createdAt,
+                pipelineStageId: stage.id,
+                probability: stage.isWon ? 100 : stage.isLost ? 0 : stage === contacted ? 70 : 40,
+                closedAt: closed ? daysFrom(createdAt, 5 + Math.round(random() * 20)) : null,
+                lostReason: stage.isLost ? pick(LOST_REASONS) : null,
+                expectedCloseDate: closed ? null : utcDay(daysFrom(today, Math.round(5 + random() * 50))),
+            };
+        }),
+    });
 
     // --- Tasks: finished work for everyone, and a few on the manager's plate today ---
     const doneTasks = people.flatMap((person) =>

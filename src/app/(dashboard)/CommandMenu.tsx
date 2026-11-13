@@ -35,6 +35,7 @@ import { PriorityBadge } from "./shared/tasks";
 import { ACTIVITY_TYPES, durationLabel, type ActivityStatus, type ActivityType } from "./activities/shared";
 import { TASK_STATUSES, type TaskPriority, type TaskStatus } from "./tasks/shared";
 import { rememberedUrl } from "./shared/useUrlState";
+import { usePipelines } from "./deals/shared";
 
 /**
  * The global search, opened with ⌘K (Ctrl+K), "/" or the sidebar's search button.
@@ -81,7 +82,7 @@ interface SearchResults {
         probability: number;
         expectedCloseDate: string | null;
         lead: { name: string } | null;
-        pipelineStage: { name: string; color: string };
+        pipelineStage: { name: string; color: string; pipeline?: { name: string } };
     })[];
     contacts: (Owner & { id: number; name: string; email: string | null; phone: string; jobTitle: string | null; company: { name: string } | null })[];
     tasks: (Owner & {
@@ -171,8 +172,9 @@ function remember(item: Item) {
 const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 const owner = (record: Owner): PreviewField => ({ icon: IconUserCircle, label: "Owner", value: record.assignedTo?.name });
 
-// The search results as menu rows, grouped in a fixed order
-function toItems(results: SearchResults): Item[] {
+// The search results as menu rows, grouped in a fixed order. With two or more pipelines a deal's
+// stage has its pipeline's name in front of it.
+function toItems(results: SearchResults, manyPipelines: boolean): Item[] {
     return [
         ...results.leads.map((lead) => ({
             key: `lead-${lead.id}`,
@@ -203,7 +205,16 @@ function toItems(results: SearchResults): Item[] {
             trailing: <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} />,
             preview: [
                 { icon: IconCoin, label: "Amount", value: <span className="font-medium text-ink">{formatMoney(deal.amount)}</span> },
-                { icon: IconProgress, label: "Stage", value: <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} /> },
+                {
+                    icon: IconProgress,
+                    label: "Stage",
+                    value: (
+                        <span className="flex min-w-0 items-center gap-1.5">
+                            {manyPipelines && deal.pipelineStage.pipeline && <span className="truncate">{deal.pipelineStage.pipeline.name}</span>}
+                            <StageBadge name={deal.pipelineStage.name} color={deal.pipelineStage.color} />
+                        </span>
+                    ),
+                },
                 { icon: IconPercentage, label: "Probability", value: `${deal.probability}%` },
                 { icon: IconCalendarDue, label: "Closes", value: deal.expectedCloseDate && formatDay(deal.expectedCloseDate) },
                 { icon: IconLink, label: "Lead", value: deal.lead?.name },
@@ -324,6 +335,8 @@ function Palette({ pages, kinds, onClose }: { pages: MenuPage[]; kinds: SearchKi
         placeholderData: keepPreviousData,
         staleTime: 30_000,
     });
+    // only asked for once deals turn up (seeing them is what lets someone read the pipelines)
+    const manyPipelines = (usePipelines(Boolean(searchQuery.data?.deals.length)).data?.length ?? 0) > 1;
 
     const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -367,7 +380,7 @@ function Palette({ pages, kinds, onClose }: { pages: MenuPage[]; kinds: SearchKi
     const recentOfKind = recent.filter((item) => !kind || kindOf(item) === kind);
 
     // empty: recent things, then every page; typing: the records found, then matching pages
-    const items: Item[] = typed === "" ? [...recentOfKind, ...matchingPages] : [...(searchQuery.data && term ? toItems(searchQuery.data) : []), ...matchingPages];
+    const items: Item[] = typed === "" ? [...recentOfKind, ...matchingPages] : [...(searchQuery.data && term ? toItems(searchQuery.data, manyPipelines) : []), ...matchingPages];
     const activeIndex = Math.min(active, Math.max(items.length - 1, 0));
     const current = items[activeIndex];
     const loading = term !== "" && searchQuery.isFetching;

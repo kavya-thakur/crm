@@ -3,7 +3,13 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { redis } from "@/lib/db/redis";
 import { createOrgWithUser, cleanupOrg } from "../helpers";
+
+const redisUp = await redis()
+    .ping()
+    .then(() => true)
+    .catch(() => false);
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -69,6 +75,20 @@ describe("the profile endpoints", () => {
         const res = await changePassword(patchRequest({ currentPassword: "wrong-guess", newPassword: "new-password" }));
 
         expect(res.status).toBe(400);
+        const saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+        expect(await verifyPassword("old-password", saved.passwordHash)).toBe(true);
+    });
+
+    // the limit lives in Redis; without it running, limits let everything through, so skip
+    it.skipIf(!redisUp)("stops guessing the current password after 10 tries", async () => {
+        const user = await setUp();
+
+        for (let attempt = 1; attempt <= 10; attempt++) {
+            expect((await changePassword(patchRequest({ currentPassword: "wrong-guess", newPassword: "new-password" }))).status).toBe(400);
+        }
+        // the 11th is refused even with the right password
+        expect((await changePassword(patchRequest({ currentPassword: "old-password", newPassword: "new-password" }))).status).toBe(429);
+
         const saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
         expect(await verifyPassword("old-password", saved.passwordHash)).toBe(true);
     });

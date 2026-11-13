@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { Controller, type Control, type UseFormRegister } from "react-hook-form";
+import { useState, type ReactNode } from "react";
+import { Controller, type Control, type FieldValues, type Path, type UseFormRegister } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { IconSettings } from "@tabler/icons-react";
 
@@ -158,8 +158,13 @@ export function createCustomFilterField<TFilters extends { customFields?: Record
 // text filters — avoids refetching the list on every character typed.
 function CustomTextControl({ value, onChange }: { value?: string; onChange: (value: string | undefined) => void }) {
     const [draft, setDraft] = useState(value ?? "");
-
-    useEffect(() => setDraft(value ?? ""), [value]);
+    // the filter changed from outside (cleared, a saved view picked): show that, during render
+    // rather than in an effect, so there's no extra render with the old text
+    const [shown, setShown] = useState(value);
+    if (value !== shown) {
+        setShown(value);
+        setDraft(value ?? "");
+    }
 
     return (
         <input
@@ -186,15 +191,15 @@ function CustomTextControl({ value, onChange }: { value?: string; onChange: (val
 const inputClassName =
     "h-8 w-full rounded-lg border border-line bg-surface px-2 outline-none placeholder:text-light focus:border-accent focus:ring-3 focus:ring-accent-soft";
 
-export function CustomFieldsFormSection({
+export function CustomFieldsFormSection<T extends FieldValues>({
     fields,
     register,
     control,
     agents,
 }: {
     fields: CustomFieldDef[];
-    register: UseFormRegister<any>;
-    control: Control<any>;
+    register: UseFormRegister<T>;
+    control: Control<T>;
     agents?: AgentOption[];
 }) {
     if (fields.length === 0) return null;
@@ -215,20 +220,20 @@ export function CustomFieldsFormSection({
 }
 
 // react-hook-form supports dynamic nested paths like "customFields.budget_range"
-// even though the schema only knows `customFields` as a loose record —
-// `register`/`control` are typed loosely here rather than fighting that generic.
-function CustomFieldInput({
+// even though the schema only knows `customFields` as a loose record,
+// so the path is cast to the form's own type once, here.
+function CustomFieldInput<T extends FieldValues>({
     field,
     register,
     control,
     agents,
 }: {
     field: CustomFieldDef;
-    register: UseFormRegister<any>;
-    control: Control<any>;
+    register: UseFormRegister<T>;
+    control: Control<T>;
     agents?: AgentOption[];
 }) {
-    const name = `customFields.${field.key}` as const;
+    const name = `customFields.${field.key}` as Path<T>;
 
     if (field.type === "AGENT") {
         return (

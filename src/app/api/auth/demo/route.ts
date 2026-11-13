@@ -15,13 +15,20 @@ export async function GET(req: NextRequest) {
     const redirect = (to: string) => new NextResponse(null, { status: 303, headers: { Location: to } });
     const back = (reason: string) => redirect(`/login?demo=${reason}`);
 
-    if (await tooManyAttempts(`demo:${visitorOf(req.headers)}`, 30, 10 * 60 * 1000)) return back("busy");
-
-    // the demo workspace's own person, never anyone else (the email is unique across Flash)
-    const user = await prisma.user.findFirst({
-        where: { email: DEMO_EMAIL, organization: { slug: DEMO_SLUG } },
-        select: { id: true, organizationId: true },
-    });
+    // the demo workspace's own person, never anyone else (the email is unique across Flash).
+    // A plain link a visitor clicked, so a database or Redis that's down (or still waking up)
+    // sends them back to the login page with a message, never to a blank error page
+    let user: { id: number; organizationId: number } | null;
+    try {
+        if (await tooManyAttempts(`demo:${visitorOf(req.headers)}`, 30, 10 * 60 * 1000)) return back("busy");
+        user = await prisma.user.findFirst({
+            where: { email: DEMO_EMAIL, organization: { slug: DEMO_SLUG } },
+            select: { id: true, organizationId: true },
+        });
+    } catch (error) {
+        console.error("Demo sign-in:", error);
+        return back("unavailable");
+    }
     if (!user) return back("unavailable");
 
     const response = redirect("/dashboard");

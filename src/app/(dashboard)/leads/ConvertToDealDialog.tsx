@@ -1,21 +1,22 @@
 "use client";
 import { currencySymbol } from "@/lib/utils/format";
 import { useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { IconProgress } from "@tabler/icons-react";
+import { IconProgress, IconTimeline } from "@tabler/icons-react";
 import { api, errorMessage } from "@/lib/api/client";
 import { Spinner } from "@/components/Loader";
 import { Modal } from "@/components/Modal";
 import { Select } from "@/components/Select";
-import { StageLabel } from "@/app/(dashboard)/deals/shared";
+import { StageLabel, usePipelines } from "@/app/(dashboard)/deals/shared";
 import { createDealSchema } from "@/lib/validations/deals";
 
 interface PipelineStage {
     id: number;
     name: string;
     color: string;
+    pipelineId: number;
 }
 
 interface OptionsResponse<T> {
@@ -49,6 +50,7 @@ function ConvertToDealForm({ open, leadId, leadName, onClose, onConverted }: Con
         control,
         handleSubmit,
         reset,
+        setValue,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(convertFormSchema),
@@ -71,19 +73,29 @@ function ConvertToDealForm({ open, leadId, leadName, onClose, onConverted }: Con
         enabled: open,
     });
 
-    // Reset to a fresh form (with the first stage preselected) each time the dialog opens
+    const pipelinesQuery = usePipelines(open);
+    const pipelines = pipelinesQuery.data ?? [];
+
+    // The deal's pipeline is its stage's, so the Pipeline field just narrows the Stage list
+    const allStages = stagesQuery.data ?? [];
+    const stageId = useWatch({ control, name: "pipelineStageId" });
+    const dealPipelineId = allStages.find((stage) => stage.id === stageId)?.pipelineId;
+    const stages = allStages.filter((stage) => dealPipelineId === undefined || stage.pipelineId === dealPipelineId);
+
+    // Reset to a fresh form (with the first pipeline's first stage preselected) each time the dialog opens
+    const firstStageId = allStages[0]?.id;
     useEffect(() => {
-        if (open && stagesQuery.data?.length) {
+        if (open && firstStageId) {
             reset({
                 title: leadName,
                 amount: 0,
                 probability: 0,
-                pipelineStageId: stagesQuery.data[0].id,
+                pipelineStageId: firstStageId,
                 expectedCloseDate: null,
                 description: "",
             });
         }
-    }, [open, stagesQuery.data, leadName, reset]);
+    }, [open, firstStageId, leadName, reset]);
 
     const convert = useMutation({
         mutationFn: (values: {
@@ -164,6 +176,25 @@ function ConvertToDealForm({ open, leadId, leadName, onClose, onConverted }: Con
                     </div>
                 </div>
 
+                {pipelines.length > 1 && (
+                    <div>
+                        <span className="mb-1 flex items-center gap-1.5 text-sm font-medium text-muted">
+                            <IconTimeline size={14} /> Pipeline <span className="text-danger">*</span>
+                        </span>
+                        <Select
+                            disabled={stagesQuery.isPending}
+                            value={dealPipelineId !== undefined ? String(dealPipelineId) : undefined}
+                            // another pipeline starts the deal at its first stage
+                            onChange={(value) => {
+                                const first = allStages.find((stage) => String(stage.pipelineId) === value);
+                                if (first) setValue("pipelineStageId", first.id, { shouldValidate: true });
+                            }}
+                            placeholder="Select a pipeline"
+                            options={pipelines.map((pipeline) => ({ value: String(pipeline.id), label: pipeline.name }))}
+                        />
+                    </div>
+                )}
+
                 <div>
                     <label htmlFor="convert-stage" className="mb-1 flex items-center gap-1.5 text-sm font-medium text-muted">
                         <IconProgress size={14} /> Pipeline stage <span className="text-danger">*</span>
@@ -177,7 +208,7 @@ function ConvertToDealForm({ open, leadId, leadName, onClose, onConverted }: Con
                                 value={field.value !== undefined ? String(field.value) : undefined}
                                 onChange={(value) => field.onChange(value === undefined ? undefined : Number(value))}
                                 placeholder="Select a stage"
-                                options={(stagesQuery.data ?? []).map((stage) => ({
+                                options={stages.map((stage) => ({
                                     value: String(stage.id),
                                     label: stage.name,
                                     render: <StageLabel stage={stage} />,

@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { quoteTotals } from "@/lib/deals/quote";
-import { createOrgWithUser, cleanupOrg } from "../helpers";
+import { createOrgWithUser, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 
@@ -47,7 +47,7 @@ describe("products", () => {
         organizationId = organization.id;
         (getCurrentUser as Mock).mockResolvedValue(user);
         const org = { organizationId };
-        const stage = await prisma.pipelineStage.create({ data: { ...org, name: "Proposal" } });
+        const stage = await createPipelineStage(org.organizationId, { name: "Proposal" });
         const deal = await prisma.deal.create({ data: { ...org, title: "Acme rollout", amount: 99, pipelineStageId: stage.id } });
         return { user, org, deal };
     }

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/db/prisma";
-import { DEFAULT_PIPELINE_STAGES } from "../src/lib/deals/stages";
+import { createPipeline, DEFAULT_PIPELINE_NAME, DEFAULT_PIPELINE_STAGES } from "../src/lib/deals/stages";
 import { DEFAULT_LEAD_STAGES } from "../src/lib/leads/stages";
 import { DEFAULT_LEAD_SOURCES } from "../src/lib/leads/sources";
 
@@ -121,17 +121,15 @@ async function main() {
         skipDuplicates: true,
     });
 
-    // Organizations registered before deals existed have no pipeline stages; give them the defaults
-    const orgsWithoutStages = await prisma.organization.findMany({
-        where: { pipelineStages: { none: {} } },
+    // Organizations registered before deals existed have no pipeline; give them the default one
+    const orgsWithoutPipeline = await prisma.organization.findMany({
+        where: { pipelines: { none: {} } },
         select: { id: true },
     });
 
-    await prisma.pipelineStage.createMany({
-        data: orgsWithoutStages.flatMap((org) =>
-            DEFAULT_PIPELINE_STAGES.map((stage) => ({ ...stage, organizationId: org.id }))
-        ),
-    });
+    for (const org of orgsWithoutPipeline) {
+        await createPipeline(prisma, { organizationId: org.id, name: DEFAULT_PIPELINE_NAME, order: 0 }, DEFAULT_PIPELINE_STAGES);
+    }
 
     // Same backfill, for organizations with no lead stages yet
     const orgsWithoutLeadStages = await prisma.organization.findMany({

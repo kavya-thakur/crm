@@ -4,6 +4,7 @@ import { broadcastChange } from "@/lib/realtime/notify";
 import { activatePro } from "./gate";
 import { BILLING_CYCLES, type BillingCycle } from "./plans";
 import { capturePayment, fetchOrder, fetchPayment } from "./razorpay";
+import { emailReceipt } from "./receipts";
 
 /*
  * Turning a Razorpay payment into Pro. Called two ways, for the same payment: by the Billing page
@@ -35,17 +36,19 @@ export async function settlePayment(orderId: string, paymentId: string, forWorks
     if (payment.status !== "captured") throw new PaymentProblem(`The payment wasn't completed (${payment.status})`);
 
     try {
-        const paidUntil = await prisma.$transaction(async (tx) => {
+        const { paidUntil, paymentId } = await prisma.$transaction(async (tx) => {
             // first: the payment id is unique, so a second arrival stops here, before adding more time
             const record = await tx.payment.create({
                 data: { organizationId, paidBy: payment.email ?? "", razorpayOrderId: order.id, razorpayPaymentId: payment.id, cycle, amount: payment.amount, paidUntil: new Date() },
             });
             const until = await activatePro(organizationId, cycle, tx);
             await tx.payment.update({ where: { id: record.id }, data: { paidUntil: until } });
-            return until;
+            return { paidUntil: until, paymentId: record.id };
         });
         // every open page in the workspace re-renders, so a locked app opens up straight away
         broadcastChange(organizationId, "billing");
+        // only here, where the payment was first counted, so the browser and the webhook never send it twice
+        await emailReceipt(paymentId);
         return { organizationId, paidUntil, alreadyCounted: false };
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return { organizationId, paidUntil: null, alreadyCounted: true };

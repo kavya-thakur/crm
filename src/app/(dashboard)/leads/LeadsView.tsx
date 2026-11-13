@@ -156,13 +156,15 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
     });
 
     const bulk = useMutation({
-        mutationFn: (body: BulkAction) => api.patch("/leads/bulkUpdate", { ...body, leadIds: [...selected] }),
-        onSuccess: (_res, body) => {
+        mutationFn: (body: BulkAction) => api.patch<{ skipped?: number }>("/leads/bulkUpdate", { ...body, leadIds: [...selected] }),
+        onSuccess: (res, body) => {
+            // lost leads that would have been a second open lead for someone stay lost
+            const skipped = res.data.skipped ?? 0;
             // read before the selection is cleared below
-            const count = selected.size;
+            const count = selected.size - skipped;
             const leadsLabel = `${count} ${count === 1 ? "lead" : "leads"}`;
 
-            toast.success(
+            if (count > 0) toast.success(
                 body.action === "delete"
                     ? `${leadsLabel} deleted`
                     : body.action === "update"
@@ -173,6 +175,9 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                             ? `${leadsLabel} unassigned`
                             : `${leadsLabel} assigned`
             );
+            if (skipped > 0) {
+                toast.warning(`${skipped} ${skipped === 1 ? "lead wasn't" : "leads weren't"} reopened`, "That person already has an open lead. Open or merge that one instead.");
+            }
             setSelected(new Set());
             setConfirmingDelete(false);
             refreshLeads(queryClient);

@@ -99,7 +99,8 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       email cancels pending reset links. **Log in as** ends at once when the right to it goes
       (`getCurrentUser` checks the real person on every request). A **changed or reset password**
       signs out every other session (`User.passwordChangedAt` against the token's `iat`; changing
-      it gives this browser a fresh token, and is refused while logged in as someone). The demo's
+      it gives this browser a fresh token, and is refused while logged in as someone), live
+      connections included. Guessing the current password stops after 10 tries in 15 minutes. The demo's
       shared login can't be made a site admin. Tests: `tests/integration/accountSafety.test.ts`.
 - [x] **Billing: 7-day trial, then Pro** (2026-11-07, Settings → Billing). Every workspace starts
       on a **7-day free trial** (`Organization.trialEndsAt`, a database default; existing workspaces
@@ -122,6 +123,15 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       `Payment` (unique payment id, so a retry never adds time twice) and switches Pro on in one
       transaction; the app unlocks at once. No SDK (three REST calls). Without the keys it falls back
       to "ask for Pro" and a site admin.
+- [x] **Receipts** (2026-11-13): the owner's **Payments** list in Settings → Billing, each with a
+      printable receipt at `/receipts/<id>` (outside the app layout, so it prints clean; "Download
+      PDF" is the browser's own Save as PDF, no library). Number `FL-000123`, the period paid for,
+      amount, online (Razorpay id) or manual (its note). Not a GST invoice (Flash isn't registered):
+      "No tax has been charged". Razorpay test keys add "Test payment: no money was charged". Only
+      the owner or a site admin sees one (others get a 404); a free (₹0) entry has none. A "Payment
+      received" email with the link goes to the owner once per payment (from `settlePayment`, so the
+      browser and the webhook never send two; and from a site admin's manual payment). Site admin
+      payment lines link to it. `src/lib/billing/receipts.ts`; tests `receipts`, `payments`, `billing`
 - [x] **Payments checked with Razorpay, a webhook, and renewal reminders** (2026-11-08). Before Pro
       switches on, `settlePayment` (`src/lib/billing/payments.ts`) fetches the payment itself: it must
       be for the order, of the order's amount, in INR, and **captured** (an authorised one is captured
@@ -131,12 +141,25 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       gets Pro, and the payment counts once either way. **Reminders** (`src/lib/billing/reminders.ts`,
       hourly): the owner gets a bell notification and an email 3 and 1 days before the trial ends,
       7 and 1 days before Pro ends, and when it has ended; each once (`billingReminderKey`). The
-      sidebar shows Pro's last week too. Renewal itself is paying again (it adds on); automatic
+      sidebar shows Pro's last week too. Renewal itself is paying again (it adds on, and each plan
+      card says so: "Adds a year after your current plan ends on ..."); automatic
       charging would be Razorpay Subscriptions
 - [x] **Leads**: table + kanban by stage, filters (multi-stage, source, owner, created/modified
       by and date, custom fields, possible duplicates), saved filters, inline edit, bulk
       stage/assign/edit/merge/delete, side panel with timeline, notes, tasks, activities
 - [x] **Deals**: the same, with amount, probability, expected close, pipeline value per column
+- [x] **Several pipelines** (2026-11-13): deal boards with their own stages ("New sales", "Renewals"),
+      managed in their own Settings → Pipelines page (a card per pipeline with its stages and deal
+      count, a short "what's a pipeline" note, the picked one's stages to edit below; lead stages
+      and sources stay in Settings → Lead stages & sources). Every workspace's old stages became one "Sales
+      pipeline" (migration `pipelines`); with only one, nothing on screen changes. A deal's pipeline
+      is its stage's (`PipelineStage.pipelineId`), so moving it across is picking a stage there
+      ("Deal moved to the Renewals pipeline" on its timeline). Deals list, dashboard
+      (`?pipelineId=`), automations (a "pipeline" condition) and CSV export (a Pipeline column)
+      know about it. A pipeline is deleted only once it has no deals, never the last one; a
+      pipeline keeps at least one stage. Demo: "New sales" and "Renewals". Routes `/api/pipelines`,
+      `/api/pipelines/[id]`, `/api/pipeline-stages?pipelineId=` (the old org-wide `reorder` route
+      was unused and is gone). Tests: `tests/integration/pipelines.test.ts`
 - [x] **Contacts**: every lead gets one; deduplicated by phone
 - [x] **Companies** (2026-11-06, `/companies`): list (A to Z, search by name or industry, 50 a page)
       with contacts, open deals and revenue won per company (one grouped SQL query per page); a
@@ -262,7 +285,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Campaign tracking (UTM tags)**: `?utm_campaign=…` on the link to a form's page (or the
       site page an embedded form sits on) is saved on the lead; shown on the lead, as a list
       column and in exports; the dashboard shows each campaign's leads, conversions and revenue won
-- [x] **Lead integrations (webhooks)**: a private link per tool (Google Ads lead forms, IndiaMART,
+- [x] **Lead integrations (webhooks)**: a private link per tool (Google Ads lead forms, IndiaMART, IVR calls,
       Facebook/Typeform/Sheets via Zapier, Make or Pabbly, or any code); leads go through the same
       rules as web forms; a log of what arrived and why anything was rejected; test button; new
       link on demand. See [INTEGRATIONS.md](INTEGRATIONS.md)
@@ -360,8 +383,12 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 4. README for the repo, and deployment (Railway/Render, since the custom server needs a long-running Node process)
 5. Presence ("Priya is viewing this lead"), email for missed notifications
 
-Known gaps: moving lost leads back to open **in bulk** doesn't check for duplicates yet;
-11 old lint errors remain (none in new code).
+Known gaps: none open. Fixed 2026-11-11: reopening lost leads **in bulk** now skips any that would
+be a second open lead for someone (`moveLeads` in `src/lib/jobs/bulkActions.ts`, both the
+in-request path and the background job; "N weren't reopened" toast); two admins demoting or
+removing each other at the same moment: only the first goes through (`lockBoth` in
+`src/app/api/agents/[id]/route.ts`: both rows locked in id order, roles re-checked); lint is
+clean (`dist/` ignored, the 11 old errors fixed).
 
 ---
 
@@ -431,5 +458,9 @@ Newest first. The reason matters more than the choice.
 | 2026-10 | **Light-only, Twenty-style** UI (dashboard has its own look) | a calm, modern CRM look; one theme done well |
 | 2026-10 | Agent "deactivation" deferred | confusing to explain; revisit with a clear design |
 | 2026-10 | Integration tests on a real database, not mocks | the queries and permissions *are* the product |
+| 2026-11-13 | A deal's pipeline is **its stage's** (no `Deal.pipelineId`) | one source of truth: a deal can never sit in one pipeline with another's stage, and moving pipelines is just picking a stage, through every existing route (board, panel, bulk, automations) unchanged |
+| 2026-11-13 | Existing stages became **one "Sales pipeline"** in the migration; pipeline controls show only with 2+ | nobody's data or screens change until they add a second pipeline |
+| 2026-11-11 | Bulk reopen **skips** a lead that would be a second open lead (doesn't refuse the whole batch) | a background job of thousands can't stop at the first duplicate; the rest are fine to move, and the toast/job card says how many stayed lost |
+| 2026-11-11 | Two admins at once: **row locks** (`SELECT … FOR UPDATE`, id order) and a re-check of both roles | a check-then-write lets both demotions pass; locking just the two rows serialises them without a table lock or serializable transactions |
 | 2026-11-11 | Team email: **Connect with Google** (Gmail API) next to app passwords, not instead of them | Render's free plan blocks SMTP, so app passwords only work locally or on a paid host; Gmail's API is HTTPS. Until Google verifies the app, people see an "unverified app" screen once and at most 100 Google accounts can connect, fine for now. Other providers still use app passwords |
 | 2026-11-10 | In the record tables the Name column is **pinned only from 768px up**; on phones it scrolls away | pinned, it took ~240px of a ~375px screen and left little room for the other fields |

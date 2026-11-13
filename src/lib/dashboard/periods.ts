@@ -10,6 +10,8 @@ export const dashboardQuerySchema = z.object({
     range: z.enum(DASHBOARD_RANGES).default("30d"),
     /** narrow the deal and lead numbers to one agent; only for people who see the whole team */
     agentId: idParamSchema.optional(),
+    /** narrow the deal numbers to one pipeline; all of them when left out */
+    pipelineId: idParamSchema.optional(),
 });
 
 const DAY = 24 * 60 * 60 * 1000;

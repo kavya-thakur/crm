@@ -52,7 +52,10 @@ export interface OptionListConfig {
     description: string;
     /** "/lead-stages" */
     endpoint: string;
-    queryKey: string;
+    /** ["leadStage"]; one pipeline's stages are ["pipelineStage", 3] */
+    queryKey: readonly unknown[];
+    /** other lists made from these options, refetched after a save: ["pipelineStage"] for every pipeline's stages */
+    refreshes?: string[];
     flags: Flag[];
     /** what the preview card is a mock of: "Lead" / "Deal" */
     recordLabel: string;
@@ -84,11 +87,11 @@ function payload(rows: Row[], flags: Flag[]) {
 const FLAG_ICONS = { green: IconCircleCheck, red: IconCircleX };
 const FLAG_INKS = { green: "text-[#218358]", red: "text-[#ce2c31]" };
 
-export function OptionListEditor({ config }: { config: OptionListConfig }) {
+export function OptionListEditor({ config, onDirtyChange }: { config: OptionListConfig; onDirtyChange?: (dirty: boolean) => void }) {
     const queryClient = useQueryClient();
 
     const optionsQuery = useQuery({
-        queryKey: [config.queryKey],
+        queryKey: config.queryKey,
         queryFn: () => api.get<{ data: SavedOption[] }>(config.endpoint).then((res) => res.data.data),
     });
 
@@ -111,6 +114,12 @@ export function OptionListEditor({ config }: { config: OptionListConfig }) {
         return () => window.removeEventListener("beforeunload", warn);
     }, [dirty]);
 
+    // The page can hold things back while there are edits here (switching pipeline would lose them)
+    useEffect(() => {
+        onDirtyChange?.(dirty);
+        return () => onDirtyChange?.(false);
+    }, [dirty, onDirtyChange]);
+
     const [previewKey, setPreviewKey] = useState<string | null>(null);
     const [focusKey, setFocusKey] = useState<string | null>(null);
     const [draggingKey, setDraggingKey] = useState<string | null>(null);
@@ -121,7 +130,8 @@ export function OptionListEditor({ config }: { config: OptionListConfig }) {
             api.put<{ data: SavedOption[] }>(config.endpoint, { options: payload(list, config.flags) }).then((res) => res.data.data),
         onSuccess: (data) => {
             toast.success(`${config.title} saved`);
-            queryClient.setQueryData([config.queryKey], data);
+            queryClient.setQueryData(config.queryKey, data);
+            for (const key of config.refreshes ?? []) void queryClient.invalidateQueries({ queryKey: [key] });
             setDraft(null);
         },
         onError: (error) => toast.error(errorMessage(error)),

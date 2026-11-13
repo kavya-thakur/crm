@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Controller, useForm, useWatch, type Control } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -230,7 +230,7 @@ function NewLeadForm({ canAssign, canLinkContact, agents, onClose, onCreated }: 
             <CustomFieldsFormSection
                 fields={customFieldsQuery.data ?? []}
                 register={register}
-                control={control as Control<any>}
+                control={control}
                 agents={agents}
             />
 

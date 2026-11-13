@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 // the queues just record what they're given; the tests run the engine themselves
@@ -81,6 +81,8 @@ describe("automation rules", () => {
         expect(rule("deal.won", "amount")).toBe(true);
         expect(rule("lead.created", "amount")).toBe(false);
         expect(rule("deal.won", "campaign")).toBe(false);
+        expect(rule("deal.won", "pipeline")).toBe(true);
+        expect(rule("lead.created", "pipeline")).toBe(false);
         expect(rule("lead.created", "via")).toBe(true);
         expect(rule("lead.stageChanged", "via")).toBe(false);
     });
@@ -185,9 +187,9 @@ describe("automation rules", () => {
             const base = await setUp();
             const org = { organizationId };
             const [open, won, lost] = await Promise.all([
-                prisma.pipelineStage.create({ data: { ...org, name: "Proposal", order: 0 } }),
-                prisma.pipelineStage.create({ data: { ...org, name: "Won", order: 1, isWon: true } }),
-                prisma.pipelineStage.create({ data: { ...org, name: "Lost", order: 2, isLost: true } }),
+                createPipelineStage(org.organizationId, { name: "Proposal", order: 0 }),
+                createPipelineStage(org.organizationId, { name: "Won", order: 1, isWon: true }),
+                createPipelineStage(org.organizationId, { name: "Lost", order: 2, isLost: true }),
             ]);
             const rahul = await base.lead("Rahul Mehta");
             const deal = (amount: number, extra: object = {}) =>
@@ -233,6 +235,24 @@ describe("automation rules", () => {
             await prisma.deal.update({ where: { id: big.id }, data: { pipelineStageId: won.id } });
             await runAutomations(wonEvent(big.id));
             expect(await prisma.automationRun.count({ where: { ruleId: rule.id } })).toBe(1);
+        });
+
+        it("a pipeline condition only matches deals in that pipeline", async () => {
+            const { won, deal, dealRule } = await setUpDeals();
+            const renewals = await prisma.pipeline.create({ data: { organizationId, name: "Renewals", order: 1 } });
+            const renewed = await createPipelineStage(organizationId, { name: "Renewed", isWon: true, pipelineId: renewals.id });
+            await dealRule("deal.won", {
+                conditions: [{ field: "pipeline", op: "is", value: String(renewals.id) }],
+                actions: [{ type: "task", title: "Thank them for renewing", dueInDays: 1, priority: "MEDIUM" }],
+            });
+            const sale = await deal(5000, { pipelineStageId: won.id });
+            const renewal = await deal(5000, { pipelineStageId: renewed.id });
+
+            await runAutomations({ trigger: "deal.won", organizationId, dealId: sale.id, stageId: won.id });
+            await runAutomations({ trigger: "deal.won", organizationId, dealId: renewal.id, stageId: renewed.id });
+
+            expect(await prisma.task.count({ where: { dealId: sale.id } })).toBe(0);
+            expect(await prisma.task.count({ where: { dealId: renewal.id } })).toBe(1);
         });
 
         it("skips a stage move that's already out of date, and moves records without setting off other rules", async () => {

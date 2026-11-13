@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 // a big restore is queued: catch it here, and run it by hand
@@ -39,7 +39,7 @@ describe("recycle bin", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
         const org = { organizationId: organization.id };
         const [fresh, qualified] = await Promise.all([createLeadStage(organization.id, { name: "New", order: 0 }), createLeadStage(organization.id, { name: "Qualified", order: 1 })]);
-        const pipeline = await prisma.pipelineStage.create({ data: { ...org, name: "Proposal" } });
+        const pipeline = await createPipelineStage(org.organizationId, { name: "Proposal" });
         return { organization, user, org, fresh, qualified, pipeline };
     }
 

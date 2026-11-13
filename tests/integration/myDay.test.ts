@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { startOfToday } from "@/lib/work/tasks";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 
@@ -66,8 +66,8 @@ describe("my day", () => {
         await task("Email the brochure", daysFromNow(3), { leadId: tasked.id });
 
         const [open, won] = await Promise.all([
-            prisma.pipelineStage.create({ data: { ...org, name: "Proposal", order: 0 } }),
-            prisma.pipelineStage.create({ data: { ...org, name: "Won", order: 1, isWon: true } }),
+            createPipelineStage(org.organizationId, { name: "Proposal", order: 0 }),
+            createPipelineStage(org.organizationId, { name: "Won", order: 1, isWon: true }),
         ]);
         const deal = (title: string, expectedCloseDate: Date, extra: object = {}) =>
             prisma.deal.create({ data: { ...org, title, amount: 50000, pipelineStageId: open.id, assignedToId: user.id, expectedCloseDate, ...extra } });

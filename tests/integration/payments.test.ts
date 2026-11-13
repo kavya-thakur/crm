@@ -6,8 +6,11 @@ import { prisma } from "@/lib/db/prisma";
 import { createOrgWithUser, cleanupOrg } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
+// Flash's own emails (the receipt) are recorded, not sent
+vi.mock("@/lib/emails/system", async (original) => ({ ...(await original<object>()), sendSystemEmail: vi.fn(async () => true) }));
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { sendSystemEmail } from "@/lib/emails/system";
 import { POST as createOrder } from "@/app/api/billing/order/route";
 import { POST as verify } from "@/app/api/billing/verify/route";
 import { POST as webhook } from "@/app/api/public/razorpay/route";
@@ -35,6 +38,7 @@ describe("paying for Pro with Razorpay", () => {
     const payments = new Map<string, { id: string; order_id: string; amount: number; currency: string; status: string; email: string }>();
 
     beforeEach(() => {
+        (sendSystemEmail as Mock).mockClear();
         vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_key");
         vi.stubEnv("RAZORPAY_KEY_SECRET", SECRET);
         vi.stubEnv("RAZORPAY_WEBHOOK_SECRET", WEBHOOK_SECRET);
@@ -114,6 +118,14 @@ describe("paying for Pro with Razorpay", () => {
         expect(await (await webhook(fromRazorpay("payment.captured", { id: "pay_1", order_id: orderId }))).json()).toMatchObject({ alreadyCounted: true });
         expect((await workspace()).paidUntil).toEqual(first.paidUntil);
         expect(await prisma.payment.count({ where: { organizationId } })).toBe(1);
+
+        // one "Payment received" email with the receipt, however many times the payment arrived
+        expect(sendSystemEmail).toHaveBeenCalledTimes(1);
+        const [email] = (sendSystemEmail as Mock).mock.calls[0];
+        const payment = await prisma.payment.findFirstOrThrow({ where: { organizationId } });
+        expect(email).toMatchObject({ subject: "Payment received: Flash Pro (yearly)" });
+        expect(email.text).toContain(`/receipts/${payment.id}`);
+        expect(email.text).toContain("test payment: no money was charged");
     });
 
     it("won't switch Pro on for a failed payment, a smaller amount, or another workspace's order", async () => {

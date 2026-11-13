@@ -118,7 +118,7 @@ export function BackgroundJobs() {
                                 ? job.affected < job.total
                                     ? job.action === "restore"
                                         ? `${(job.total - job.affected).toLocaleString()} couldn't go back (a duplicate now, or already restored)`
-                                        : `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" ? "gone" : "that way"} or out of reach`
+                                        : `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" ? "gone" : "that way"} or out of reach${job.action === "stage" && job.entity === "lead" ? ", or the person already has an open lead" : ""}`
                                     : "All done"
                                 : failed
                                   ? (job.error ?? "Something went wrong")

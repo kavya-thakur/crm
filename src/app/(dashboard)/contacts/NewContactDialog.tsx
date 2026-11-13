@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller, useForm, type Control } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -137,7 +137,7 @@ function NewContactForm({ canAssign, agents, onClose, onCreated }: Omit<NewConta
             <CustomFieldsFormSection
                 fields={customFieldsQuery.data ?? []}
                 register={register}
-                control={control as Control<any>}
+                control={control}
                 agents={agents}
             />
 

@@ -457,6 +457,17 @@ export function PaymentLine({
               .join(" · ")}
         {` · until ${formatDate(payment.paidUntil)}`}
       </span>
+      {/* in a new tab, so the panel stays open (a free one has no receipt) */}
+      {payment.amount > 0 && (
+        <a
+          href={`/receipts/${payment.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 font-medium text-accent hover:underline"
+        >
+          Receipt
+        </a>
+      )}
     </li>
   );
 }

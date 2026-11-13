@@ -8,6 +8,7 @@ import { requireSiteAdmin } from "@/lib/auth/siteAdmin";
 import { broadcastChange } from "@/lib/realtime/notify";
 import { accessOf, BILLING_CYCLES, PRO_PLANS, TRIAL_DAYS, type BillingCycle } from "@/lib/billing/plans";
 import { activatePro } from "@/lib/billing/gate";
+import { emailReceipt } from "@/lib/billing/receipts";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -115,9 +116,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
             const cycle = picked as BillingCycle;
             // the plan's price unless said otherwise, in paise like online payments
             const paise = Math.round((amount ?? PRO_PLANS[cycle].price) * 100);
-            const paidUntil = await prisma.$transaction(async (tx) => {
+            const { paidUntil, paymentId } = await prisma.$transaction(async (tx) => {
                 const until = await activatePro(workspace.id, cycle, tx);
-                await tx.payment.create({
+                const payment = await tx.payment.create({
                     data: {
                         organizationId: workspace.id,
                         paidBy: workspace.users[0]?.email ?? "",
@@ -129,8 +130,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
                         recordedBy: admin.email,
                     },
                 });
-                return until;
+                return { paidUntil: until, paymentId: payment.id };
             });
+            // the owner gets their receipt (not for a free month or year)
+            await emailReceipt(paymentId);
             message = `${workspace.name} is on Pro until ${paidUntil.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
         } else {
             if (accessOf(workspace, now).state === "pro") {

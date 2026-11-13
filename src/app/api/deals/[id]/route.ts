@@ -90,6 +90,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
             },
             select: {
                 pipelineStageId: true,
+                pipelineStage: { select: { pipelineId: true } },
                 customFields: true,
                 // as they were, for the activity history
                 title: true,
@@ -110,7 +111,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         // when the stage changes: the moment the deal closed, or null if it's open again
         let closedAt: Date | null = null;
         let lost = false;
-        let newStage: { id: number; isWon: boolean; isLost: boolean } | undefined;
+        let newStage: { id: number; isWon: boolean; isLost: boolean; pipelineId: number; pipeline: { name: string } } | undefined;
 
         // Verify that the pipeline stage belongs to this organization, if changing it.
         if (pipelineStageId !== undefined) {
@@ -119,7 +120,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
                     id: pipelineStageId,
                     organizationId: user.organizationId,
                 },
-                select: { id: true, isWon: true, isLost: true },
+                select: { id: true, isWon: true, isLost: true, pipelineId: true, pipeline: { select: { name: true } } },
             });
 
             if (!stage) {
@@ -208,7 +209,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
                         create: {
                             userId: user.id,
                             type: "STAGE_CHANGED",
-                            message: lost && fields.lostReason ? `Deal lost: ${fields.lostReason}` : "Deal moved to a new pipeline stage",
+                            message:
+                                lost && fields.lostReason
+                                    ? `Deal lost: ${fields.lostReason}`
+                                    : newStage && newStage.pipelineId !== existingDeal.pipelineStage.pipelineId
+                                      ? `Deal moved to the ${newStage.pipeline.name} pipeline`
+                                      : "Deal moved to a new pipeline stage",
                         },
                     },
                 }),

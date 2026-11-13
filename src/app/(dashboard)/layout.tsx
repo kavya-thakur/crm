@@ -72,9 +72,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
         ...(!isDemoWorkspace(user) ? [{ href: "/settings/billing", label: "Billing", section: "billing" as const }] : []),
         ...(canSeeMembers ? [{ href: "/settings/members", label: "Members", section: "members" as const }] : []),
         ...(canSeeRoles ? [{ href: "/settings/roles", label: "Roles", section: "roles" as const }] : []),
-        ...(canSeePipeline || canSeeLeadStages || canSeeLeadSources
-            ? [{ href: "/settings/stages", label: "Stages & sources", section: "stages" as const }]
-            : []),
+        ...(canSeePipeline ? [{ href: "/settings/pipelines", label: "Pipelines", section: "pipelines" as const }] : []),
+        ...(canSeeLeadStages || canSeeLeadSources ? [{ href: "/settings/stages", label: "Lead stages & sources", section: "stages" as const }] : []),
         ...(canSeeCustomFields ? [{ href: "/settings/custom-fields", label: "Custom fields", section: "customFields" as const }] : []),
         ...(canSeeLeadForms ? [{ href: "/settings/lead-forms", label: "Web forms", section: "leadForms" as const }] : []),
         ...(canSeeLeadForms ? [{ href: "/settings/integrations", label: "Lead integrations", section: "integrations" as const }] : []),

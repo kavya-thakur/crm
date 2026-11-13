@@ -6,7 +6,7 @@ import { api } from "@/lib/api/client";
 import { formatDate } from "@/lib/utils/format";
 import { Avatar } from "@/components/Avatar";
 import { DuplicateSuggestions, MergePanel, type MergeFieldSpec, type MergePair } from "@/components/MergePanel";
-import { formatDealAmount, refreshDeals, StageLabel, type Deal } from "./shared";
+import { formatDealAmount, refreshDeals, StageLabel, stageName, usePipelines, type Deal, type PipelineStage } from "./shared";
 
 // The fields two copies of a deal can disagree on (the same list as MERGE_DEAL_FIELDS in lib/validations/deals)
 const FIELDS: MergeFieldSpec<Deal>[] = [
@@ -14,7 +14,7 @@ const FIELDS: MergeFieldSpec<Deal>[] = [
     // 0 is the default for "not known yet", so it's filled in from the other copy
     { key: "amount", label: "Amount", value: (deal) => Number(deal.amount) || null, show: (deal) => formatDealAmount(deal.amount) },
     { key: "probability", label: "Probability", value: (deal) => deal.probability, show: (deal) => `${deal.probability}%` },
-    { key: "pipelineStageId", label: "Stage", value: (deal) => deal.pipelineStageId, show: (deal) => <StageLabel stage={deal.pipelineStage} /> },
+    { key: "pipelineStageId", label: "Stage", value: (deal) => deal.pipelineStageId, show: (deal) => <MergedStage stage={deal.pipelineStage} /> },
     {
         key: "expectedCloseDate",
         label: "Expected close",
@@ -36,6 +36,12 @@ const FIELDS: MergeFieldSpec<Deal>[] = [
     },
     { key: "description", label: "Description", value: (deal) => deal.description?.trim() || null, show: (deal) => deal.description },
 ];
+
+// A copy's stage, named with its pipeline once there are two or more ("Renewals · Won")
+function MergedStage({ stage }: { stage: PipelineStage }) {
+    const pipelines = usePipelines().data;
+    return <StageLabel stage={{ ...stage, name: stageName(stage, pipelines) }} />;
+}
 
 export function MergeDealsPanel({ pair, onClose, onMerged }: { pair: MergePair | null; onClose: () => void; onMerged: (keptId: number) => void }) {
     return (

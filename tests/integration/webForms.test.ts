@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -152,7 +152,7 @@ describe("web forms and duplicate leads", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
         const org = { organizationId };
         const [first, later] = await Promise.all([createLeadStage(organizationId, { name: "New", order: 0 }), createLeadStage(organizationId, { name: "Meeting", order: 1 })]);
-        const pipelineStage = await prisma.pipelineStage.create({ data: { ...org, name: "Open", order: 0 } });
+        const pipelineStage = await createPipelineStage(org.organizationId, { name: "Open", order: 0 });
 
         const kept = await prisma.lead.create({
             data: { ...org, name: "Rahul M", phone: "9876543210", stageId: first.id, customFields: { budget: "50k", size: "" } },
