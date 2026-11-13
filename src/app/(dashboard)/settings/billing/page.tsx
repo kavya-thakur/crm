@@ -4,13 +4,15 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { billingSummary } from "@/lib/billing/gate";
 import { SectionIcon } from "@/components/SectionIcon";
+import { paymentsOf } from "@/lib/billing/receipts";
 import BillingView from "./BillingView";
+import { PaymentHistory } from "./PaymentHistory";
 
 export const metadata: Metadata = {
     title: "Billing",
 };
 
-// Everyone can see where the workspace stands; only the owner chooses a plan
+// Everyone can see where the workspace stands; only the owner chooses a plan and sees the payments
 export default async function BillingPage() {
     const user = await getCurrentUser();
 
@@ -26,6 +28,8 @@ export default async function BillingPage() {
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <BillingView billing={await billingSummary(user)} />
+                {/* what was paid and its receipts: the owner's, like choosing the plan */}
+                {user.isOwner && <PaymentHistory payments={await paymentsOf(user.organizationId)} />}
             </div>
         </div>
     );

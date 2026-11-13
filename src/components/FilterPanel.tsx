@@ -87,6 +87,9 @@ export function useColumnPrefs(storageKey: string, defaultOrder: string[], defau
             // corrupt or blocked storage: fall back to the defaults set above
         }
 
+        // read in an effect on purpose: the server has no localStorage, so reading it while
+        // rendering would make the first render differ between server and browser
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOrder(nextOrder);
         setHidden(nextHidden);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +141,8 @@ export function useTableColumns<TColumn extends ColumnDef>(storageKey: string, c
     useEffect(() => {
         try {
             const raw = localStorage.getItem(widthsKey);
+            // in an effect for the same reason as the column order above (no localStorage on the server)
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setWidths(raw ? JSON.parse(raw) : {});
         } catch {
             setWidths({});
@@ -482,7 +487,7 @@ export function OptionsMenuButton<TColumn extends ColumnDef>({
     columns: TColumn[];
     columnPrefs: ColumnPrefs;
     canManageCustomFields?: boolean;
-    /** this entity's other admin-editable lists, e.g. [{ label: "Pipeline stages", href: "/settings/stages" }] */
+    /** this entity's other admin-editable lists, e.g. [{ label: "Pipelines & stages", href: "/settings/pipelines" }] */
     extraLinks?: { label: string; href: string }[];
 }) {
     return (

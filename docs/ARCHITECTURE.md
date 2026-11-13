@@ -90,7 +90,7 @@ crm/
 │   │   ├── leads/  deals/  contacts/   each: page.tsx (server) + XView (client) +
 │   │   │   │                               XTable, XBoard, XPanel, NewXDialog, shared.tsx
 │   │   │   ├── tasks/  activities/  notes/
-│   │   │   ├── settings/     profile, members, roles, stages & sources, custom fields, web forms
+│   │   │   ├── settings/     profile, members, roles, pipelines, lead stages & sources, custom fields, web forms
 │   │   │   ├── shared/       pieces used by several record types (notes, tasks and activities tabs,
 │   │   │   │                 custom fields, the full-page form, list query hook)
 │   │   │   ├── CommandMenu.tsx      ⌘K global search
@@ -144,7 +144,7 @@ Organization ─┬─ User ── Role ── RolePermission ── Permission
  (workspace)  ├─ Lead ──┬─ LeadTimeline, LeadNote            (+ Contact: every lead has one)
               │         └─ Deal ── DealTimeline, DealNote
               ├─ Contact ── ContactTimeline, ContactNote
-              ├─ LeadStage, LeadSource, PipelineStage        (admin-editable option lists)
+              ├─ LeadStage, LeadSource, Pipeline → PipelineStage (admin-editable option lists)
               ├─ CustomFieldDefinition                        (values live in each record's customFields JSON)
               ├─ Task, ScheduledActivity (+ attendees)        (linked to at most one lead/deal/contact)
               ├─ LeadForm                                      (web forms)
@@ -180,7 +180,7 @@ All under `/api`, JSON in and out (`{ ok, data, message }`), most needing a logi
 | Deals | the same shape, plus `deals/[id]/duplicates`, and `deals/[id]/products` (+ `/[lineId]`): the quote's lines |
 | Contacts | the same shape (no convert or merge) |
 | Work | `tasks`, `tasks/[id]`, `activities`, `activities/[id]`, `notes` (the feed) |
-| Settings | `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `lead-forms`, `agents`, `roles`, `permissions`, `saved-filters`, `products` (the catalogue) |
+| Settings | `lead-stages`, `lead-sources`, `pipelines` (+ `[id]`), `pipeline-stages` (`?pipelineId=`), `custom-fields`, `lead-forms`, `agents`, `roles`, `permissions`, `saved-filters`, `products` (the catalogue) |
 | Other | `dashboard`, `search`, `notifications` |
 | Public | `public/forms/[key]`: web form submissions (no login; CORS, honeypot, rate limit) |
 

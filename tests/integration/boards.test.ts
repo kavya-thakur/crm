@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -58,7 +58,7 @@ describe("the lists behind the boards", () => {
     it("lists one kind of record's notes when asked", async () => {
         const { org, user } = await setUp();
         const stage = await createLeadStage(organizationId);
-        const pipelineStage = await prisma.pipelineStage.create({ data: { ...org, name: "Open" } });
+        const pipelineStage = await createPipelineStage(org.organizationId, { name: "Open" });
         const lead = await prisma.lead.create({ data: { ...org, name: "Acme", stageId: stage.id, assignedToId: user.id } });
         const deal = await prisma.deal.create({ data: { ...org, title: "Big deal", pipelineStageId: pipelineStage.id, assignedToId: user.id } });
         await prisma.leadNote.create({ data: { leadId: lead.id, authorId: user.id, body: "On the lead" } });
@@ -89,7 +89,7 @@ describe("the lists behind the boards", () => {
 
     it("pages a deal column, with the whole column's value on the first page", async () => {
         const { org } = await setUp();
-        const stage = await prisma.pipelineStage.create({ data: { ...org, name: "Open" } });
+        const stage = await createPipelineStage(org.organizationId, { name: "Open" });
         await prisma.deal.createMany({
             data: Array.from({ length: 30 }, (_, index) => ({ ...org, title: `Deal ${index}`, amount: 100, pipelineStageId: stage.id })),
         });

@@ -7,6 +7,8 @@ import { IconBell, IconChecks } from "@tabler/icons-react";
 import { api } from "@/lib/api/client";
 import { timeAgo } from "@/lib/utils/format";
 import { Dropdown } from "@/components/Dropdown";
+import { ErrorState } from "@/components/ErrorState";
+import { Spinner } from "@/components/Loader";
 import { SectionIcon, type Section } from "@/components/SectionIcon";
 
 interface Notification {
@@ -88,7 +90,16 @@ export function NotificationBell() {
                         )}
                     </div>
 
-                    {items.length === 0 ? (
+                    {query.isPending ? (
+                        <div className="flex justify-center py-10 text-faint">
+                            <Spinner />
+                        </div>
+                    ) : query.isError && items.length === 0 ? (
+                        // not "Nothing yet": that would say there's nothing when it just didn't load
+                        <div className="p-2">
+                            <ErrorState variant="inline" title="Couldn't load notifications" error={query.error} onRetry={() => query.refetch()} retrying={query.isFetching} />
+                        </div>
+                    ) : items.length === 0 ? (
                         <p className="px-3 py-10 text-center text-faint">Nothing yet. When someone assigns you work or mentions you, it shows up here.</p>
                     ) : (
                         <ul className="p-1">

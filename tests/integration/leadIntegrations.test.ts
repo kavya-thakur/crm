@@ -6,7 +6,7 @@ import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
-import { POST as receive } from "@/app/api/public/leads/[key]/route";
+import { GET as receiveGet, POST as receive } from "@/app/api/public/leads/[key]/route";
 import { PATCH as updateForm } from "@/app/api/lead-forms/[id]/route";
 import { POST as createForm } from "@/app/api/lead-forms/route";
 
@@ -95,6 +95,27 @@ describe("lead integrations (webhooks)", () => {
         const lead = await prisma.lead.findFirstOrThrow({ where: { organizationId }, include: { timeline: true } });
         expect(lead).toMatchObject({ name: "Kabir Shah", email: "kabir@shah.example" });
         expect(lead.timeline[0].message).toContain("Need 500 units");
+    });
+
+    it("takes an IVR call: the caller's number, no name, by POST or by GET", async () => {
+        const { integration } = await setUp();
+        const viaGet = (query: string) => receiveGet(new NextRequest(`http://localhost/api/public/leads/${integration.key}?${query}`), { params: Promise.resolve({ key: integration.key }) });
+
+        // the business's own line ("CallTo") is kept as a detail, never taken as the lead's phone
+        const res = await send(integration.key, { CallSid: "abc123", CallTo: "08047112233", CallFrom: "09876543210", RecordingUrl: "https://ivr.example/rec.mp3" });
+        expect(res.status).toBe(200);
+        const lead = await prisma.lead.findFirstOrThrow({ where: { organizationId }, include: { timeline: true } });
+        expect(lead).toMatchObject({ name: "09876543210", phone: "09876543210" });
+        expect(lead.timeline[0].message).toContain("CallTo: 08047112233");
+
+        // the same caller again, as a GET with the call in the address: their lead's timeline, not a second lead
+        const again = await viaGet("CallSid=def456&From=09876543210&CallTo=08047112233");
+        expect(await again.json()).toMatchObject({ ok: true, created: false, leadId: lead.id });
+        expect((await viaGet("caller_number=09111111111")).status).toBe(200);
+        expect(await prisma.lead.count({ where: { organizationId } })).toBe(2);
+
+        // a bare GET is still just "is this address working?"
+        expect(await (await viaGet("")).json()).toMatchObject({ ok: true, message: expect.stringContaining("is ready") });
     });
 
     it("says plainly what's missing, and logs it", async () => {

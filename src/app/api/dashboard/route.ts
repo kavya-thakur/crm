@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { range, agentId } = query.data;
+        const { range, agentId, pipelineId } = query.data;
         const seesTeam = hasPermission(user, "deal:all") || hasPermission(user, "lead:all");
 
         // picking an agent only makes sense if you can see other people's work
@@ -40,11 +40,13 @@ export async function GET(req: NextRequest) {
         const period = dashboardPeriod(range);
         // AND-ed with the usual scope, so the agent filter can only ever narrow it
         const agent = agentId ? { assignedToId: agentId } : {};
+        // a pipeline's stages, for every deal figure (deals, and the team's won/lost/open columns)
+        const inPipeline = pipelineId ? { pipelineId } : {};
 
         const [deals, leads, team, tasks, activities] = await Promise.all([
-            hasPermission(user, "deal:read") ? dealNumbers({ AND: [dealScope(user), agent] }, user, period) : null,
+            hasPermission(user, "deal:read") ? dealNumbers({ AND: [dealScope(user), agent, { pipelineStage: inPipeline }] }, user, period, inPipeline) : null,
             hasPermission(user, "lead:read") ? leadNumbers({ AND: [leadScope(user), agent] }, user, period) : null,
-            seesTeam ? teamPerformance(user, period) : null,
+            seesTeam ? teamPerformance(user, period, inPipeline) : null,
             myTasks(user),
             myUpcomingActivities(user),
         ]);
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
             data: {
                 range,
                 agentId: agentId ?? null,
+                pipelineId: pipelineId ?? null,
                 scope: seesTeam ? "team" : "mine",
                 deals,
                 leads,
@@ -77,7 +80,7 @@ function perBucket<T>(buckets: Date[], rows: T[], dateOf: (row: T) => Date, valu
     return totals;
 }
 
-async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, period: Period) {
+async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, period: Period, inPipeline: { pipelineId?: number }) {
     const { start, end, previousStart, buckets, previousBuckets } = period;
     const today = startOfToday();
     const isOpen = { isWon: false, isLost: false };
@@ -103,10 +106,11 @@ async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, peri
         prisma.deal.count({ where: lostThisPeriod }),
         prisma.deal.count({ where: { ...where, pipelineStage: { isLost: true }, closedAt: { gte: previousStart, lt: start } } }),
         prisma.deal.groupBy({ by: ["lostReason"], where: lostThisPeriod, _count: { _all: true } }),
+        // pipeline by pipeline, each in board order
         prisma.pipelineStage.findMany({
-            where: { organizationId: user.organizationId, ...isOpen },
-            orderBy: [{ order: "asc" }, { id: "asc" }],
-            select: { id: true, name: true, color: true },
+            where: { organizationId: user.organizationId, ...isOpen, ...inPipeline },
+            orderBy: [{ pipeline: { order: "asc" } }, { pipelineId: "asc" }, { order: "asc" }, { id: "asc" }],
+            select: { id: true, name: true, color: true, pipelineId: true },
         }),
         prisma.deal.groupBy({ by: ["pipelineStageId"], where: open, _count: { _all: true }, _sum: { amount: true } }),
         // probability is a whole 0-100, so grouping by it is at most 101 rows: enough to
@@ -261,7 +265,7 @@ type Groups = { assignedToId: number | null; _count: { _all: number }; _sum?: { 
 
 // One row per person in the organization, so a manager can see who's doing well. Deal
 // columns need deal:all and lead columns lead:all; the others come back as null.
-async function teamPerformance(user: CurrentUser, { start, end }: Period) {
+async function teamPerformance(user: CurrentUser, { start, end }: Period, inPipeline: { pipelineId?: number }) {
     const org = { organizationId: user.organizationId };
     const inPeriod = { gte: start, lt: end };
     const seesDeals = hasPermission(user, "deal:all");
@@ -273,18 +277,18 @@ async function teamPerformance(user: CurrentUser, { start, end }: Period) {
         seesDeals
             ? prisma.deal.groupBy({
                   by: ["assignedToId"],
-                  where: { ...org, pipelineStage: { isWon: true }, closedAt: inPeriod },
+                  where: { ...org, pipelineStage: { isWon: true, ...inPipeline }, closedAt: inPeriod },
                   _count: { _all: true },
                   _sum: { amount: true },
               })
             : none,
         seesDeals
-            ? prisma.deal.groupBy({ by: ["assignedToId"], where: { ...org, pipelineStage: { isLost: true }, closedAt: inPeriod }, _count: { _all: true } })
+            ? prisma.deal.groupBy({ by: ["assignedToId"], where: { ...org, pipelineStage: { isLost: true, ...inPipeline }, closedAt: inPeriod }, _count: { _all: true } })
             : none,
         seesDeals
             ? prisma.deal.groupBy({
                   by: ["assignedToId"],
-                  where: { ...org, pipelineStage: { isWon: false, isLost: false } },
+                  where: { ...org, pipelineStage: { isWon: false, isLost: false, ...inPipeline } },
                   _count: { _all: true },
                   _sum: { amount: true },
               })

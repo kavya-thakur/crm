@@ -3,6 +3,8 @@ import { capitalizeFirst, hasAnyField, optionalText, idParamSchema, paginationSc
 
 export const listDealsQuerySchema = paginationSchema.extend({
     search: z.string().trim().max(100).optional(),
+    // one pipeline's deals (the board's switcher)
+    pipelineId: idParamSchema.optional(),
     pipelineStageId: idParamSchema.optional(),
     // several stages at once ("1,4"), from the filter; pipelineStageId is one board column
     pipelineStageIds: idListParamSchema.optional(),

@@ -189,6 +189,7 @@ async function loadRecord(event: AutomationJobData): Promise<RuleRecord | null> 
                   title: true,
                   amount: true,
                   pipelineStageId: true,
+                  pipelineStage: { select: { pipelineId: true } },
                   lostReason: true,
                   customFields: true,
                   assignedTo: ownerSelect,
@@ -208,7 +209,7 @@ async function loadRecord(event: AutomationJobData): Promise<RuleRecord | null> 
             link: `/deals?open=${deal.id}`,
             person: deal.lead && { name: deal.lead.name, company: deal.lead.companyName, phone: deal.lead.phone },
             deal: { title: deal.title, amount: Number(deal.amount) },
-            fields: { source: deal.lead?.sourceId, owner: deal.assignedTo?.id, stage: deal.pipelineStageId, amount: Number(deal.amount), lostReason: deal.lostReason },
+            fields: { source: deal.lead?.sourceId, owner: deal.assignedTo?.id, stage: deal.pipelineStageId, pipeline: deal.pipelineStage.pipelineId, amount: Number(deal.amount), lostReason: deal.lostReason },
             customFields: deal.customFields,
         }
     );

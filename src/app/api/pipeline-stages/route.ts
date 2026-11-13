@@ -2,20 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/requirePermission";
 import { placeholderName, planOptionList } from "@/lib/settings/optionLists";
-import { closedAtFor } from "@/lib/deals/stages";
-import { handleRouteError, parseBody } from "@/lib/api/http";
-import { createPipelineStageSchema, savePipelineStagesSchema } from "@/lib/validations/pipelineStages";
+import { closedAtFor, STAGE_ORDER } from "@/lib/deals/stages";
+import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { broadcastChange } from "@/lib/realtime/notify";
+import { searchParamsToObject } from "@/lib/validations/common";
+import { createPipelineStageSchema, pipelineQuerySchema, savePipelineStagesSchema } from "@/lib/validations/pipelineStages";
 
+/*
+ * The stages of the deals boards. Each belongs to a pipeline (src/lib/deals/stages.ts); GET lists
+ * every pipeline's (pipeline by pipeline, each in board order) or, with ?pipelineId=, one pipeline's.
+ */
 
-export async function GET() {
+// Pipeline by pipeline, then each pipeline's own order
+const BOARD_ORDER = [{ pipeline: { order: "asc" as const } }, { pipelineId: "asc" as const }, ...STAGE_ORDER];
+
+// ?pipelineId=, checked to be one of this workspace's pipelines (null when it isn't)
+async function pipelineFrom(req: NextRequest, organizationId: number) {
+    const query = pipelineQuerySchema.safeParse(searchParamsToObject(req.nextUrl.searchParams));
+    if (!query.success) return { error: validationError(query.error) };
+    const { pipelineId } = query.data;
+    if (pipelineId === undefined) return { pipelineId: undefined };
+    const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, organizationId }, select: { id: true } });
+    return pipeline ? { pipelineId: pipeline.id } : { error: NextResponse.json({ ok: false, message: "Pipeline not found" }, { status: 404 }) };
+}
+
+export async function GET(req: NextRequest) {
     try {
         // stages are the columns of the deals board, so anyone who can see deals needs them
         const user = await requirePermission("deal:read");
 
+        const { pipelineId, error } = await pipelineFrom(req, user.organizationId);
+        if (error) return error;
+
         const stages = await prisma.pipelineStage.findMany({
-            where: { organizationId: user.organizationId },
-            // id as tie-breaker so stages with the same order never swap places
-            orderBy: [{ order: "asc" }, { id: "asc" }],
+            where: { organizationId: user.organizationId, ...(pipelineId && { pipelineId }) },
+            orderBy: BOARD_ORDER,
         });
 
         return NextResponse.json({ ok: true, data: stages });
@@ -35,9 +56,14 @@ export async function POST(req: NextRequest) {
             return body.response;
         }
 
-        // new stages go at the end of the board
+        const pipeline = await prisma.pipeline.findFirst({ where: { id: body.data.pipelineId, organizationId: user.organizationId }, select: { id: true } });
+        if (!pipeline) {
+            return NextResponse.json({ ok: false, message: "Pipeline not found" }, { status: 404 });
+        }
+
+        // new stages go at the end of their pipeline's board
         const last = await prisma.pipelineStage.findFirst({
-            where: { organizationId: user.organizationId },
+            where: { pipelineId: pipeline.id },
             orderBy: { order: "desc" },
             select: { order: true },
         });
@@ -50,17 +76,24 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        broadcastChange(user.organizationId, "pipeline-stages");
         return NextResponse.json({ ok: true, data: stage }, { status: 201 });
     } catch (error) {
         return handleRouteError(error, "Create pipeline stage");
     }
 }
 
-// Saves the whole list from the settings page in one go: renames, colours, won/lost,
-// order, new stages and removed ones. All or nothing.
+// Saves one pipeline's whole list from the settings page in one go (?pipelineId=): renames,
+// colours, won/lost, order, new stages and removed ones. All or nothing.
 export async function PUT(req: NextRequest) {
     try {
         const user = await requirePermission("pipeline:manage");
+
+        const { pipelineId, error } = await pipelineFrom(req, user.organizationId);
+        if (error) return error;
+        if (!pipelineId) {
+            return NextResponse.json({ ok: false, message: "Pick the pipeline these stages belong to" }, { status: 400 });
+        }
 
         const body = await parseBody(req, savePipelineStagesSchema);
 
@@ -69,10 +102,11 @@ export async function PUT(req: NextRequest) {
         }
 
         const existing = await prisma.pipelineStage.findMany({
-            where: { organizationId: user.organizationId },
+            where: { pipelineId, organizationId: user.organizationId },
             select: { id: true, name: true, isWon: true, isLost: true },
         });
 
+        // only this pipeline's stages can be renamed or removed from here
         const plan = planOptionList(existing.map((stage) => stage.id), body.data.options);
 
         if (!plan.ok) {
@@ -128,16 +162,17 @@ export async function PUT(req: NextRequest) {
 
             for (const stage of plan.creates) {
                 await tx.pipelineStage.create({
-                    data: { ...stage, organizationId: user.organizationId },
+                    data: { ...stage, pipelineId, organizationId: user.organizationId },
                 });
             }
         });
 
         const stages = await prisma.pipelineStage.findMany({
-            where: { organizationId: user.organizationId },
-            orderBy: [{ order: "asc" }, { id: "asc" }],
+            where: { pipelineId, organizationId: user.organizationId },
+            orderBy: STAGE_ORDER,
         });
 
+        broadcastChange(user.organizationId, "pipeline-stages");
         return NextResponse.json({ ok: true, data: stages });
     } catch (error) {
         return handleRouteError(error, "Save pipeline stages");

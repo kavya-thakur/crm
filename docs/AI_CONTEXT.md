@@ -190,7 +190,7 @@ src/app/
     LiveUpdates.tsx            the Socket.IO client
     NotificationBell.tsx  CommandMenu.tsx (⌘K)  ActivityAlert.tsx (start-time popup)
     BackgroundJobs.tsx (progress cards)  LoggedInAsBar.tsx  SidebarShell.tsx (mobile drawer)
-  api/                         107 route handlers, one folder per resource; api/public = no login
+  api/                         108 route handlers, one folder per resource; api/public = no login
   providers/QueryProvider.tsx  React Query defaults
   globals.css                  Tailwind 4 + design tokens
 src/components/                DataTable, Board (kanban), FilterPanel, ListPage, Dropdown, Select,
@@ -230,7 +230,7 @@ Organization (workspace) ─┬─ User ── Role ── RolePermission ──
                           │         └─ Deal ── DealTimeline, DealNote, DealProduct (quote lines)
                           ├─ Contact ── ContactTimeline, ContactNote   (every lead has a contact)
                           ├─ Company ── Contact                         (deal's company = its lead's contact's company)
-                          ├─ LeadStage, LeadSource, PipelineStage       (admin-editable)
+                          ├─ LeadStage, LeadSource, Pipeline → PipelineStage (admin-editable)
                           ├─ CustomFieldDefinition                      (values in each record's customFields JSONB)
                           ├─ Product                                    (catalogue)
                           ├─ LeadForm (kind FORM | WEBHOOK) ── LeadFormDelivery

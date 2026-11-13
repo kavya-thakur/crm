@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 
@@ -53,7 +53,7 @@ describe("activity history", () => {
 
     it("shows a deal's money in the workspace's currency, and a contact's company by name", async () => {
         const { org } = await setUp();
-        const pipeline = await prisma.pipelineStage.create({ data: { ...org, name: "Proposal" } });
+        const pipeline = await createPipelineStage(org.organizationId, { name: "Proposal" });
         const deal = await prisma.deal.create({ data: { ...org, title: "Licence", amount: 100000, probability: 20, pipelineStageId: pipeline.id } });
         await updateDeal(send("PUT", { amount: 80000, probability: 60 }), params(deal.id));
         expect((await prisma.dealTimeline.findMany({ where: { dealId: deal.id, type: "UPDATED" }, orderBy: { id: "asc" } })).map((entry) => entry.message)).toEqual([

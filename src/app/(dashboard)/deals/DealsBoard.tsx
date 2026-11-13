@@ -43,9 +43,11 @@ export default function DealsBoard({ filters, columns, canMove, onOpen, onCreate
         );
     }
 
-    // filtered to some stages: just those columns
+    // the pipeline on screen's stages (all of them while there's one pipeline); filtered to some stages, just those
     const picked = filters.pipelineStageIds;
-    const stages = picked ? stagesQuery.data.filter((stage) => picked.includes(stage.id)) : stagesQuery.data;
+    const stages = stagesQuery.data.filter(
+        (stage) => (filters.pipelineId === undefined || stage.pipelineId === filters.pipelineId) && (!picked || picked.includes(stage.id)),
+    );
 
     if (stages.length === 0) {
         return <p className="p-4 text-sm text-faint">No pipeline stages configured yet.</p>;

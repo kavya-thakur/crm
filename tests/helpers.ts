@@ -84,12 +84,30 @@ export async function createOrgWithUser(permissionNames: string[]) {
     return { organization, user };
 }
 
-export async function createPipelineStage(organizationId: number, overrides: Partial<{ name: string; order: number }> = {}) {
+// The workspace's first pipeline, made on first use (as a new workspace gets its "Sales pipeline").
+// Tests often create several stages at once: a second caller racing the first finds its pipeline.
+export async function pipelineOf(organizationId: number) {
+    const existing = await prisma.pipeline.findFirst({ where: { organizationId }, orderBy: { id: "asc" }, select: { id: true } });
+    if (existing) return existing.id;
+    try {
+        return (await prisma.pipeline.create({ data: { organizationId, name: "Sales pipeline" }, select: { id: true } })).id;
+    } catch {
+        return (await prisma.pipeline.findFirstOrThrow({ where: { organizationId }, orderBy: { id: "asc" }, select: { id: true } })).id;
+    }
+}
+
+export async function createPipelineStage(
+    organizationId: number,
+    overrides: Partial<{ name: string; order: number; isWon: boolean; isLost: boolean; pipelineId: number }> = {},
+) {
     return prisma.pipelineStage.create({
         data: {
             organizationId,
+            pipelineId: overrides.pipelineId ?? (await pipelineOf(organizationId)),
             name: overrides.name ?? "Stage",
             order: overrides.order ?? 0,
+            isWon: overrides.isWon ?? false,
+            isLost: overrides.isLost ?? false,
         },
     });
 }

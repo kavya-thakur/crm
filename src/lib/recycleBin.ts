@@ -207,7 +207,8 @@ export async function restoreFromBin(user: CurrentUser, binId: number) {
         } else if (entity === "deal") {
             const stage =
                 (await tx.pipelineStage.findFirst({ where: { ...org, id: data.pipelineStageId as number } })) ??
-                (await tx.pipelineStage.findFirst({ where: org, orderBy: { order: "asc" } }));
+                // its stage (or whole pipeline) was deleted since: the first stage of the first pipeline
+                (await tx.pipelineStage.findFirst({ where: org, orderBy: [{ pipeline: { order: "asc" } }, { pipelineId: "asc" }, { order: "asc" }, { id: "asc" }] }));
             if (!stage) throw new RestoreProblem("This workspace has no pipeline stages to put it in");
             const lead = data.leadId ? await tx.lead.findFirst({ where: { ...org, id: data.leadId as number }, select: { id: true } }) : null;
             const sameStage = stage.id === data.pipelineStageId;

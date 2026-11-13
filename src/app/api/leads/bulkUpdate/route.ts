@@ -157,7 +157,7 @@ export async function PATCH(req: NextRequest) {
         if (data.action === "stage") {
             const stage = await prisma.leadStage.findFirst({
                 where: { id: data.stageId, organizationId: user.organizationId },
-                select: { id: true, name: true, isLost: true },
+                select: { id: true, name: true, isLost: true, isConverted: true },
             });
 
             if (!stage) {
@@ -169,11 +169,14 @@ export async function PATCH(req: NextRequest) {
 
             const changed = await prisma.$transaction((tx) => moveLeads(tx, user, leads, stage, data.lostReason));
             await startAutomations(...stageEvents("lead", user.organizationId, changed.map((lead) => lead.id), stage));
+            // lost leads that would have been a second open lead for someone stayed lost
+            const skipped = leads.filter((lead) => lead.stageId !== stage.id).length - changed.length;
 
             return NextResponse.json({
                 ok: true,
                 message: `${changed.length} leads updated successfully`,
                 affected: changed.length,
+                skipped,
             });
         }
 

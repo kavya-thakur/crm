@@ -6,6 +6,7 @@ import { tooManyAttempts, visitorOf } from "@/lib/api/rateLimit";
 import { resetPasswordSchema } from "@/lib/validations/auth";
 import { hashPassword } from "@/lib/auth/password";
 import { findReset } from "@/lib/auth/passwordReset";
+import { getSocketServer, userRoom } from "@/lib/realtime/notify";
 
 // The new password, from a "Forgot password?" link. The link (and any other for this person) stops working.
 export async function POST(req: NextRequest) {
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
             prisma.user.update({ where: { id: reset.userId }, data: { passwordHash, passwordChangedAt: new Date() } }),
             prisma.passwordReset.deleteMany({ where: { userId: reset.userId } }),
         ]);
+        // and their open live connections close (any that try to reconnect are refused)
+        getSocketServer()?.in(userRoom(reset.userId)).disconnectSockets();
 
         return NextResponse.json({ ok: true, message: "Password changed. Sign in with your new password." });
     } catch (error) {

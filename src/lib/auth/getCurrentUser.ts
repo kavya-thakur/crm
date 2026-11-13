@@ -1,11 +1,8 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { verifyToken } from "@/lib/auth/jwt";
+import { signedBefore, verifyToken } from "@/lib/auth/jwt";
 import { prisma } from "@/lib/db/prisma";
 import { isSiteAdmin } from "@/lib/auth/siteAdmin";
-
-// when a token was signed (seconds), against a moment it must come after
-const signedBefore = (iat: number, moment: Date | null) => !!moment && iat < Math.floor(moment.getTime() / 1000);
 
 // cache(): the layout and the page both ask for the user, but the DB is hit once per request
 export const getCurrentUser = cache(async () => {

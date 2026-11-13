@@ -1,11 +1,18 @@
 import { z } from "zod";
-import { dbIdSchema, hasAnyField, requiredText } from "./common";
+import { dbIdSchema, hasAnyField, idParamSchema, requiredText } from "./common";
 
 // "#3a5bc7" — the same format the stage colours are stored in
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Color must be a hex code like #3a5bc7");
 
+// A pipeline: just its name; it starts with a few stages to rename (NEW_PIPELINE_STAGES)
+export const pipelineSchema = z.object({ name: requiredText(50) });
+
+// Which pipeline a stage list belongs to: ?pipelineId= on GET and PUT /api/pipeline-stages
+export const pipelineQuerySchema = z.object({ pipelineId: idParamSchema.optional() });
+
 export const createPipelineStageSchema = z
     .object({
+        pipelineId: dbIdSchema,
         name: requiredText(50),
         color: hexColor.optional(),
         isWon: z.boolean().default(false),

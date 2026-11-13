@@ -23,6 +23,20 @@ const agentSelect = {
     canLogInAs: true,
 } satisfies Prisma.UserSelect;
 
+/**
+ * Two admins changing each other at the same moment (each demoting or removing the other): each
+ * was allowed when it was checked, but only the first may go through. Both people's rows are locked
+ * (always in id order, so the two requests can't wait on each other forever) and the second request,
+ * once it gets them, finds things changed and is refused. Run inside the transaction that writes.
+ */
+async function lockBoth(tx: Prisma.TransactionClient, actor: { id: number; roleId: number }, target: { id: number; roleId: number }) {
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id IN (${actor.id}, ${target.id}) ORDER BY id FOR UPDATE`;
+    const now = await tx.user.findMany({ where: { id: { in: [actor.id, target.id] } }, select: { id: true, roleId: true } });
+    const roleOf = (id: number) => now.find((person) => person.id === id)?.roleId;
+    // the one doing it was demoted or removed meanwhile, or the other person's role changed since the check
+    if (roleOf(actor.id) !== actor.roleId || roleOf(target.id) !== target.roleId) throw new Error("FORBIDDEN");
+}
+
 function agentNotFound() {
     return NextResponse.json(
         { ok: false, message: "Agent not found" },
@@ -140,10 +154,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
 
         // undefined fields are skipped by Prisma; org in the where keeps the write tenant-scoped
-        const updatedAgent = await prisma.user.update({
-            where: { id: agent.id, organizationId: user.organizationId },
-            data: { name, email, roleId },
-            select: agentSelect,
+        const updatedAgent = await prisma.$transaction(async (tx) => {
+            if (roleId !== undefined && roleId !== agent.roleId) await lockBoth(tx, user, agent);
+            return tx.user.update({
+                where: { id: agent.id, organizationId: user.organizationId },
+                data: { name, email, roleId },
+                select: agentSelect,
+            });
         });
         // a reset link sent to the old address stops working
         if (emailChanged) await prisma.passwordReset.deleteMany({ where: { userId: agent.id } });
@@ -207,8 +224,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         }
 
         // Their assigned leads become unassigned (Lead.assignedTo is optional -> SET NULL)
-        await prisma.user.delete({
-            where: { id: agent.id, organizationId: user.organizationId },
+        await prisma.$transaction(async (tx) => {
+            await lockBoth(tx, user, agent);
+            await tx.user.delete({ where: { id: agent.id, organizationId: user.organizationId } });
         });
 
         return NextResponse.json({

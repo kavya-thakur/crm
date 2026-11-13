@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { contactScope, dealScope, hasPermission, leadScope, userForJob, type CurrentUser } from "@/lib/auth/requirePermission";
 import { broadcastChange, firstName, getSocketServer, notify, userRoom } from "@/lib/realtime/notify";
 import { stageMessage } from "@/lib/leads/stages";
+import { OPEN_STAGE } from "@/lib/leads/duplicates";
 import { closedAtFor } from "@/lib/deals/stages";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
 import { deleteToBin, restoreMany } from "@/lib/recycleBin";
@@ -45,8 +46,16 @@ function assignmentEntry(noun: "Lead" | "Deal", before: number | null, agent: Ag
 // --- One batch of each action. Each takes rows already loaded within the person's scope,
 // --- skips the ones already that way, and returns the ones it changed.
 
-export async function moveLeads(tx: Tx, user: CurrentUser, leads: { id: number; stageId: number }[], stage: { id: number; name: string; isLost: boolean }, lostReason?: string | null) {
-    const changed = leads.filter((lead) => lead.stageId !== stage.id);
+export async function moveLeads(
+    tx: Tx,
+    user: CurrentUser,
+    leads: { id: number; stageId: number }[],
+    stage: { id: number; name: string; isLost: boolean; isConverted?: boolean },
+    lostReason?: string | null,
+) {
+    const reopenedCopies = !stage.isLost && !stage.isConverted ? await secondOpenLeads(tx, user.organizationId, leads) : new Set<number>();
+    // already there, or would be a second open lead for someone (those stay where they are)
+    const changed = leads.filter((lead) => lead.stageId !== stage.id && !reopenedCopies.has(lead.id));
     if (changed.length === 0) return changed;
 
     const names = new Map((await tx.leadStage.findMany({ where: { organizationId: user.organizationId }, select: { id: true, name: true } })).map((item) => [item.id, item.name]));
@@ -58,6 +67,37 @@ export async function moveLeads(tx: Tx, user: CurrentUser, leads: { id: number; 
         data: changed.map((lead) => ({ leadId: lead.id, userId: user.id, type: "STATUS_CHANGED", message: stageMessage(names.get(lead.stageId), stage, lostReason) })),
     });
     return changed;
+}
+
+// One open lead per person, as when one lead is reopened (PATCH /api/leads/:id): of these leads, the
+// closed (lost or converted) ones that reopening would make a second open lead for someone, because
+// that person has an open lead already, or an earlier one in this same batch is reopened for them
+async function secondOpenLeads(tx: Tx, organizationId: number, leads: { id: number }[]) {
+    const reopening = await tx.lead.findMany({
+        where: { id: { in: leads.map((lead) => lead.id) }, organizationId, stage: { OR: [{ isLost: true }, { isConverted: true }] } },
+        select: { id: true, phoneKey: true, emailKey: true },
+        orderBy: { id: "asc" },
+    });
+    const keysOf = (lead: { phoneKey: string | null; emailKey: string | null }) => [lead.phoneKey && `phone:${lead.phoneKey}`, lead.emailKey && `email:${lead.emailKey}`].filter((key) => key !== null);
+    if (reopening.length === 0) return new Set<number>();
+
+    const open = await tx.lead.findMany({
+        where: {
+            organizationId,
+            stage: OPEN_STAGE,
+            OR: [{ phoneKey: { in: reopening.flatMap((lead) => lead.phoneKey ?? []) } }, { emailKey: { in: reopening.flatMap((lead) => lead.emailKey ?? []) } }],
+        },
+        select: { phoneKey: true, emailKey: true },
+    });
+    const taken = new Set(open.flatMap(keysOf));
+
+    const blocked = new Set<number>();
+    for (const lead of reopening) {
+        const keys = keysOf(lead);
+        if (keys.some((key) => taken.has(key))) blocked.add(lead.id);
+        else keys.forEach((key) => taken.add(key));
+    }
+    return blocked;
 }
 
 export async function assignLeads<T extends { id: number; assignedToId: number | null }>(tx: Tx, user: CurrentUser, leads: T[], agent: Agent) {
@@ -113,7 +153,7 @@ export function findStage(organizationId: number, entity: BulkEntity, stageId: n
     if (stageId === undefined || entity === "contact") return Promise.resolve(null);
     return entity === "lead"
         ? // a lead stage is never "won" (leads convert instead), which moveDeals' closedAt doesn't apply to anyway
-          prisma.leadStage.findFirst({ where: { id: stageId, organizationId }, select: { id: true, name: true, isLost: true } }).then((stage) => stage && { ...stage, isWon: false })
+          prisma.leadStage.findFirst({ where: { id: stageId, organizationId }, select: { id: true, name: true, isLost: true, isConverted: true } }).then((stage) => stage && { ...stage, isWon: false })
         : prisma.pipelineStage.findFirst({ where: { id: stageId, organizationId }, select: { id: true, name: true, isLost: true, isWon: true } });
 }
 

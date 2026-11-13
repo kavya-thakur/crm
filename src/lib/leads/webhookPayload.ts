@@ -8,6 +8,8 @@ import { guessField } from "@/lib/validations/imports";
  *    the CSV import makes, plus first_name + last_name
  *  - Google Ads lead forms: { user_column_data: [{ column_id: "FULL_NAME", string_value }], campaign_id }
  *  - IndiaMART: { RESPONSE: { SENDER_NAME, SENDER_MOBILE, SENDER_EMAIL, QUERY_MESSAGE } }
+ *  - IVR / cloud calling (Exotel, Knowlarity, MyOperator...): the caller's number as "CallFrom",
+ *    "caller_number" and the like, and no name, so the number is the name until someone edits it
  * The lead's own custom fields match by their key or name; anything else is kept as details
  * on the lead's timeline, so nothing sent is lost.
  */
@@ -44,6 +46,10 @@ function fromGoogleAds(raw: Record<string, unknown>) {
 
 const normalise = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+// How calling tools name the caller's number. Not "To" / "CallTo": that's the business's own line.
+// Kept out of the CSV import's guesses, where a "From" column could be anything.
+const CALLER_FIELDS = ["from", "callfrom", "caller", "callernumber", "callerid", "callerphone", "customernumber", "customerphone", "customermobile", "clinumber"];
+
 export function toSubmission(raw: unknown, customFields: { key: string; label: string }[]) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     const body = raw as Record<string, unknown>;
@@ -74,7 +80,7 @@ export function toSubmission(raw: unknown, customFields: { key: string; label: s
             continue;
         }
 
-        const field = guessField(key, customFields);
+        const field = CALLER_FIELDS.includes(name) ? "phone" : guessField(key, customFields);
         if (field === "name" || field === "email" || field === "phone" || field === "company") {
             submission[field] ??= value;
         } else if (field === "note") {
@@ -89,7 +95,8 @@ export function toSubmission(raw: unknown, customFields: { key: string; label: s
         }
     }
 
-    submission.name ??= [first, last].filter(Boolean).join(" ") || undefined;
+    // no name at all (an IVR call): the phone number stands in, as the CSV import's fix does
+    submission.name ??= [first, last].filter(Boolean).join(" ") || submission.phone;
     if (typeof submission.message === "string") submission.message = submission.message.slice(0, 2000);
     if (Object.keys(custom).length > 0) submission.customFields = custom;
     if (Object.keys(details).length > 0) submission.details = details;

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } =
+        const { page, limit, search, pipelineId, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } =
             query.data;
 
         const term = search && escapeLike(search);
@@ -63,6 +63,8 @@ export async function GET(req: NextRequest) {
             ...(term && {
                 title: { contains: term, mode: "insensitive" },
             }),
+
+            ...(pipelineId && { pipelineStage: { pipelineId } }),
 
             ...(pipelineStageIds && { pipelineStageId: { in: pipelineStageIds } }),
 

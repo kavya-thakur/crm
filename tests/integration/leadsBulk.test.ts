@@ -78,4 +78,32 @@ describe("PATCH /api/leads/bulkUpdate", () => {
         const remaining = await prisma.lead.count({ where: { id: lead.id } });
         expect(remaining).toBe(0);
     });
+    it("won't reopen a lost lead as a second open lead for the same person", async () => {
+        const { organization, user } = await createOrgWithUser(["lead:read", "lead:update", "lead:all"]);
+        organizationId = organization.id;
+        (getCurrentUser as Mock).mockResolvedValue(user);
+
+        const open = await createLeadStage(organization.id, { name: "New", order: 0 });
+        const lost = await createLeadStage(organization.id, { name: "Lost", order: 1, isLost: true });
+        const lead = (name: string, stageId: number, contact: { phone?: string; email?: string }) =>
+            prisma.lead.create({ data: { organizationId: organization.id, name, stageId, ...contact } });
+
+        await lead("Rahul (open)", open.id, { phone: "98765 43210" });
+        const rahulLost = await lead("Rahul (lost)", lost.id, { phone: "+91 98765-43210" });
+        // the same person lost twice: only the first one comes back
+        const ashaFirst = await lead("Asha", lost.id, { email: "asha@example.com" });
+        const ashaAgain = await lead("Asha again", lost.id, { email: "ASHA@example.com" });
+        const someoneNew = await lead("Someone new", lost.id, { phone: "90000 11111" });
+
+        const res = await bulkUpdateLeads(bulkRequest({ action: "stage", stageId: open.id, leadIds: [rahulLost.id, ashaFirst.id, ashaAgain.id, someoneNew.id] }));
+        expect(await res.json()).toMatchObject({ ok: true, affected: 2, skipped: 2 });
+
+        const stages = await prisma.lead.findMany({ where: { id: { in: [rahulLost.id, ashaFirst.id, ashaAgain.id, someoneNew.id] } }, select: { id: true, stageId: true } });
+        expect(Object.fromEntries(stages.map((row) => [row.id, row.stageId]))).toEqual({
+            [rahulLost.id]: lost.id,
+            [ashaFirst.id]: open.id,
+            [ashaAgain.id]: lost.id,
+            [someoneNew.id]: open.id,
+        });
+    });
 });

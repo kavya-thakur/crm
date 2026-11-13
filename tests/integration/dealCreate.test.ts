@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, createPipelineStage, cleanupOrg } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -23,7 +23,7 @@ describe("creating a deal", () => {
         const { organization, user } = await createOrgWithUser(permissions);
         organizationId = organization.id;
         (getCurrentUser as Mock).mockResolvedValue(user);
-        const stage = await prisma.pipelineStage.create({ data: { organizationId, name: "Proposal", order: 0 } });
+        const stage = await createPipelineStage(organizationId, { name: "Proposal", order: 0 });
         const colleague = await prisma.user.create({
             data: { organizationId, roleId: user.roleId, name: "Colleague", email: `deal-owner-${organizationId}@example.com`, passwordHash: "x" },
         });

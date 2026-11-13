@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -32,8 +32,8 @@ describe("merging duplicate deals", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
         const org = { organizationId };
         const [open, lost] = await Promise.all([
-            prisma.pipelineStage.create({ data: { ...org, name: "Proposal", order: 0 } }),
-            prisma.pipelineStage.create({ data: { ...org, name: "Lost", order: 1, isLost: true } }),
+            createPipelineStage(org.organizationId, { name: "Proposal", order: 0 }),
+            createPipelineStage(org.organizationId, { name: "Lost", order: 1, isLost: true }),
         ]);
         return { org, user, open, lost };
     }

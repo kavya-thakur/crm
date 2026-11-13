@@ -29,6 +29,8 @@ describe("DELETE /api/pipeline-stages/:id", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
 
         const stage = await createPipelineStage(organization.id);
+        // a pipeline keeps at least one stage: another one, so this one may go
+        await createPipelineStage(organization.id, { name: "Other", order: 1 });
         await prisma.deal.create({
             data: { organizationId: organization.id, pipelineStageId: stage.id, title: "Blocking deal" },
         });
@@ -52,6 +54,7 @@ describe("DELETE /api/pipeline-stages/:id", () => {
         (getCurrentUser as Mock).mockResolvedValue(user);
 
         const stage = await createPipelineStage(organization.id);
+        await createPipelineStage(organization.id, { name: "Other", order: 1 });
 
         const res = await deleteStage(
             new NextRequest("http://localhost/api/pipeline-stages/1", { method: "DELETE" }),
@@ -92,9 +95,7 @@ describe("PATCH /api/pipeline-stages/:id", () => {
         organizationId = organization.id;
         (getCurrentUser as Mock).mockResolvedValue(user);
 
-        const stage = await prisma.pipelineStage.create({
-            data: { organizationId: organization.id, name: "Won", order: 0, isWon: true },
-        });
+        const stage = await createPipelineStage(organization.id, { name: "Won", isWon: true });
 
         const res = await patchStage(patchRequest({ isLost: true }), {
             params: Promise.resolve({ id: String(stage.id) }),

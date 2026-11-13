@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // the production server bundle (npm run build), not source
+    "dist/**",
   ]),
 ]);
 

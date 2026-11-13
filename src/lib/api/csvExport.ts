@@ -129,7 +129,7 @@ export async function exportLeads(organizationId: number, where: Prisma.LeadWher
 export async function exportDeals(organizationId: number, where: Prisma.DealWhereInput) {
     const custom = await customColumns(organizationId, "deal");
     const header = [
-        "Title", "Amount", "Probability %", "Stage", "Expected close", "Lead", "Phone", "Email", "Company", "Assigned to", "Lost reason", "Closed",
+        "Title", "Amount", "Probability %", "Pipeline", "Stage", "Expected close", "Lead", "Phone", "Email", "Company", "Assigned to", "Lost reason", "Closed",
         "Description", "Products", "Created", "Last updated", "Created by", "Last modified by",
         ...custom.header,
     ];
@@ -144,7 +144,7 @@ export async function exportDeals(organizationId: number, where: Prisma.DealWher
                     orderBy: { id: "asc" },
                     take: PAGE,
                     include: {
-                        pipelineStage: true,
+                        pipelineStage: { include: { pipeline: { select: { name: true } } } },
                         lead: { select: { name: true, phone: true, email: true, contact: { select: { company: { select: { name: true } } } } } },
                         assignedTo: { select: { name: true } },
                         // its quote's lines, as "2 × Licence; 1 × Setup"
@@ -156,6 +156,7 @@ export async function exportDeals(organizationId: number, where: Prisma.DealWher
                 deal.title,
                 Number(deal.amount),
                 deal.probability,
+                deal.pipelineStage.pipeline.name,
                 deal.pipelineStage.name,
                 day(deal.expectedCloseDate),
                 deal.lead?.name ?? "",

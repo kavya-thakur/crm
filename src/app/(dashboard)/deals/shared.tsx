@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+
+import { api } from "@/lib/api/client";
 import { formatMoneyExact } from "@/lib/utils/format";
 import { StageBadge } from "@/components/StageBadge";
 
@@ -28,6 +31,33 @@ export interface DealLead {
     email: string | null;
 }
 export type PipelineStage = PrismaPipelineStage;
+
+// A deals board with its own stages ("New sales", "Renewals"). Every workspace has at least one,
+// and every pipeline control in the app only shows once there are two or more.
+export interface Pipeline {
+    id: number;
+    name: string;
+    order: number;
+    stages: PipelineStage[];
+    // from the list only (not after adding or renaming one): how many deals are in it
+    dealCount?: number;
+}
+
+// The workspace's pipelines in order, each with its stages in board order
+export function usePipelines(enabled = true) {
+    return useQuery({
+        queryKey: ["pipelines"],
+        queryFn: () => api.get<{ data: Pipeline[] }>("/pipelines").then((res) => res.data.data),
+        enabled,
+    });
+}
+
+// "Renewals · Contacted" once there's more than one pipeline, so two "Won" stages can be told apart;
+// just "Contacted" while there's one
+export function stageName(stage: { name: string; pipelineId: number }, pipelines: Pipeline[] | undefined) {
+    const pipeline = pipelines && pipelines.length > 1 ? pipelines.find((item) => item.id === stage.pipelineId) : undefined;
+    return pipeline ? `${pipeline.name} · ${stage.name}` : stage.name;
+}
 
 export function StageLabel({ stage }: { stage: { name: string; color: string } }) {
     return <StageBadge name={stage.name} color={stage.color} />;
@@ -73,6 +103,8 @@ export interface Product {
 }
 export interface DealFilters {
     search: string;
+    // the pipeline whose deals are shown; only set once there are two or more
+    pipelineId?: number;
     // several stages at once; the board shows just these columns
     pipelineStageIds?: number[];
     assignedTo?: "me" | "unassigned" | number;

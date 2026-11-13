@@ -26,6 +26,10 @@ export function verifyToken(token: string) {
     return jwt.verify(token, JWT_SECRET);
 }
 
+// Was this session signed in (`iat`, the token's "issued at" in seconds) before `moment`?
+// Used with passwordChangedAt: a session from before a password change is over.
+export const signedBefore = (iat: number, moment: Date | null) => !!moment && iat < Math.floor(moment.getTime() / 1000);
+
 // How the session cookies are set, for as long as their token lasts
 export function sessionCookie(seconds: number) {
     return {
@@ -55,6 +59,7 @@ export function signedIn(cookieHeader: string | undefined) {
             userId: payload.userId as number,
             organizationId: payload.organizationId as number,
             actingAs: typeof payload.actingAs === "number" ? (payload.actingAs as number) : null,
+            signedAt: typeof payload.iat === "number" ? payload.iat : 0,
         };
     } catch {
         return null;

@@ -565,7 +565,7 @@ erDiagram
 
 ## API
 
-107 route handlers under `src/app/api`, one folder per resource. All of them are JSON (except the two Google connect routes, which redirect), and all
+108 route handlers under `src/app/api`, one folder per resource. All of them are JSON (except the two Google connect routes, which redirect), and all
 of them check sign-in, permission, input (Zod) and workspace scope.
 
 | Area | Routes |
@@ -575,7 +575,7 @@ of them check sign-in, permission, input (Zod) and workspace scope.
 | **Email** | `emails` (list and send), `email-templates`, `whatsapp` (note an opened chat) |
 | **Automation** | `automations` (rules, on/off), `automations/:id/runs` (the run log) |
 | **Capture** | `lead-forms` (web forms and integrations), `lead-forms/:id/deliveries`, `imports` (+ `problems`, `sample`), `bulk-jobs` |
-| **Workspace** | `workspace` (its currency), `workspace/email-account` (the team mailbox, + `google`, `google/callback`), `onboarding`, `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipeline-stages` (+ `reorder`), `custom-fields`, `saved-filters` |
+| **Workspace** | `workspace` (its currency), `workspace/email-account` (the team mailbox, + `google`, `google/callback`), `onboarding`, `agents` (members), `roles`, `permissions`, `lead-stages`, `lead-sources`, `pipelines` (+ `[id]`), `pipeline-stages` (`?pipelineId=`), `custom-fields`, `saved-filters` |
 | **You** | `auth/login`, `auth/register`, `auth/logout`, `auth/demo`, `auth/forgot-password`, `auth/reset-password`, `auth/back` (end "log in as"), `me`, `me/password`, `notifications` |
 | **Billing** | `billing` (plan and status), `billing/order` (start a Razorpay payment), `billing/verify` (confirm it) |
 | **Site admin** | `site-admin/overview` (counts, revenue, trials ending), `site-admin/workspaces` (+ `:id`: one company, record a payment, extend a trial), `site-admin/users`, `site-admin/payments` |

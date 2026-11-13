@@ -24,7 +24,7 @@ const REFRESH: Record<string, string[]> = {
     activities: ["activities", "activity", "lead", "deal", "contact", "dashboard", "my-day"],
     "lead-stages": ["leadStage", "leads", "lead", "dashboard", "my-day"],
     "lead-sources": ["leadSource", "leads", "lead", "dashboard"],
-    "pipeline-stages": ["pipelineStage", "deals", "deal", "dashboard"],
+    "pipeline-stages": ["pipelineStage", "pipelines", "deals", "deal", "dashboard"],
     "custom-fields": ["customFields", "leads", "deals", "contacts"],
     // a new integration can add a lead source of its name
     "lead-forms": ["leadForms", "leadSource"],
@@ -80,6 +80,14 @@ export function LiveUpdates() {
             connectedBefore = true;
         });
 
+        // The server closed it because the password changed. Socket.IO doesn't reconnect on its own
+        // then, so try again in a second, once the new login cookie has arrived. A session from
+        // before the change is refused and stays closed.
+        let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+        socket.on("disconnect", (reason) => {
+            if (reason === "io server disconnect") reconnectTimer = setTimeout(() => socket.connect(), 1000);
+        });
+
         socket.on("changed", ({ topic }: { topic: string }) => {
             for (const key of REFRESH[topic] ?? []) void queryClient.invalidateQueries({ queryKey: [key] });
             if (RERENDER.has(topic)) router.refresh();
@@ -102,6 +110,7 @@ export function LiveUpdates() {
         socket.on("bulk-progress", (progress: BulkProgress) => trackBulkJob(queryClient, progress));
 
         return () => {
+            clearTimeout(reconnectTimer);
             socket.disconnect();
         };
     }, [queryClient, router]);

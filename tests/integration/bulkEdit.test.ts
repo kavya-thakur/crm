@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -89,7 +89,7 @@ describe("editing many records at once, and one field at a time", () => {
 
     it("sets amount and probability on many deals, and renaming one deal keeps its amount", async () => {
         const { org } = await setUp();
-        const stage = await prisma.pipelineStage.create({ data: { ...org, name: "Open" } });
+        const stage = await createPipelineStage(org.organizationId, { name: "Open" });
         const deals = await Promise.all(
             ["One", "Two"].map((title) => prisma.deal.create({ data: { ...org, title, amount: 1000, probability: 10, pipelineStageId: stage.id } })),
         );

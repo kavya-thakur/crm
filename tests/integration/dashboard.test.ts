@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { dashboardPeriod, bucketIndex } from "@/lib/dashboard/periods";
-import { createOrgWithUser, cleanupOrg } from "../helpers";
+import { createOrgWithUser, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
@@ -55,8 +55,8 @@ describe("GET /api/dashboard", () => {
 
         const org = { organizationId: organization.id };
         const [open, won] = await Promise.all([
-            prisma.pipelineStage.create({ data: { ...org, name: "Proposal", order: 0 } }),
-            prisma.pipelineStage.create({ data: { ...org, name: "Won", order: 1, isWon: true } }),
+            createPipelineStage(org.organizationId, { name: "Proposal", order: 0 }),
+            createPipelineStage(org.organizationId, { name: "Won", order: 1, isWon: true }),
         ]);
         return { user, org, open, won };
     }
@@ -89,7 +89,7 @@ describe("GET /api/dashboard", () => {
         expect(data.scope).toBe("team");
         expect(data.deals.won).toMatchObject({ value: 5000, count: 1, previousValue: 2000 });
         expect(data.deals.won.trend).toHaveLength(30);
-        expect(data.deals.open.stages).toEqual([{ id: open.id, name: "Proposal", color: open.color, count: 1, value: 800 }]);
+        expect(data.deals.open.stages).toEqual([{ id: open.id, name: "Proposal", color: open.color, pipelineId: open.pipelineId, count: 1, value: 800 }]);
     });
 
     it("only counts your own deals without deal:all, and leaves out leads without lead:read", async () => {
@@ -113,7 +113,7 @@ describe("GET /api/dashboard", () => {
     it("narrows to one agent for a manager, and ranks everyone in the team table", async () => {
         const { user, org, open, won } = await setUp(["deal:read", "deal:all"]);
         const colleague = await addColleague(org, user.roleId);
-        const lostStage = await prisma.pipelineStage.create({ data: { ...org, name: "Lost", order: 2, isLost: true } });
+        const lostStage = await createPipelineStage(org.organizationId, { name: "Lost", order: 2, isLost: true });
         const theirs = { ...org, assignedToId: colleague.id };
         await prisma.deal.createMany({
             data: [
@@ -149,7 +149,7 @@ describe("GET /api/dashboard", () => {
             prisma.leadStage.create({ data: { ...org, name: "New", order: 0 } }),
             prisma.leadStage.create({ data: { ...org, name: "Customer", order: 1, isConverted: true } }),
             prisma.leadStage.create({ data: { ...org, name: "Lost", order: 2, isLost: true } }),
-            prisma.pipelineStage.create({ data: { ...org, name: "Lost", order: 2, isLost: true } }),
+            createPipelineStage(org.organizationId, { name: "Lost", order: 2, isLost: true }),
             prisma.leadSource.create({ data: { ...org, name: "Website" } }),
             prisma.leadSource.create({ data: { ...org, name: "Referral" } }),
         ]);
@@ -201,8 +201,8 @@ describe("Deal.closedAt", () => {
         organizationId = organization.id;
         (getCurrentUser as Mock).mockResolvedValue(user);
         const org = { organizationId: organization.id };
-        const open = await prisma.pipelineStage.create({ data: { ...org, name: "Open", order: 0 } });
-        const won = await prisma.pipelineStage.create({ data: { ...org, name: "Won", order: 1, isWon: true } });
+        const open = await createPipelineStage(org.organizationId, { name: "Open", order: 0 });
+        const won = await createPipelineStage(org.organizationId, { name: "Won", order: 1, isWon: true });
         const deal = await prisma.deal.create({ data: { ...org, title: "Deal", pipelineStageId: open.id } });
 
         const move = (pipelineStageId: number) =>
@@ -240,8 +240,8 @@ describe("lost reasons", () => {
         organizationId = organization.id;
         (getCurrentUser as Mock).mockResolvedValue(user);
         const org = { organizationId };
-        const open = await prisma.pipelineStage.create({ data: { ...org, name: "Open", order: 0 } });
-        const lost = await prisma.pipelineStage.create({ data: { ...org, name: "Lost", order: 1, isLost: true } });
+        const open = await createPipelineStage(org.organizationId, { name: "Open", order: 0 });
+        const lost = await createPipelineStage(org.organizationId, { name: "Lost", order: 1, isLost: true });
         const deal = await prisma.deal.create({ data: { ...org, title: "Deal", pipelineStageId: open.id } });
         const params = { params: Promise.resolve({ id: String(deal.id) }) };
 

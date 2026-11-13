@@ -31,13 +31,15 @@ captureLead()  (same as web forms)  → lead + contact + reply task, or the exis
 - **Tagged from the first lead:** creating an integration picks the lead source with the same
   name ("Google Ads"), or adds one to the end of the source list. A new web form starts tagged
   "Website". Either can be changed on its card.
-- **Only name and phone are required.** Every lead and contact needs them; everything else is optional.
+- **Only the phone is required.** With no name (an IVR call), the number stands in as the
+  lead's name until someone edits it; everything else is optional.
 - **Any lead custom field** can be filled by sending its name or key ("Budget": "5-10L").
 - **Rejections are visible:** the integration's page lists what arrived and why anything was
   rejected, with the raw data, so "my leads aren't showing up" is a one-look fix.
 - **New link:** makes a fresh key; the old address stops working at once (`PATCH { newKey: true }`).
 - **Send a test lead** posts a made-up lead to the real link from the browser.
-- A `GET` on the link answers 200, for tools that check an address before saving it.
+- A bare `GET` on the link answers 200, for tools that check an address before saving it. A `GET`
+  with a query string is a delivery (Exotel's Passthru reports calls as `?CallFrom=...&CallSid=...`).
 
 ## Payloads it understands
 
@@ -55,6 +57,15 @@ Google Ads lead form webhook (campaign saved as `utm_campaign`, source `google /
 ```
 
 IndiaMART push: `{ "RESPONSE": { "SENDER_NAME", "SENDER_MOBILE", "SENDER_EMAIL", "SENDER_COMPANY", "QUERY_MESSAGE" } }`.
+
+IVR / cloud calling (Exotel, Knowlarity, MyOperator, Tata Smartflo...): paste the link into the
+provider's call webhook. The caller's number is read from `CallFrom`, `From`, `caller_number`,
+`caller_id`, `customer_number` and the like (never `To` / `CallTo`, the business's own line);
+everything else (call id, recording link, duration, key pressed) goes on the lead's timeline.
+A repeat caller with an open lead gets a timeline note, not a second lead.
+```json
+{ "CallSid": "abc123", "CallFrom": "09876543210", "CallTo": "08047112233", "RecordingUrl": "https://..." }
+```
 
 ## On a free host
 

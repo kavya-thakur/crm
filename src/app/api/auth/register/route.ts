@@ -2,7 +2,7 @@ import { createToken } from "@/lib/auth/jwt";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { registerSchema } from "@/lib/validations/auth";
-import { DEFAULT_PIPELINE_STAGES } from "@/lib/deals/stages";
+import { createPipeline, DEFAULT_PIPELINE_NAME, DEFAULT_PIPELINE_STAGES } from "@/lib/deals/stages";
 import { DEFAULT_LEAD_STAGES } from "@/lib/leads/stages";
 import { DEFAULT_LEAD_SOURCES } from "@/lib/leads/sources";
 import { Prisma } from "@/generated/prisma/client";
@@ -56,13 +56,8 @@ export async function POST(req: NextRequest) {
                     permissionId: permission.id,
                 })),
             });
-            // the deals board needs stages before the first deal can be created
-            await tx.pipelineStage.createMany({
-                data: DEFAULT_PIPELINE_STAGES.map((stage) => ({
-                    ...stage,
-                    organizationId: organization.id,
-                })),
-            });
+            // the deals board needs a pipeline and its stages before the first deal can be created
+            await createPipeline(tx, { organizationId: organization.id, name: DEFAULT_PIPELINE_NAME, order: 0 }, DEFAULT_PIPELINE_STAGES);
             // same for the leads board
             await tx.leadStage.createMany({
                 data: DEFAULT_LEAD_STAGES.map((stage) => ({

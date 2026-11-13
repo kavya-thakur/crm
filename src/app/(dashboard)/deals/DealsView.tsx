@@ -1,11 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowDown, IconArrowUp, IconCalendarDue, IconCoin, IconGitMerge, IconPercentage, IconTargetArrow } from "@tabler/icons-react";
+import {
+    IconArrowDown,
+    IconArrowUp,
+    IconCalendarDue,
+    IconChevronDown,
+    IconCoin,
+    IconGitMerge,
+    IconPercentage,
+    IconTargetArrow,
+    IconTimeline,
+} from "@tabler/icons-react";
 
 import { Dropdown, MenuItem } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
+import { PageLoader } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 import { askLostReason } from "@/components/LostReasonPrompt";
 import {
@@ -38,6 +49,7 @@ import { api, errorMessage } from "@/lib/api/client";
 import {
     StageLabel,
     refreshDeals,
+    usePipelines,
     type Deal,
     type DealFilters,
     type DealUser,
@@ -76,6 +88,9 @@ interface OptionsResponse<T> {
     data: T[];
 }
 
+// The pipeline last picked on the deals page, in this browser
+const PIPELINE_KEY = "flash:deals-pipeline";
+
 export default function DealsView({ can, meId }: { can: Permissions; meId: number }) {
     const queryClient = useQueryClient();
     // list or board, kept in the URL so a refresh keeps it (the list is the default)
@@ -90,6 +105,9 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     // two deals picked in the table, being merged; the one added first (lower id) stays
     const [merging, setMerging] = useState<{ keepId: number; duplicateId: number } | null>(null);
+    // the deals wait until it's settled which pipeline's to show, so another pipeline's never flash up
+    const [pipelineReady, setPipelineReady] = useState(false);
+    const pipelinesQuery = usePipelines(can.read);
 
     const {
         query: dealsQuery,
@@ -106,8 +124,49 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         "deals",
         "/deals",
         { sortBy: "createdAt", sortOrder: "desc", search: "" },
-        { enabled: can.read, onSearch: (trimmed) => ({ search: trimmed }) },
+        { enabled: can.read && pipelineReady, onSearch: (trimmed) => ({ search: trimmed }) },
     );
+
+    // Only with two or more pipelines does the page pick one; with one it shows every deal, as it always has
+    const pipelines = pipelinesQuery.data ?? [];
+    const pipeline = pipelines.length > 1 ? pipelines.find((item) => item.id === filters.pipelineId) : undefined;
+
+    // Shows another pipeline's deals. A stage filter keeps just the stages that pipeline has.
+    function showPipeline(pipelineId: number | undefined) {
+        const stages = pipelines.find((item) => item.id === pipelineId)?.stages;
+        const stageIds = stages ? filters.pipelineStageIds?.filter((id) => stages.some((stage) => stage.id === id)) : filters.pipelineStageIds;
+        updateFilters({ pipelineId, pipelineStageIds: stageIds?.length ? stageIds : undefined });
+    }
+
+    // Once the pipelines are known: the one in the link, else the one last picked in this browser,
+    // else the first (also when the remembered one has been deleted). In an effect, because the
+    // server has no localStorage.
+    useEffect(() => {
+        if (pipelinesQuery.isPending) return;
+        const ids = pipelinesQuery.data?.map((item) => item.id);
+        if (ids) {
+            let remembered: number | undefined;
+            try {
+                remembered = Number(localStorage.getItem(PIPELINE_KEY)) || undefined;
+            } catch {
+                // blocked storage: start from the first pipeline
+            }
+            const next = ids.length > 1 ? ([filters.pipelineId, remembered].find((id) => id !== undefined && ids.includes(id)) ?? ids[0]) : undefined;
+            if (next !== filters.pipelineId) showPipeline(next);
+        }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setPipelineReady(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pipelinesQuery.isPending, pipelinesQuery.data, filters.pipelineId]);
+
+    function pickPipeline(pipelineId: number) {
+        showPipeline(pipelineId);
+        try {
+            localStorage.setItem(PIPELINE_KEY, String(pipelineId));
+        } catch {
+            // storage blocked or full: the page just opens on the first pipeline next time
+        }
+    }
 
     const agentsQuery = useQuery({
         queryKey: ["agents"],
@@ -124,6 +183,9 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 .then((response) => response.data.data),
         enabled: can.read,
     });
+
+    // the stages of the pipeline on screen (with one pipeline, simply all of them)
+    const stages = stagesQuery.data?.filter((stage) => filters.pipelineId === undefined || stage.pipelineId === filters.pipelineId);
 
     const customFieldsQuery = useCustomFields("deal");
     const customFields = customFieldsQuery.data ?? [];
@@ -203,7 +265,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         label: "Pipeline stage",
         get: (f) => f.pipelineStageIds,
         set: (value) => ({ pipelineStageIds: value }),
-        options: stagesQuery.data?.map((stage) => ({ value: stage.id, label: stage.name, render: <StageLabel stage={stage} /> })) ?? [],
+        options: stages?.map((stage) => ({ value: stage.id, label: stage.name, render: <StageLabel stage={stage} /> })) ?? [],
     });
 
     const FILTER_FIELDS: FilterFieldDef<DealFilters>[] = [
@@ -242,7 +304,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         ...withDealEdits(DEAL_COLUMNS, {
             canUpdate: can.update,
             canAssign: can.assign,
-            stages: stagesQuery.data,
+            stages,
             agents: can.seeAgents ? agentsQuery.data : undefined,
             onUpdate: (deal, changes) => updateDeal.mutate({ id: deal.id, changes }),
             onAssign: (deal, assignedToId) => assignDeal.mutate({ id: deal.id, assignedToId }),
@@ -263,6 +325,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 // picking who it's for needs the right to give deals to others, and to see the team
                 canAssign={can.assign && can.seeAgents}
                 canLinkLead={can.readLeads}
+                pipelineId={filters.pipelineId}
                 onClose={() => setCreating(false)}
                 onCreated={() => setCreating(false)}
             />
@@ -302,6 +365,34 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                     }}
                 />
 
+                {pipeline && (
+                    <Dropdown
+                        buttonClassName="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
+                        label={
+                            <>
+                                <IconTimeline size={16} />
+                                {pipeline.name}
+                                <IconChevronDown size={14} className="text-faint" />
+                            </>
+                        }
+                    >
+                        {(close) =>
+                            pipelines.map((item) => (
+                                <MenuItem
+                                    key={item.id}
+                                    selected={item.id === pipeline.id}
+                                    onClick={() => {
+                                        close();
+                                        if (item.id !== pipeline.id) pickPipeline(item.id);
+                                    }}
+                                >
+                                    {item.name}
+                                </MenuItem>
+                            ))
+                        }
+                    </Dropdown>
+                )}
+
                 <div className="ml-auto flex items-center gap-1">
                     <SearchBox value={searchInput} ariaLabel="Search deals" onChange={setSearchInput} />
 
@@ -320,7 +411,7 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         columns={dealColumns}
                         columnPrefs={columnPrefs}
                         canManageCustomFields={can.manageCustomFields}
-                        extraLinks={can.managePipeline ? [{ label: "Pipeline stages", href: "/settings/stages" }] : undefined}
+                        extraLinks={can.managePipeline ? [{ label: "Pipelines & stages", href: "/settings/pipelines" }] : undefined}
                     />
                 </div>
             </div>
@@ -342,14 +433,17 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 <ActiveFilterChips fields={FILTER_FIELDS} filters={filters} onChange={updateFilters} />
             </FilterBar>
 
-            {can.read && stagesQuery.isError && (
+            {can.read && (stagesQuery.isError || pipelinesQuery.isError) && (
                 <div className="border-b border-line-light px-3 py-2">
                     <ErrorState
                         variant="inline"
-                        title="Couldn't load pipeline stages"
-                        error={stagesQuery.error}
-                        onRetry={() => stagesQuery.refetch()}
-                        retrying={stagesQuery.isFetching}
+                        title="Couldn't load the pipeline"
+                        error={stagesQuery.error ?? pipelinesQuery.error}
+                        onRetry={() => {
+                            if (stagesQuery.isError) void stagesQuery.refetch();
+                            if (pipelinesQuery.isError) void pipelinesQuery.refetch();
+                        }}
+                        retrying={stagesQuery.isFetching || pipelinesQuery.isFetching}
                     />
                 </div>
             )}
@@ -376,6 +470,8 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                         onOpen={setSelectedDealId}
                         onCreate={can.create ? () => setCreating(true) : undefined}
                     />
+                ) : !pipelineReady ? (
+                    <PageLoader label="Loading pipeline" variant="board" />
                 ) : (
                     <DealsBoard
                         filters={filters}
@@ -395,13 +491,13 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
                 onClear={selection.clear}
                 onDelete={can.delete ? () => setConfirmingDelete(true) : undefined}
             >
-                {can.update && stagesQuery.data && (
+                {can.update && stages && (
                     <Dropdown
                         openUp
                         buttonClassName="flex h-7 items-center gap-1 rounded-lg px-2 hover:bg-fill"
                         label={<><IconTargetArrow size={14} /> Stage</>}
                     >
-                        {(close) => stagesQuery.data.map((stage) => (
+                        {(close) => stages.map((stage) => (
                             <MenuItem
                                 key={stage.id}
                                 onClick={async () => {

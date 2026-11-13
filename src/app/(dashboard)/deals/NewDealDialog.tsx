@@ -2,7 +2,7 @@
 
 import { currencySymbol } from "@/lib/utils/format";
 import { useEffect } from "react";
-import { Controller, useForm, type Control } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,6 +11,7 @@ import {
     IconFileDescription,
     IconPercentage,
     IconProgress,
+    IconTimeline,
     IconUser,
     IconUserCircle,
 } from "@tabler/icons-react";
@@ -21,7 +22,7 @@ import { Select } from "@/components/Select";
 import { createDealSchema } from "@/lib/validations/deals";
 import { FormFieldRow, FormIdentityHeader, FormSection, RecordFormShell } from "../shared/FullPageForm";
 import { CustomFieldsFormSection, useCustomFields } from "../shared/customFields";
-import { StageLabel, refreshDeals, type Deal, type PipelineStage } from "./shared";
+import { StageLabel, refreshDeals, usePipelines, type Deal, type PipelineStage } from "./shared";
 
 const inputClassName =
     "h-8 w-full rounded-lg border border-line bg-surface px-2 outline-none placeholder:text-light focus:border-accent focus:ring-3 focus:ring-accent-soft";
@@ -44,6 +45,8 @@ interface NewDealDialogProps {
     canAssign: boolean;
     // linking a lead lists the leads, which needs lead:read
     canLinkLead: boolean;
+    // the pipeline on screen, which the deal goes in unless another is picked
+    pipelineId?: number;
     onClose: () => void;
     onCreated: (deal: Deal) => void;
 }
@@ -53,7 +56,7 @@ export default function NewDealDialog({ open, ...props }: NewDealDialogProps) {
     return <NewDealForm {...props} />;
 }
 
-function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDealDialogProps, "open">) {
+function NewDealForm({ canAssign, canLinkLead, pipelineId, onClose, onCreated }: Omit<NewDealDialogProps, "open">) {
     const queryClient = useQueryClient();
     const {
         register,
@@ -95,12 +98,22 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
         enabled: canAssign,
     });
 
+    const pipelinesQuery = usePipelines();
+    const pipelines = pipelinesQuery.data ?? [];
+
     const customFieldsQuery = useCustomFields("deal");
 
-    // Defaults to the first stage once it loads, same as Lead's stage picker
+    // The deal's pipeline is its stage's, so the Pipeline field just narrows the Stage list
+    const allStages = stagesQuery.data ?? [];
+    const stageId = useWatch({ control, name: "pipelineStageId" });
+    const dealPipelineId = allStages.find((stage) => stage.id === stageId)?.pipelineId ?? pipelineId;
+    const stages = allStages.filter((stage) => dealPipelineId === undefined || stage.pipelineId === dealPipelineId);
+
+    // Defaults to the first stage once it loads (of the pipeline on screen), same as Lead's stage picker
+    const firstStageId = (allStages.find((stage) => stage.pipelineId === pipelineId) ?? allStages[0])?.id;
     useEffect(() => {
-        if (stagesQuery.data?.length) setValue("pipelineStageId", stagesQuery.data[0].id);
-    }, [stagesQuery.data, setValue]);
+        if (firstStageId) setValue("pipelineStageId", firstStageId);
+    }, [firstStageId, setValue]);
 
     const create = useMutation({
         mutationFn: (values: {
@@ -135,8 +148,8 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
     });
 
     // only the lists this person may load count (a disabled query stays "pending" forever)
-    const loadingOptions = stagesQuery.isPending || (canLinkLead && leadsQuery.isPending) || (canAssign && agentsQuery.isPending);
-    const optionsError = stagesQuery.error || (canLinkLead && leadsQuery.error) || (canAssign && agentsQuery.error);
+    const loadingOptions = stagesQuery.isPending || pipelinesQuery.isPending || (canLinkLead && leadsQuery.isPending) || (canAssign && agentsQuery.isPending);
+    const optionsError = stagesQuery.error || pipelinesQuery.error || (canLinkLead && leadsQuery.error) || (canAssign && agentsQuery.error);
 
     return (
         <RecordFormShell
@@ -165,6 +178,22 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
                     <input type="number" min="0" max="100" {...register("probability", { valueAsNumber: true })} className={inputClassName} />
                 </FormFieldRow>
 
+                {pipelines.length > 1 && (
+                    <FormFieldRow icon={IconTimeline} label="Pipeline" required>
+                        <Select
+                            disabled={loadingOptions}
+                            value={dealPipelineId !== undefined ? String(dealPipelineId) : undefined}
+                            // another pipeline starts the deal at its first stage
+                            onChange={(value) => {
+                                const first = allStages.find((stage) => String(stage.pipelineId) === value);
+                                if (first) setValue("pipelineStageId", first.id, { shouldValidate: true });
+                            }}
+                            placeholder="Select..."
+                            options={pipelines.map((pipeline) => ({ value: String(pipeline.id), label: pipeline.name }))}
+                        />
+                    </FormFieldRow>
+                )}
+
                 <FormFieldRow icon={IconProgress} label="Stage" required>
                     <Controller
                         name="pipelineStageId"
@@ -175,7 +204,7 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
                                 value={field.value !== undefined ? String(field.value) : undefined}
                                 onChange={(value) => field.onChange(value === undefined ? undefined : Number(value))}
                                 placeholder="Select..."
-                                options={(stagesQuery.data ?? []).map((stage) => ({
+                                options={stages.map((stage) => ({
                                     value: String(stage.id),
                                     label: stage.name,
                                     render: <StageLabel stage={stage} />,
@@ -248,7 +277,7 @@ function NewDealForm({ canAssign, canLinkLead, onClose, onCreated }: Omit<NewDea
             <CustomFieldsFormSection
                 fields={customFieldsQuery.data ?? []}
                 register={register}
-                control={control as Control<any>}
+                control={control}
                 agents={agentsQuery.data}
             />
 

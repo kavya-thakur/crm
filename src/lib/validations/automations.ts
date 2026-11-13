@@ -19,12 +19,12 @@ export const kindOf = (trigger: AutomationTrigger): RecordKind => (trigger.start
 
 // What a condition can look at: the source (id), where a new lead came in (a web form or
 // integration id, or "manual"), the ad campaign, the owner (id), the stage (id), the deal's
-// amount, the lost reason, or one of the record's custom fields
-const conditionField = z.string().regex(/^(source|via|campaign|owner|stage|amount|lostReason|cf:[a-z0-9_]+)$/, "Unknown field");
+// pipeline (id) and amount, the lost reason, or one of the record's custom fields
+const conditionField = z.string().regex(/^(source|via|campaign|owner|stage|pipeline|amount|lostReason|cf:[a-z0-9_]+)$/, "Unknown field");
 
 // The fields only one kind of record has; the rest fit both
 const LEAD_ONLY = ["via", "campaign"];
-const DEAL_ONLY = ["amount"];
+const DEAL_ONLY = ["amount", "pipeline"];
 
 export function fieldFits(field: string, trigger: AutomationTrigger) {
     // where it came in only means something for a lead that just came in

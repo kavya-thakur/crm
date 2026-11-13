@@ -153,6 +153,12 @@ export default function BillingView({ billing, locked = false }: { billing: Bill
                             ) : (
                                 <p className="mt-5 text-center text-sm text-faint">{current ? "Your current plan" : `Only ${billing.owner?.name ?? "the owner"} can choose a plan`}</p>
                             )}
+                            {/* paying early adds on after what's running now (activatePro), so say when */}
+                            {billing.canChoose && !ended && billing.endsAt && (
+                                <p className="mt-2 text-center text-sm text-faint">
+                                    Adds a {plan.per} after your {billing.state === "trial" ? "trial" : "current plan"} ends on {formatDate(billing.endsAt)}
+                                </p>
+                            )}
                         </div>
                     );
                 })}

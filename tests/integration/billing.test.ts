@@ -9,8 +9,11 @@ import { activatePro, apiLocked, lockedFor } from "@/lib/billing/gate";
 import { createOrgWithUser, cleanupOrg } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
+// Flash's own emails (the receipt) are recorded, not sent
+vi.mock("@/lib/emails/system", async (original) => ({ ...(await original<object>()), sendSystemEmail: vi.fn(async () => true) }));
 
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import { sendSystemEmail } from "@/lib/emails/system";
 import { POST as requestPlan } from "@/app/api/billing/route";
 import { GET as workspaceDetail, PUT as changePlan } from "@/app/api/site-admin/workspaces/[id]/route";
 import { GET as overview } from "@/app/api/site-admin/overview/route";
@@ -154,6 +157,7 @@ describe("billing lock", () => {
         vi.stubEnv("SITE_ADMIN_EMAILS", admin.owner.email);
         (getCurrentUser as Mock).mockResolvedValue({ ...admin.owner, actingAsId: null });
         const before = (await (await overview()).json()).data;
+        (sendSystemEmail as Mock).mockClear();
 
         // the plan's price unless said otherwise; 0 is still recorded
         expect((await changePlan(send({ action: "activate", cycle: "MONTHLY", note: "UPI 4521" }), params(organization.id))).status).toBe(200);
@@ -166,6 +170,11 @@ describe("billing lock", () => {
         ]);
         // the year starts after the month
         expect(Math.round((recorded[1].paidUntil.getTime() - recorded[0].paidUntil.getTime()) / DAY)).toBe(365);
+        // the owner gets a receipt for what was paid, not for the free year
+        expect(sendSystemEmail).toHaveBeenCalledTimes(1);
+        const owner = await prisma.user.findFirstOrThrow({ where: { organizationId: organization.id, isOwner: true } });
+        expect((sendSystemEmail as Mock).mock.calls[0][0]).toMatchObject({ to: owner.email });
+        expect((sendSystemEmail as Mock).mock.calls[0][0].text).toContain(`/receipts/${recorded[0].id}`);
 
         const detail = (await (await workspaceDetail(send({}), params(organization.id))).json()).data;
         expect(detail).toMatchObject({ access: { state: "pro" }, paidTotal: 1499, counts: { users: 1 } });

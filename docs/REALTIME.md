@@ -98,8 +98,10 @@ with any request to the same site, so the server can read the same cookie:
 // src/lib/realtime/socketServer.ts
 io.use(async (socket, next) => {
     const session = signedIn(socket.handshake.headers.cookie);   // verify the JWT
-    const user = session && (await prisma.user.findUnique(...));  // still a member?
-    if (!user) return next(new Error("Not signed in"));          // connection refused
+    if (!session) return next(new Error("Not signed in"));       // connection refused
+    const user = await prisma.user.findUnique(...);              // still a member?
+    // signed in before the password last changed? that session is over
+    if (!user || signedBefore(session.signedAt, user.passwordChangedAt)) return next(new Error("Not signed in"));
     socket.data.user = user;                                      // like req.user
     next();
 });
@@ -111,6 +113,12 @@ io.on("connection", (socket) => {
 
 Nothing from the browser decides which rooms it's in, so nobody can listen to another
 workspace or another person's notifications.
+
+**A changed or reset password** also closes that person's open sockets
+(`disconnectSockets()` on their room). Socket.IO doesn't reconnect by itself after the server
+closes a connection, so `LiveUpdates` tries again a second later. The browser that changed the
+password has its new token by then and gets back in. Any session from before the change is
+refused at the handshake above.
 
 ---
 
@@ -154,6 +162,9 @@ How the pieces do it:
   through your user room, so every bell shows the same count.)
 - **No session, no hook:** a website visitor submitting a web form has no cookie, so
   `captureLead` announces `leads` and `tasks` itself with `broadcastChange(orgId, topic)`.
+- **Pipelines** (`/api/pipelines`, and stage lists saved per pipeline) announce the
+  `pipeline-stages` topic themselves; it refetches the pipelines, every stage list, the deals and
+  the dashboard, so a pipeline added in Settings shows up in everyone's switcher.
 
 ---
 

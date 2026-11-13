@@ -109,6 +109,7 @@ model Organization {
   deletedRecords         DeletedRecord[]
   leads                  Lead[]
   pipelineStages         PipelineStage[]
+  pipelines              Pipeline[]
   leadStages             LeadStage[]
   leadSources            LeadSource[]
   deals                  Deal[]
@@ -352,9 +353,28 @@ model LeadNote {
   @@index([authorId])
 }
 
+// A deal board with its own stages ("New sales", "Renewals"). Every workspace has at least one; the
+// stages it had before pipelines existed became one called "Sales pipeline". A deal's pipeline is
+// its stage's: moving a deal to another pipeline is moving it to one of that pipeline's stages.
+model Pipeline {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stages       PipelineStage[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, order])
+}
+
 model PipelineStage {
   id             Int      @id @default(autoincrement())
   organizationId Int
+  pipelineId     Int
   name           String
   order          Int      @default(0)
   color          String   @default("#64748b")
@@ -364,10 +384,14 @@ model PipelineStage {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // a pipeline's stages go with it (it can only be deleted once it has no deals)
+  pipeline     Pipeline     @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals        Deal[]
 
-  @@unique([organizationId, name])
+  // "Won" can be a stage of every pipeline, but only once in each
+  @@unique([pipelineId, name])
   @@index([organizationId, order])
+  @@index([pipelineId, order])
 }
 
 model Deal {

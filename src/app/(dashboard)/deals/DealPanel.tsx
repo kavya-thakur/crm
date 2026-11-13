@@ -31,6 +31,7 @@ import {
     IconUserOff,
     IconX,
     IconThumbDown,
+    IconTimeline,
     IconGitMerge,
     IconLinkOff,
     IconMail,
@@ -60,6 +61,7 @@ import {
     StageLabel,
     formatDealAmount,
     refreshDeals,
+    usePipelines,
     type Deal,
     type DealLead,
     type DealUser,
@@ -170,6 +172,7 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
             api.get<StagesResponse>("/pipeline-stages").then((res) => res.data.data),
         enabled: can.update,
     });
+    const pipelines = usePipelines().data ?? [];
 
     const update = useMutation({
         mutationFn: (changes: DealChanges) =>
@@ -217,6 +220,14 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
         timelineQuery.data?.pages.flatMap((page) => page.data) ?? [];
     const mutationError = update.error ?? assign.error ?? remove.error;
     const enterRef = usePanelEnter<HTMLDivElement>();
+    const dealPipelineId = deal?.pipelineStage.pipelineId;
+
+    // Moving to a lost stage asks why first; closing the question calls the move off
+    async function moveTo(stage: PipelineStage) {
+        if (stage.id === deal?.pipelineStageId) return;
+        const answer = stage.isLost ? await askLostReason("deal") : {};
+        if (answer) update.mutate({ pipelineStageId: stage.id, ...answer });
+    }
 
     return (
         <div ref={enterRef} className="flex h-full min-h-0 flex-col">
@@ -297,6 +308,40 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                         <section className="space-y-0.5 px-3 py-3">
                             <SectionLabel>Fields</SectionLabel>
 
+                            {/* only once there's a choice: another pipeline takes the deal to its first stage */}
+                            {pipelines.length > 1 && (
+                                <FieldRow icon={IconTimeline} label="Pipeline">
+                                    {can.update ? (
+                                        <Dropdown
+                                            buttonClassName="flex h-7 max-w-full items-center gap-1 rounded-lg px-1 hover:bg-fill"
+                                            label={
+                                                <>
+                                                    <span className="truncate">{pipelines.find((pipeline) => pipeline.id === dealPipelineId)?.name}</span>
+                                                    <IconChevronDown size={14} className="shrink-0 text-faint" />
+                                                </>
+                                            }
+                                        >
+                                            {(close) =>
+                                                pipelines.map((pipeline) => (
+                                                    <MenuItem
+                                                        key={pipeline.id}
+                                                        selected={pipeline.id === dealPipelineId}
+                                                        onClick={() => {
+                                                            close();
+                                                            if (pipeline.id !== dealPipelineId && pipeline.stages[0]) void moveTo(pipeline.stages[0]);
+                                                        }}
+                                                    >
+                                                        {pipeline.name}
+                                                    </MenuItem>
+                                                ))
+                                            }
+                                        </Dropdown>
+                                    ) : (
+                                        <span className="px-1">{pipelines.find((pipeline) => pipeline.id === dealPipelineId)?.name}</span>
+                                    )}
+                                </FieldRow>
+                            )}
+
                             <FieldRow icon={IconProgress} label="Stage">
                                 {can.update ? (
                                     <Dropdown
@@ -309,21 +354,21 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                         }
                                     >
                                         {(close) =>
-                                            (stagesQuery.data ?? []).map((stage) => (
-                                                <MenuItem
-                                                    key={stage.id}
-                                                    selected={stage.id === deal.pipelineStageId}
-                                                    onClick={async () => {
-                                                        close();
-                                                        if (stage.id === deal.pipelineStageId) return;
-                                                        // moving to a lost stage asks why first; closing the question calls the move off
-                                                        const answer = stage.isLost ? await askLostReason("deal") : {};
-                                                        if (answer) update.mutate({ pipelineStageId: stage.id, ...answer });
-                                                    }}
-                                                >
-                                                    <StageLabel stage={stage} />
-                                                </MenuItem>
-                                            ))
+                                            // its own pipeline's stages; the Pipeline field above moves it to another
+                                            (stagesQuery.data ?? [])
+                                                .filter((stage) => stage.pipelineId === dealPipelineId)
+                                                .map((stage) => (
+                                                    <MenuItem
+                                                        key={stage.id}
+                                                        selected={stage.id === deal.pipelineStageId}
+                                                        onClick={() => {
+                                                            close();
+                                                            void moveTo(stage);
+                                                        }}
+                                                    >
+                                                        <StageLabel stage={stage} />
+                                                    </MenuItem>
+                                                ))
                                         }
                                     </Dropdown>
                                 ) : (
@@ -782,11 +827,8 @@ function EditableText({
     className = "",
 }: EditableTextProps) {
     const [editing, setEditing] = useState(false);
+    // filled from the value each time editing starts (and put back by Escape), so it never goes stale
     const [draft, setDraft] = useState(value ?? "");
-
-    useEffect(() => {
-        if (!editing) setDraft(value ?? "");
-    }, [value, editing]);
 
     if (editing) {
         return (

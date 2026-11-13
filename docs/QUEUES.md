@@ -130,6 +130,7 @@ for stopping bots and password guessing.
 |---|---|---|
 | Web form submissions | 5 per 10 min | visitor IP + form |
 | Sign-in attempts | 10 per 15 min | visitor IP + email (so nobody can lock a real user out from elsewhere) |
+| Current-password tries when changing it | 10 per 15 min | user |
 | Starting imports | 10 per hour | user |
 | Starting big bulk actions | 20 per hour | user |
 

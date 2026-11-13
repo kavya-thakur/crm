@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import Papa from "papaparse";
 
 import { prisma } from "@/lib/db/prisma";
-import { createOrgWithUser, createLeadStage, cleanupOrg } from "../helpers";
+import { createOrgWithUser, createLeadStage, cleanupOrg, createPipelineStage } from "../helpers";
 
 vi.mock("@/lib/auth/getCurrentUser", () => ({ getCurrentUser: vi.fn() }));
 
@@ -53,7 +53,7 @@ describe("exports", () => {
             data: { ...org, ...by, name: "Rahul Mehta", phone: "+91 98000 80001", email: "rahul@acme.example", companyName: "Acme", stageId: stage.id, sourceId: source.id, contactId: contact.id, utmSource: "google", utmMedium: "cpc", utmCampaign: "diwali", customFields: custom },
         });
         const lead = await prisma.lead.findFirstOrThrow({ where: org });
-        const pipeline = await prisma.pipelineStage.create({ data: { ...org, name: "Proposal" } });
+        const pipeline = await createPipelineStage(org.organizationId, { name: "Proposal" });
         const deal = await prisma.deal.create({
             data: { ...org, ...by, title: "Acme licence", amount: 250000, probability: 60, description: "Annual plan", pipelineStageId: pipeline.id, leadId: lead.id, customFields: custom },
         });
