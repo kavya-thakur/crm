@@ -170,7 +170,8 @@ export async function GET(req: NextRequest) {
                 page,
                 limit,
                 total,
-                totalPages: Math.ceil(total / limit),
+                // a date range is one page, all of it, so a board column never asks for a second
+                totalPages: to ? 1 : Math.ceil(total / limit),
             },
         });
     } catch (error) {

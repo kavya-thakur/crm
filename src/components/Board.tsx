@@ -86,7 +86,8 @@ export function BoardColumn({
     /** shown after the count, like a deal column's total value */
     aside?: ReactNode;
     /** leave out to make the column read-only (no dropping into it) */
-    onDropCard?: (cardId: number) => void;
+    // with the column it came from
+    onDropCard?: (cardId: number, fromColumn: string) => void;
     onAdd?: () => void;
     loading?: boolean;
     error?: unknown;
@@ -120,7 +121,8 @@ export function BoardColumn({
     function handleDrop(event: DragEvent) {
         setOver(false);
         const cardId = Number(event.dataTransfer.getData(CARD_ID));
-        if (onDropCard && cardId && event.dataTransfer.getData(FROM_COLUMN) !== id) onDropCard(cardId);
+        const from = event.dataTransfer.getData(FROM_COLUMN);
+        if (onDropCard && cardId && from !== id) onDropCard(cardId, from);
     }
 
     return (

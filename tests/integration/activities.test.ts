@@ -105,6 +105,32 @@ describe("scheduled activities", () => {
         expect(json.data.map((activity: { title: string }) => activity.title)).toEqual(["Just started", "Tomorrow"]);
     });
 
+    it("splits scheduled ones into the board's Overdue, Today and Upcoming columns", async () => {
+        const { organization, user } = await setUpOrg();
+        (getCurrentUser as Mock).mockResolvedValue(user);
+        const hoursFromNow = (hours: number) => new Date(Date.now() + hours * 3_600_000);
+        const book = (title: string, scheduledAt: Date, status: "SCHEDULED" | "COMPLETED" = "SCHEDULED") =>
+            prisma.scheduledActivity.create({
+                data: { organizationId: organization.id, type: "CALL", title, scheduledAt, status, assignedToId: user.id, createdById: user.id },
+            });
+        await book("Missed call", hoursFromNow(-2));
+        await book("Done call", hoursFromNow(-3), "COMPLETED");
+        await book("Later today", hoursFromNow(1));
+        await book("Tomorrow", hoursFromNow(30));
+
+        // the browser sends where its day ends; a fixed boundary here so the test doesn't depend on the clock
+        const endOfDay = hoursFromNow(3).toISOString();
+        const column = async (query: string) => {
+            const json = await (await listActivities(new NextRequest(`http://localhost/api/activities?${query}`))).json();
+            return { titles: json.data.map((activity: { title: string }) => activity.title), totalPages: json.pagination.totalPages };
+        };
+
+        expect((await column("scope=overdue")).titles).toEqual(["Missed call"]);
+        // a range comes whole, as one page, so the board never asks for (and repeats) a second
+        expect(await column(`scope=upcoming&to=${endOfDay}&limit=1`)).toEqual({ titles: ["Later today"], totalPages: 1 });
+        expect((await column(`scope=upcoming&from=${endOfDay}`)).titles).toEqual(["Tomorrow"]);
+    });
+
     it("reschedules, changes who is tagged, and completes an activity", async () => {
         const { user, colleague } = await setUpOrg();
         (getCurrentUser as Mock).mockResolvedValue(user);
