@@ -193,6 +193,10 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       customer from the deal's lead, the lines and totals, number Q-<id>, valid 30 days, and a
       "Print or save as PDF" button (the browser's own print dialog, so no PDF library). Lines go to
       the recycle bin with their deal. The demo has a catalogue and six quoted deals
+- [x] **Activities board by due date** (2026-11-14): Overdue, Today, Upcoming, Done, Cancelled.
+      The first three are scheduled ones split by their time ("today" ends at midnight in the
+      viewer's browser); dragging to Done/Cancelled sets the status, dragging back schedules it
+      again, and between the first three the time decides (a toast says to change the date)
 - [x] **Activities calendar** (2026-11-07): a third view on Activities beside List and Kanban;
       **Month** (up to 3 a day, "+2 more", a count on phones; the day number opens its week) and
       **Week** (a column a day, stacked on phones). Today, back and forward; mine or everyone's; the

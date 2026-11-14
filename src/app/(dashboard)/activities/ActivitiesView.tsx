@@ -122,7 +122,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
             <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-line-light px-2 font-medium text-muted [&>*]:shrink-0">
                 <ViewSwitcher view={view} onChange={setView} views={["table", "board", "calendar"]} />
 
-                {/* the board's columns already split activities by status, so these are table-only */}
+                {/* the board's columns already split them (overdue, today, upcoming, done, cancelled), so these are table-only */}
                 {view === "table" && <span className="mx-1 h-4 w-px bg-line" />}
                 {view === "table" && SCOPES.map((item) => (
                     <button
