@@ -7,8 +7,14 @@ export const api = axios.create({
     },
 });
 
-// The workspace's trial or plan ran out while a page was open: off to Billing, where it says so
+// The workspace's trial or plan ran out while a page was open: off to Billing, where it says so.
+// The session ran out (401) while a page was open: off to sign in again. The /auth routes are
+// left out, since a wrong password there is a 401 too.
 api.interceptors.response.use(undefined, (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401 && !error.config?.url?.startsWith("/auth/")) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign("/login");
+    }
     if (axios.isAxiosError(error) && error.response?.status === 402 && error.response.data?.locked && window.location.pathname !== "/settings/billing") {
         // a full load (no router here), so the layout renders the lock screen
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination

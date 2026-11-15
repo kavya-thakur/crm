@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createToken } from "@/lib/auth/jwt";
+import { createToken, SESSION_SECONDS, sessionCookie } from "@/lib/auth/jwt";
 import { tooManyAttempts, visitorOf } from "@/lib/api/rateLimit";
 import { DEMO_EMAIL, DEMO_SLUG } from "@/lib/demo/workspace";
 
@@ -33,12 +33,6 @@ export async function GET(req: NextRequest) {
 
     const response = redirect("/dashboard");
     // the same login cookie as a normal sign-in
-    response.cookies.set("access_token", createToken({ userId: user.id, organizationId: user.organizationId }), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24,
-        path: "/",
-    });
+    response.cookies.set("access_token", createToken({ userId: user.id, organizationId: user.organizationId }), sessionCookie(SESSION_SECONDS));
     return response;
 }

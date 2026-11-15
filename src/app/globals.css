@@ -247,3 +247,13 @@ dialog.sheet[open]::backdrop {
     scrollbar-color: rgb(0 0 0 / 0.16) transparent;
   }
 }
+
+/* iPhones zoom the page into any field under 16px when you tap it, so on touch screens fields
+   are 16px. Unlayered on purpose: it beats Tailwind's text-* utilities on the inputs. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

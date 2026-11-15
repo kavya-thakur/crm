@@ -44,7 +44,8 @@ Take "save a lead's company" (`PUT /api/leads/12 { companyName: "Acme" }`):
    cookie goes along automatically.
 2. **Auth:** `requirePermission("lead:update")` (`src/lib/auth/requirePermission.ts`) calls
    `getCurrentUser()`, which verifies the JWT and loads the user with role and permissions.
-   No user → `UNAUTHORIZED` (401). Missing permission → `FORBIDDEN` (403).
+   No user → `UNAUTHORIZED` (401). Missing permission → `FORBIDDEN` (403). A 401 outside
+   `/api/auth/*` sends the browser to `/login` (the axios interceptor in `client.ts`).
 3. **Validate:** `parseBody(req, updateLeadSchema)` uses zod (`src/lib/validations/leads.ts`).
    The **same schema** validates the form in the browser (react-hook-form + `zodResolver`),
    so client and server agree on the rules.
@@ -221,6 +222,7 @@ helpers), and mirrored in the UI by the `can` flags.
   runs as a background job with a progress card ([QUEUES.md](QUEUES.md)).
 - **Kanban boards** (`Board.tsx`): one column per stage, each column its own paged query
   (`useBoardColumn`, 25 cards at a time). Dragging a card `PUT`s its new stage.
+  Phones can't drag, so on touch screens each card has "Move to…", then "Move here" on a column.
   Leads, deals, tasks (by status), activities and notes all have boards.
 
 ### Page state lives in the URL

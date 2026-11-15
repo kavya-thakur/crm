@@ -2,7 +2,8 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
-export const SESSION_SECONDS = 60 * 60 * 24;
+// a month, so nobody is signed out every day
+export const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // "Log in as" a teammate lasts this long, then it's back to the sign-in page
 export const LOG_IN_AS_SECONDS = 60 * 60;
 // While logged in as someone, your own session waits in this cookie, for "Back to my account"

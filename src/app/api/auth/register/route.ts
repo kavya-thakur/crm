@@ -1,4 +1,4 @@
-import { createToken } from "@/lib/auth/jwt";
+import { createToken, SESSION_SECONDS, sessionCookie } from "@/lib/auth/jwt";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { registerSchema } from "@/lib/validations/auth";
@@ -108,13 +108,7 @@ export async function POST(req: NextRequest) {
             { status: 201 }
         );
 
-        response.cookies.set("access_token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24,
-            path: "/"
-        })
+        response.cookies.set("access_token", token, sessionCookie(SESSION_SECONDS))
         return response
 
     } catch (error) {

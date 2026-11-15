@@ -18,7 +18,7 @@ Capture leads from anywhere, work them through a pipeline, and let automations d
 ![Redis](https://img.shields.io/badge/Redis_+_BullMQ-DC382D?logo=redis&logoColor=white)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?logo=socketdotio&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-205_passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-236_passing-2ea44f)
 
 <br />
 
@@ -520,7 +520,7 @@ every visitor.
 
 ## Data model
 
-37 models. The core:
+38 models. The core:
 
 ```mermaid
 erDiagram
@@ -624,7 +624,7 @@ crm/
 ├── server.ts                 Next.js + Socket.IO + job workers, on one port
 ├── prisma/
 │   ├── schema.prisma         every model, commented
-│   ├── migrations/           58 migrations, applied in order
+│   ├── migrations/           63 migrations, applied in order
 │   ├── seed.ts               permissions and default stages
 │   └── demo.ts               builds the demo workspace (npm run db:demo)
 ├── src/
@@ -650,7 +650,7 @@ crm/
 │       ├── billing/          plans, the trial lock, Razorpay payments
 │       ├── demo/             the demo workspace
 │       └── validations/      one Zod file per resource
-└── tests/integration/        41 files, 196 tests, against a real Postgres
+└── tests/integration/        48 files, 227 tests, against a real Postgres
 ```
 
 **Conventions:**
@@ -716,7 +716,7 @@ Emails to leads need no settings here: an admin connects the team's mailbox in S
 
 ## Testing
 
-**205 tests**: 196 integration tests in 41 files, run with Vitest against a real PostgreSQL database,
+**236 tests**: 227 integration tests in 48 files, run with Vitest against a real PostgreSQL database,
 plus unit tests for the permission checks. They call
 the real route handlers, so permissions, workspace isolation, database triggers and constraints are
 all tested, not mocked. Some of what they prove:
