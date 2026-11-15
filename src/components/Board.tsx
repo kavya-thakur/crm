@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { createContext, use, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { IconPencil, IconPlus } from "@tabler/icons-react";
 
@@ -61,8 +61,19 @@ export function useBoardColumn<T>(queryKey: unknown[], endpoint: string, params:
     };
 }
 
+// Phones can't drag, so on a touch screen a card has "Move to…": tap it, then "Move here" on a
+// column. The board remembers which card is on its way.
+type Moving = { cardId: number; from: string };
+const MovingCard = createContext<{ moving: Moving | null; setMoving: (next: Moving | null) => void } | null>(null);
+
 export function Board({ children }: { children: ReactNode }) {
-    return <div className="flex min-h-full w-max items-start gap-3 bg-surface p-3">{children}</div>;
+    const [moving, setMoving] = useState<Moving | null>(null);
+
+    return (
+        <MovingCard value={{ moving, setMoving }}>
+            <div className="flex min-h-full w-max items-start gap-3 bg-surface p-3">{children}</div>
+        </MovingCard>
+    );
 }
 
 export function BoardColumn({
@@ -98,6 +109,9 @@ export function BoardColumn({
     children: ReactNode;
 }) {
     const [over, setOver] = useState(false);
+    const board = use(MovingCard);
+    // a card picked with "Move to…" from another column can land here
+    const arriving = onDropCard && board?.moving && board.moving.from !== id ? board.moving : null;
     const moreRef = useRef<HTMLButtonElement>(null);
     const canLoad = Boolean(more && more.left > 0 && !more.loading);
 
@@ -163,6 +177,18 @@ export function BoardColumn({
             </header>
 
             <div className="flex flex-col gap-2 px-2 pb-2">
+                {arriving && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onDropCard?.(arriving.cardId, arriving.from);
+                            board?.setMoving(null);
+                        }}
+                        className="h-10 rounded-lg border border-dashed border-accent/40 bg-accent-faint text-sm font-medium text-accent"
+                    >
+                        Move here
+                    </button>
+                )}
                 {loading && [0, 1, 2].map((index) => <Skeleton key={index} className="h-28 rounded-lg" delay={index * 0.08} />)}
                 {!loading && error !== undefined && error !== null && (
                     <ErrorState variant="inline" title="Couldn't load this column" error={error} onRetry={onRetry} />
@@ -204,6 +230,8 @@ export function BoardCard({
     children: ReactNode;
 }) {
     const [dragging, setDragging] = useState(false);
+    const board = use(MovingCard);
+    const moving = board?.moving?.cardId === id && board.moving.from === columnId;
 
     return (
         <article
@@ -217,9 +245,22 @@ export function BoardCard({
             onDragEnd={() => setDragging(false)}
             onClick={onOpen}
             className={`group/card rounded-lg border border-line bg-surface p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition hover:border-line-strong hover:shadow-light
-                ${onOpen ? "cursor-pointer" : ""} ${draggable ? "active:cursor-grabbing" : ""} ${dragging ? "opacity-40" : ""}`}
+                ${onOpen ? "cursor-pointer" : ""} ${draggable ? "active:cursor-grabbing" : ""} ${dragging ? "opacity-40" : ""} ${moving ? "ring-2 ring-accent/40" : ""}`}
         >
             {children}
+            {/* touch screens only: the stand-in for dragging (see Board) */}
+            {draggable && board && (
+                <button
+                    type="button"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        board.setMoving(moving ? null : { cardId: id, from: columnId });
+                    }}
+                    className="mt-2 hidden h-8 w-full items-center justify-center rounded-md text-sm text-muted hover:bg-fill hover:text-ink pointer-coarse:flex"
+                >
+                    {moving ? "Cancel move" : "Move to…"}
+                </button>
+            )}
         </article>
     );
 }

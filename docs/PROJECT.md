@@ -22,7 +22,7 @@ _Last updated: 2026-11-02_
 | Server | **`server.ts`**: Next.js + **Socket.IO** + the queue worker on one Node process | route handlers can't keep WebSockets open; one process lets routes push events directly ([REALTIME.md](REALTIME.md)) |
 | Jobs & limits | **Redis** + **BullMQ** | CSV imports run in the background with retries and live progress; rate limits shared and kept across restarts ([QUEUES.md](QUEUES.md)) |
 | Database | **PostgreSQL** + **Prisma 7** (pg driver adapter) | relational data (workspaces, roles, records, timelines), JSONB for custom fields, `pg_trgm` for fast search, triggers where they keep data honest |
-| Auth | JWT in an **httpOnly cookie** (`access_token`, 1 day), bcrypt passwords | simple, no third party; the same cookie authenticates the socket |
+| Auth | JWT in an **httpOnly cookie** (`access_token`, 30 days; signed-in visitors skip /login), bcrypt passwords | simple, no third party; the same cookie authenticates the socket |
 | Validation | **zod 4**, shared by forms (react-hook-form) and routes | one set of rules on both sides |
 | Data fetching | **React Query** + axios | caching, paging (`useInfiniteQuery`), and one-line refetches for live updates |
 | UI | **Tailwind v4**, Tabler icons, sonner toasts, **GSAP** (motion), three.js (onboarding) | light, Twenty-style design; tokens in `globals.css` |

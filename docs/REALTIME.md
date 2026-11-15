@@ -279,7 +279,7 @@ layout, so it works on every page):
 
 - **Is the socket connected?** In the browser DevTools → Network → filter `socket.io`.
   You should see a `101 Switching Protocols` WebSocket. Its "Messages" tab shows every event.
-- **"Not signed in" errors:** the cookie is missing or expired (tokens last a day). Log in again.
+- **"Not signed in" errors:** the cookie is missing or expired (tokens last 30 days). Log in again.
 - **Nothing updates in another tab:** check the request succeeded (status < 400) and that its
   topic is in `REFRESH` in `LiveUpdates.tsx`.
 - **Ran `next dev` by habit?** Pages work but nothing is live. Use `npm run dev`, which runs `server.ts`.

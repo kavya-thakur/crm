@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
-import { createToken } from "@/lib/auth/jwt";
+import { createToken, SESSION_SECONDS, sessionCookie } from "@/lib/auth/jwt";
 import { loginSchema } from "@/lib/validations/auth";
 import { tooManyAttempts, visitorOf } from "@/lib/api/rateLimit";
 import { z } from "zod";
@@ -78,13 +78,7 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        response.cookies.set("access_token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24,
-            path: "/"
-        })
+        response.cookies.set("access_token", token, sessionCookie(SESSION_SECONDS))
 
         return response
     } catch (error) {

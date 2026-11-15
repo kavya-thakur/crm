@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Aleo } from "next/font/google";
 import { IconCalendarEvent, IconCircleCheckFilled, IconUserCheck } from "@tabler/icons-react";
 
+import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { LogoMark } from "@/components/Logo";
 import { HeroCity } from "../(marketing)/components/HeroCity";
 
@@ -23,7 +25,11 @@ function UpdateCard({ icon, title, detail, className }: { icon: ReactNode; title
 
 // Login and register share the landing page's look: the form on white, and the
 // halftone city from the hero on the right (desktop only)
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default async function AuthLayout({ children }: { children: ReactNode }) {
+    // already signed in: straight to the app. getCurrentUser checks the token for real, so a
+    // stale cookie stays here instead of bouncing between /login and /dashboard
+    if (await getCurrentUser()) redirect("/dashboard");
+
     return (
         <div className={`${aleo.variable} grid min-h-screen bg-white font-(family-name:--font-host-grotesk) min-[921px]:grid-cols-[1fr_1.1fr]`}>
             <div className="flex flex-col px-6 py-6 min-[921px]:px-12">
