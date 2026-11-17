@@ -54,7 +54,7 @@ import { toast } from "@/components/Toast";
 import { formatDate, formatMoney, timeAgo } from "@/lib/utils/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
-import { NotesTab } from "../shared/notes";
+import { NotesTab, TimelineNote } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
 import { ComingUp } from "../shared/comingUp";
@@ -652,30 +652,40 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                                     )}
                                                 </div>
 
-                                                <div className="flex min-w-0 flex-1 items-start justify-between gap-3 pt-1 pb-4">
-                                                    <p className="text-muted">
-                                                        <span className="font-medium text-ink">
-                                                            {entry.user.name}
-                                                        </span>
-                                                        {" · "}
-                                                        {timelineHref(entry.metadata) ? (
-                                                            <Link href={timelineHref(entry.metadata)!} className="text-accent hover:underline">
-                                                                {entry.message}
-                                                            </Link>
-                                                        ) : (
-                                                            entry.message
-                                                        )}
-                                                    </p>
+                                                <div className="min-w-0 flex-1 pt-1 pb-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <p className="text-muted">
+                                                            <span className="font-medium text-ink">
+                                                                {entry.user.name}
+                                                            </span>
+                                                            {entry.type === "NOTE_ADDED" ? (
+                                                                " added a note"
+                                                            ) : (
+                                                                <>
+                                                                    {" · "}
+                                                                    {timelineHref(entry.metadata) ? (
+                                                                        <Link href={timelineHref(entry.metadata)!} className="text-accent hover:underline">
+                                                                            {entry.message}
+                                                                        </Link>
+                                                                    ) : (
+                                                                        entry.message
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </p>
 
-                                                    <time
-                                                        dateTime={entry.createdAt}
-                                                        title={new Date(
-                                                            entry.createdAt,
-                                                        ).toLocaleString()}
-                                                        className="shrink-0 text-faint"
-                                                    >
-                                                        {timeAgo(entry.createdAt)}
-                                                    </time>
+                                                        <time
+                                                            dateTime={entry.createdAt}
+                                                            title={new Date(
+                                                                entry.createdAt,
+                                                            ).toLocaleString()}
+                                                            className="shrink-0 text-faint"
+                                                        >
+                                                            {timeAgo(entry.createdAt)}
+                                                        </time>
+                                                    </div>
+                                                    {/* a note shows whole, as a card, under its line */}
+                                                    {entry.type === "NOTE_ADDED" && <TimelineNote entry={entry} agents={agents ?? []} />}
                                                 </div>
                                             </li>
                                         );

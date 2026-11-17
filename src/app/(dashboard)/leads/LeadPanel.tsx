@@ -51,7 +51,7 @@ import { askLostReason, LostReasonValue } from "@/components/LostReasonPrompt";
 import { formatDate, timeAgo } from "@/lib/utils/format";
 import { groupCustomFields, useCustomFields, type CustomFieldDef, isSameFieldValue } from "../shared/customFields";
 import { usePanelEnter } from "../shared/usePanelEnter";
-import { NotesTab } from "../shared/notes";
+import { NotesTab, TimelineNote } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
 import { ComingUp } from "../shared/comingUp";
@@ -529,26 +529,36 @@ export default function LeadPanel({ leadId, can, agents, meId, onClose }: LeadPa
                                                     {!isLast && <span className="w-0.5 flex-1 bg-line-light" />}
                                                 </div>
 
-                                                <div className="flex min-w-0 flex-1 items-start justify-between gap-3 pt-1 pb-4">
-                                                    <p className="text-muted">
-                                                        {/* a web form's or integration's entries are the visitor's doing, not a teammate's */}
-                                                        <span className="font-medium text-ink">{timelineActor(entry)}</span>
-                                                        {" · "}
-                                                        {timelineHref(entry.metadata) ? (
-                                                            <Link href={timelineHref(entry.metadata)!} className="text-accent hover:underline">
-                                                                {entry.message}
-                                                            </Link>
-                                                        ) : (
-                                                            entry.message
-                                                        )}
-                                                    </p>
-                                                    <time
-                                                        dateTime={entry.createdAt}
-                                                        title={new Date(entry.createdAt).toLocaleString()}
-                                                        className="shrink-0 text-faint"
-                                                    >
-                                                        {timeAgo(entry.createdAt)}
-                                                    </time>
+                                                <div className="min-w-0 flex-1 pt-1 pb-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <p className="text-muted">
+                                                            {/* a web form's or integration's entries are the visitor's doing, not a teammate's */}
+                                                            <span className="font-medium text-ink">{timelineActor(entry)}</span>
+                                                            {entry.type === "NOTE_ADDED" ? (
+                                                                " added a note"
+                                                            ) : (
+                                                                <>
+                                                                    {" · "}
+                                                                    {timelineHref(entry.metadata) ? (
+                                                                        <Link href={timelineHref(entry.metadata)!} className="text-accent hover:underline">
+                                                                            {entry.message}
+                                                                        </Link>
+                                                                    ) : (
+                                                                        entry.message
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </p>
+                                                        <time
+                                                            dateTime={entry.createdAt}
+                                                            title={new Date(entry.createdAt).toLocaleString()}
+                                                            className="shrink-0 text-faint"
+                                                        >
+                                                            {timeAgo(entry.createdAt)}
+                                                        </time>
+                                                    </div>
+                                                    {/* a note shows whole, as a card, under its line */}
+                                                    {entry.type === "NOTE_ADDED" && <TimelineNote entry={entry} agents={agents ?? []} />}
                                                 </div>
                                             </li>
                                         );

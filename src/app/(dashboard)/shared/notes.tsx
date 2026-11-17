@@ -1,15 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
 
 import { api, errorMessage } from "@/lib/api/client";
 import { Avatar } from "@/components/Avatar";
 import { ErrorState } from "@/components/ErrorState";
+import { ConfirmDeleteModal } from "@/components/ListPage";
 import { SkeletonList, Spinner } from "@/components/Loader";
 import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/utils/format";
+import type { TimelineMetadata } from "@/lib/work/timeline";
 import type { AgentOption } from "./customFields";
 
 type NoteEntity = "lead" | "deal" | "contact";
@@ -25,6 +27,7 @@ interface Note {
     body: string;
     mentionedUserIds: number[];
     createdAt: string;
+    updatedAt: string;
     author: { id: number; name: string; email: string };
 }
 
@@ -73,10 +76,12 @@ export function NotesTab({
                 />
             )}
             {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-                <p className="text-light">No notes yet — write one above, or @mention a teammate to loop them in.</p>
+                <p className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-faint">
+                    No notes yet. Write one above, or @mention a teammate to loop them in.
+                </p>
             )}
 
-            <ul className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-3">
                 {notesQuery.data?.map((note) => (
                     <NoteItem
                         key={note.id}
@@ -106,12 +111,18 @@ function NoteItem({
     onChanged: () => void;
 }) {
     const [editing, setEditing] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const remove = useMutation({
         mutationFn: () => api.delete(notePath),
         onSuccess: () => {
             toast.success("Note deleted");
+            setDeleting(false);
             onChanged();
+        },
+        onError: (error) => {
+            toast.error(errorMessage(error));
+            setDeleting(false);
         },
     });
 
@@ -136,43 +147,117 @@ function NoteItem({
     }
 
     return (
-        <li className="flex gap-2.5">
-            <Avatar name={note.author.name} />
-            <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5">
-                    <span className="font-medium text-ink">{note.author.name}</span>
-                    <time dateTime={note.createdAt} title={new Date(note.createdAt).toLocaleString()} className="text-sm text-faint">
-                        {timeAgo(note.createdAt)}
-                    </time>
-
-                    {isMine && (
-                        <span className="ml-auto flex items-center gap-0.5">
+        <li>
+            <NoteCard
+                author={note.author.name}
+                createdAt={note.createdAt}
+                // saved again a moment after it was written: an edit
+                edited={new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 1000}
+                body={note.body}
+                mentionedUserIds={note.mentionedUserIds}
+                agents={agents}
+                actions={
+                    isMine && (
+                        <>
                             <button
                                 type="button"
                                 aria-label="Edit note"
                                 onClick={() => setEditing(true)}
-                                className="flex size-6 items-center justify-center rounded text-faint hover:bg-fill hover:text-ink"
+                                className="flex size-7 items-center justify-center rounded-lg text-faint hover:bg-fill hover:text-ink"
                             >
-                                <IconPencil size={14} />
+                                <IconPencil size={15} />
                             </button>
                             <button
                                 type="button"
                                 aria-label="Delete note"
-                                onClick={() => remove.mutate()}
-                                disabled={remove.isPending}
-                                className="flex size-6 items-center justify-center rounded text-faint hover:bg-danger-soft hover:text-danger"
+                                onClick={() => setDeleting(true)}
+                                className="flex size-7 items-center justify-center rounded-lg text-faint hover:bg-danger-soft hover:text-danger"
                             >
-                                <IconTrash size={14} />
+                                <IconTrash size={15} />
                             </button>
-                        </span>
-                    )}
-                </p>
-
-                <p className="whitespace-pre-wrap text-muted">{renderNoteBody(note.body, note.mentionedUserIds, agents)}</p>
-
-                {remove.isError && <p role="alert" className="mt-1 text-sm text-danger">{errorMessage(remove.error)}</p>}
-            </div>
+                        </>
+                    )
+                }
+            />
+            <ConfirmDeleteModal
+                open={deleting}
+                title="Delete this note?"
+                description="It's removed from the notes and the timeline. This can't be undone."
+                pending={remove.isPending}
+                onCancel={() => setDeleting(false)}
+                onConfirm={() => remove.mutate()}
+            />
         </li>
+    );
+}
+
+// A note as a card: who wrote it and when (and whether it was edited), then the note itself.
+// The Notes tab gives it edit and delete buttons, shown on hover (always on touch screens).
+export function NoteCard({
+    author,
+    createdAt,
+    edited,
+    body,
+    mentionedUserIds,
+    agents,
+    actions,
+}: {
+    author: string;
+    createdAt: string;
+    edited?: boolean;
+    body: string;
+    mentionedUserIds: number[];
+    agents: AgentOption[];
+    actions?: ReactNode;
+}) {
+    return (
+        <article className="group rounded-xl border border-line bg-surface px-3.5 pt-2.5 pb-3 shadow-light">
+            <header className="flex h-7 items-center gap-2">
+                <Avatar name={author} />
+                <span className="truncate font-medium text-ink">{author}</span>
+                <time dateTime={createdAt} title={new Date(createdAt).toLocaleString()} className="shrink-0 text-sm text-faint">
+                    {timeAgo(createdAt)}
+                </time>
+                {edited && <span className="shrink-0 text-sm text-faint">· edited</span>}
+                {actions && (
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                        {actions}
+                    </span>
+                )}
+            </header>
+            <NoteBody body={body} mentionedUserIds={mentionedUserIds} agents={agents} className="mt-1.5" />
+        </article>
+    );
+}
+
+// A note's text: as written (line breaks kept), @mentions as chips, a long one cut to six lines
+// with "Show more"
+export function NoteBody({ body, mentionedUserIds, agents, className = "" }: { body: string; mentionedUserIds: number[]; agents: AgentOption[]; className?: string }) {
+    const [open, setOpen] = useState(false);
+    const long = body.length > 360 || body.split("\n").length > 6;
+
+    return (
+        <div className={className}>
+            <p className={`leading-6 break-words whitespace-pre-wrap text-ink ${long && !open ? "line-clamp-6" : ""}`}>
+                {renderNoteBody(body, mentionedUserIds, agents)}
+            </p>
+            {long && (
+                <button type="button" onClick={() => setOpen(!open)} className="mt-1 text-sm font-medium text-accent hover:underline">
+                    {open ? "Show less" : "Show more"}
+                </button>
+            )}
+        </div>
+    );
+}
+
+// A note on a lead, deal or contact's timeline: the note itself, under "… added a note". Entries
+// from before notes were kept whole only have the start of it ("Note added: …"), shown as it is.
+export function TimelineNote({ entry, agents }: { entry: { message: string; metadata?: TimelineMetadata | null }; agents: AgentOption[] }) {
+    const body = entry.metadata?.noteId ? entry.message : entry.message.replace(/^Note added: /, "");
+    return (
+        <div className="mt-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 shadow-light">
+            <NoteBody body={body} mentionedUserIds={entry.metadata?.mentionedUserIds ?? []} agents={agents} />
+        </div>
     );
 }
 
@@ -263,7 +348,7 @@ export function NoteComposer({
                 value={body}
                 onChange={handleChange}
                 onBlur={() => setTimeout(() => setSuggestQuery(null), 150)}
-                placeholder="Write a note... type @ to mention a teammate"
+                placeholder="Write a note…"
                 className="w-full resize-none rounded-t-lg px-3 py-2 outline-none placeholder:text-light"
             />
 
@@ -291,6 +376,7 @@ export function NoteComposer({
             )}
 
             <div className="flex items-center justify-end gap-2 border-t border-line-light px-2 py-1.5">
+                <span className="mr-auto pl-1 text-sm text-faint">Type @ to mention a teammate</span>
                 {onCancel && (
                     <button
                         type="button"
@@ -331,7 +417,7 @@ export function renderNoteBody(body: string, mentionedUserIds: number[], agents:
 
     return body.split(pattern).map((part, index) =>
         names.some((name) => part === `@${name}`)
-            ? <span key={index} className="font-medium text-accent">{part}</span>
+            ? <span key={index} className="rounded bg-accent-soft px-1 font-medium text-accent">{part}</span>
             : <span key={index}>{part}</span>
     );
 }

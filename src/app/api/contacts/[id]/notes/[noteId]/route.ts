@@ -5,6 +5,7 @@ import { contactScope, requirePermission } from "@/lib/auth/requirePermission";
 import { updateNoteSchema } from "@/lib/validations/notes";
 import { idParamSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
+import { noteEntry, noteOnTimeline } from "@/lib/work/timeline";
 
 const authorSelect = { select: { id: true, name: true, email: true } };
 
@@ -58,10 +59,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             })
             : [];
 
-        const note = await prisma.contactNote.update({
-            where: { id: parsedNoteId.data },
-            data: { body: text, mentionedUserIds: mentioned.map((agent) => agent.id) },
-            include: { author: authorSelect },
+        // the note, and its card on the timeline
+        const note = await prisma.$transaction(async (tx) => {
+            const note = await tx.contactNote.update({
+                where: { id: parsedNoteId.data },
+                data: { body: text, mentionedUserIds: mentioned.map((agent) => agent.id) },
+                include: { author: authorSelect },
+            });
+            await tx.contactTimeline.updateMany({ where: { contactId: contact.id, ...noteEntry(note.id) }, data: noteOnTimeline(note) });
+            return note;
         });
 
         return NextResponse.json({ ok: true, data: note });
@@ -99,7 +105,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
             throw new Error("FORBIDDEN");
         }
 
-        await prisma.contactNote.delete({ where: { id: parsedNoteId.data } });
+        // gone from the timeline too
+        await prisma.$transaction([
+            prisma.contactTimeline.deleteMany({ where: { contactId: contact.id, ...noteEntry(parsedNoteId.data) } }),
+            prisma.contactNote.delete({ where: { id: parsedNoteId.data } }),
+        ]);
 
         return NextResponse.json({ ok: true, message: "Note deleted successfully" });
     } catch (error) {
