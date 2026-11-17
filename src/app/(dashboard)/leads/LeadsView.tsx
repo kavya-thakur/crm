@@ -255,10 +255,27 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
         renderChip: () => "Possible duplicates",
     };
 
+    // open leads nobody has planned anything for: the dashboard's "Leads with no next step"
+    const noNextStepField: FilterFieldDef<LeadFilters> = {
+        key: "noNextStep",
+        label: "No next step",
+        isActive: (f) => f.noNextStep === true,
+        clear: () => ({ noNextStep: undefined }),
+        renderControl: (f, onChange) =>
+            renderSelectControl(
+                f.noNextStep ? "only" : undefined,
+                (value) => onChange({ noNextStep: value ? true : undefined }),
+                [{ value: "only", label: "Open, no task or call planned" }],
+                "All leads",
+            ),
+        renderChip: () => "No next step",
+    };
+
     const FILTER_FIELDS: FilterFieldDef<LeadFilters>[] = [
         stageField,
         sourceField,
         duplicatesField,
+        noNextStepField,
         createAssignedToField<LeadFilters>({
             get: (f) => f.assignedTo,
             set: (value) => ({ assignedTo: value }),

@@ -11,6 +11,8 @@ import { GET as getDashboard } from "@/app/api/dashboard/route";
 import { PUT as updateDeal } from "@/app/api/deals/[id]/route";
 import { PUT as updateLead } from "@/app/api/leads/[id]/route";
 import { PATCH as bulkUpdateLeads } from "@/app/api/leads/bulkUpdate/route";
+import { GET as listLeads } from "@/app/api/leads/route";
+import { GET as listDeals } from "@/app/api/deals/route";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -191,7 +193,8 @@ describe("GET /api/dashboard", () => {
                 { ...mine, name: "Nothing planned", stageId: stage.id },
             ],
         });
-        const deal = await prisma.deal.create({ data: { ...mine, title: "Nothing planned", pipelineStageId: open.id } });
+        const deal = await prisma.deal.create({ data: { ...mine, title: "Has a late task", pipelineStageId: open.id } });
+        await prisma.deal.create({ data: { ...mine, title: "Nothing planned", pipelineStageId: open.id } });
         await prisma.scheduledActivity.createMany({
             data: [
                 { ...mine, title: "Call booked", type: "CALL", scheduledAt: new Date(Date.now() + DAY), leadId: planned.id },
@@ -202,7 +205,15 @@ describe("GET /api/dashboard", () => {
 
         const { data } = await load();
         // the late task still counts as the deal's next step
-        expect(data.attention).toEqual({ leadsWithoutNextStep: 1, dealsWithoutNextStep: 0, overdueTasks: 1, missedActivities: 1 });
+        expect(data.attention).toEqual({ leadsWithoutNextStep: 1, dealsWithoutNextStep: 1, overdueTasks: 1, missedActivities: 1 });
+
+        // the card's links open the Leads / Deals lists with "No next step" on: the same ones it counted
+        const names = async (list: typeof listLeads, path: string) => {
+            const body = await (await list(new NextRequest(`http://localhost/api/${path}?noNextStep=true`))).json();
+            return body.data.map((row: { name?: string; title?: string }) => row.name ?? row.title);
+        };
+        expect(await names(listLeads, "leads")).toEqual(["Nothing planned"]);
+        expect(await names(listDeals, "deals")).toEqual(["Nothing planned"]);
     });
 
     it("rejects an unknown range", async () => {

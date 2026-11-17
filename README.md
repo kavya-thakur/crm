@@ -80,7 +80,7 @@ brought revenue, and why deals were lost.
 
 ## The hard parts
 
-The five problems that took the most thought, and where to look for each. Every one is proven by
+The problems that took the most thought, and where to look for each. Every one is proven by
 integration tests against a real PostgreSQL database, not mocks.
 
 | Problem | How Flash solves it | Where |
@@ -90,6 +90,9 @@ integration tests against a real PostgreSQL database, not mocks.
 | **Retries that never act twice.** Background jobs retry on failure; a naive retry sends the welcome email again or imports a row twice. | Automations **claim a unique `(rule, event)` row** before acting, so a retried job skips the rules it already ran. Imports save each batch **and** its progress counter in one transaction, so a retry resumes exactly where it stopped. | [`automations.test.ts`](tests/integration/automations.test.ts) · [`imports.test.ts`](tests/integration/imports.test.ts) |
 | **Things happening at the same moment.** Two leads arrive together; two people edit one record. | Round-robin turns are taken with an atomic `increment`, so two leads never land on the same person by accident. Meeting reminders are claimed with a conditional update. Custom-field edits merge with Postgres `jsonb \|\|`, so edits to different fields never overwrite each other. Duplicate detection is a **database trigger**, so every write path is covered. | [reliability](#reliability-and-security) · [duplicates](#duplicates-and-merging) |
 | **Payments that can't be faked.** The browser says "paid", Razorpay's webhook says "paid", or only one of them ever arrives. | The server never trusts the browser: it asks Razorpay for the order and payment, checks the workspace and amount, captures the money, and switches Pro on **once**, whichever confirmation arrives first. A forged webhook signature is ignored. | [`src/lib/billing/`](src/lib/billing) · [`payments.test.ts`](tests/integration/payments.test.ts) |
+| **A 10,000-row import that took a minute.** Measured, the time wasn't Postgres working: it was ~70,000 round trips, one row and one query at a time (contact, company, lead, timeline line, note). | Each batch of 1,000 rows is now saved in **~10 queries instead of ~7,000**: one insert each for contacts, leads, timeline lines and notes (`createManyAndReturn` hands back the new ids), and three for companies (find all, create the missing, link every contact in one `UPDATE … FROM unnest(…)`). Same checks, same resume-after-crash rule. **56 s → 7.8 s** on a laptop, and a bigger gain over the network. | [`leadImport.ts`](src/lib/jobs/leadImport.ts) · [how it works](docs/QUEUES.md#3b-how-an-import-stays-fast-2026-11-17) |
+| **"Select all 4,230 matching" without timeouts.** One request can't change thousands of rows, but a background job mustn't follow different rules from the small, instant version. | Small selections change in the request; big ones snapshot the ids and run as a job, 500 a time, with live progress. **Both call the same functions** (`moveLeads`, `assignDeals`, `prepareEdit` / `applyEdit`…), so timelines, lost reasons and won dates come out identical either way. The job re-checks permissions when it runs and only touches what the person can still reach. | [`bulkActions.ts`](src/lib/jobs/bulkActions.ts) · [`bulkJobs.test.ts`](tests/integration/bulkJobs.test.ts) |
+| **Two admins demoting each other at the same moment.** Each request checks "is the other person an admin?", both see yes, and the workspace ends up with no admin. | Both rows are locked with `SELECT … FOR UPDATE` (always in id order, so two requests can't deadlock) before the check runs. The second request waits, then sees the first one's change and is refused. | [`agents/[id]/route.ts`](src/app/api/agents/%5Bid%5D/route.ts) · [`adminRace.test.ts`](tests/integration/adminRace.test.ts) |
 
 ---
 
@@ -328,7 +331,7 @@ flowchart LR
     C["Cron · 03:00 IST"] --> QD["demo"]
 
     QI --> WI["import in batches,<br/>resumable, live progress"]
-    QB --> WB["delete / move / assign<br/>in batches, live progress"]
+    QB --> WB["delete / move / assign / edit<br/>in batches, live progress"]
     QE --> WE["SMTP send,<br/>4 tries, then 'Not sent'"]
     QA --> WA["match rules → act → log"]
     QD --> WD["rebuild the demo workspace"]
@@ -337,11 +340,13 @@ flowchart LR
 - **Retries:** a failed job is tried again after 10 s, 20 s, then 40 s. After the last try, whoever
   started it is told why.
 - **CSV import:** up to 5 MB or 50,000 rows. Columns are matched automatically ("Mobile No." → Phone,
-  "Assigned to: Priya" → that teammate). Each batch saves its rows *and* the progress counters in one
-  transaction, so a retry carries on exactly where it stopped and never adds anyone twice. Rows it
-  couldn't import are kept, with the reason, for download.
-- **Bulk actions:** up to 200 records change instantly; above that, the matching ids are saved and a
-  job works through them, with a progress card in the corner.
+  "Assigned to: Priya" → that teammate). Each batch of 1,000 rows is saved in about 10 queries (bulk
+  inserts, not one row at a time), *together with* the progress counters in one transaction, so a
+  retry carries on exactly where it stopped and never adds anyone twice. Rows it couldn't import are
+  kept, with the reason, for download.
+- **Bulk actions** (delete, move stage, assign, edit a field): up to 200 records change instantly;
+  above that, the matching ids are saved and a job works through them, with a progress card in the
+  corner. Both paths run the same code.
 - **CSV export** is streamed rather than queued: it pages through the table by id and writes as it
   goes, so memory stays flat and the download starts at once.
 
@@ -502,6 +507,9 @@ One request (`GET /api/dashboard?range=30d&agentId=`) runs Postgres `groupBy` an
 queries in parallel. Only won deals' dates and amounts come back as rows, for the charts.
 - Revenue won with its trend, compared with the previous period
 - Open pipeline by stage, **weighted forecast** (each open deal × its probability), win rate, average deal, days to close
+- **Needs attention**, right now whatever the period: leads and deals with **no next step** (no open
+  task, no booked call), overdue tasks and missed calls. Each count opens its list already filtered,
+  using the same rule as the count, so the two always agree
 - Deals closing in the next 30 days, and those already past their date
 - **Source and campaign performance:** new leads, conversion rate, deals won and revenue for each
 - Lost reasons for leads and deals

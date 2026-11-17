@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { activityScope, dealScope, hasPermission, leadScope, taskScope, type CurrentUser } from "@/lib/auth/requirePermission";
 import { handleRouteError, validationError } from "@/lib/api/http";
 import { searchParamsToObject } from "@/lib/validations/common";
-import { startOfToday } from "@/lib/work/tasks";
+import { noNextStep, startOfToday } from "@/lib/work/tasks";
 import { bucketIndex, dashboardPeriod, dashboardQuerySchema } from "@/lib/dashboard/periods";
 
 type Period = ReturnType<typeof dashboardPeriod>;
@@ -336,7 +336,6 @@ async function teamPerformance(user: CurrentUser, { start, end }: Period, inPipe
 // step for (no open task, no booked call or meeting), tasks past their due day, and calls and
 // meetings whose time passed without being marked done. Each within what this person may see.
 async function needsAttention(user: CurrentUser, whose: { assignedToId?: number }, inPipeline: { pipelineId?: number }) {
-    const noNextStep = { tasks: { none: { status: { not: "COMPLETED" as const } } }, scheduledActivities: { none: { status: "SCHEDULED" as const } } };
 
     const [leads, deals, tasks, activities] = await Promise.all([
         hasPermission(user, "lead:read")

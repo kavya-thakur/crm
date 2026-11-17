@@ -42,6 +42,7 @@ import {
     createModifiedRangeField,
     createMultiSelectField,
     createPersonField,
+    renderSelectControl,
     useTableColumns,
     type FilterFieldDef,
 } from "@/components/FilterPanel";
@@ -268,8 +269,25 @@ export default function DealsView({ can, meId }: { can: Permissions; meId: numbe
         options: stages?.map((stage) => ({ value: stage.id, label: stage.name, render: <StageLabel stage={stage} /> })) ?? [],
     });
 
+    // open deals nobody has planned anything for: the dashboard's "Deals with no next step"
+    const noNextStepField: FilterFieldDef<DealFilters> = {
+        key: "noNextStep",
+        label: "No next step",
+        isActive: (f) => f.noNextStep === true,
+        clear: () => ({ noNextStep: undefined }),
+        renderControl: (f, onChange) =>
+            renderSelectControl(
+                f.noNextStep ? "only" : undefined,
+                (value) => onChange({ noNextStep: value ? true : undefined }),
+                [{ value: "only", label: "Open, no task or call planned" }],
+                "All deals",
+            ),
+        renderChip: () => "No next step",
+    };
+
     const FILTER_FIELDS: FilterFieldDef<DealFilters>[] = [
         pipelineStageField,
+        noNextStepField,
         createAssignedToField<DealFilters>({
             get: (f) => (f.assignedTo !== undefined ? String(f.assignedTo) : undefined),
             set: (value) => ({

@@ -45,6 +45,8 @@ export const listLeadsQuerySchema = paginationSchema.extend({
     updatedTo: z.iso.date().optional(),
     // only open leads that share a phone or email with another open lead
     duplicates: z.stringbool().optional(),
+    // only open leads with nothing planned (no open task, no booked call or meeting)
+    noNextStep: z.stringbool().optional(),
     sourceId: idParamSchema.optional(),
     assignedTo: z
         .union([z.literal("me"), z.literal("unassigned"), idParamSchema])

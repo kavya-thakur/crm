@@ -53,6 +53,7 @@ interface Stage {
 interface Dashboard {
     range: DashboardRange;
     agentId: number | null;
+    pipelineId: number | null;
     scope: "team" | "mine";
     deals: {
         won: {
@@ -304,7 +305,7 @@ function Overview({
             {deals && <DealTiles deals={deals} against={against} />}
             {!deals && leads && <LeadTiles leads={leads} against={against} />}
 
-            <AttentionCard attention={data.attention} team={data.scope === "team"} />
+            <AttentionCard attention={data.attention} team={data.scope === "team"} agentId={agentId} pipelineId={data.pipelineId} />
 
             {deals && <RevenueCard deals={deals} range={range} against={against} />}
             {deals && <ClosingSoonCard closing={deals.closing} />}
@@ -443,11 +444,24 @@ function tooltipLabel(point: TrendPoint, range: DashboardRange) {
 }
 
 // What's slipping right now, each a count that links to the list it's in (red when it isn't zero)
-function AttentionCard({ attention, team }: { attention: Dashboard["attention"]; team: boolean }) {
+function AttentionCard({ attention, team, agentId, pipelineId }: { attention: Dashboard["attention"]; team: boolean; agentId: number | null; pipelineId: number | null }) {
     const whose = team ? "&whose=team" : "";
+    // the Leads / Deals list with its "No next step" filter on, for the person (and pipeline) picked here
+    const listOf = (path: string, filters: object) =>
+        `${path}?filters=${encodeURIComponent(JSON.stringify({ noNextStep: true, ...(agentId && { assignedTo: agentId }), ...filters }))}`;
     const rows = [
-        attention.leadsWithoutNextStep !== null && { count: attention.leadsWithoutNextStep, label: "Leads with no next step", hint: "Open, no task or call planned", href: "/leads" },
-        attention.dealsWithoutNextStep !== null && { count: attention.dealsWithoutNextStep, label: "Deals with no next step", hint: "Open, no task or call planned", href: "/deals" },
+        attention.leadsWithoutNextStep !== null && {
+            count: attention.leadsWithoutNextStep,
+            label: "Leads with no next step",
+            hint: "Open, no task or call planned",
+            href: listOf("/leads", {}),
+        },
+        attention.dealsWithoutNextStep !== null && {
+            count: attention.dealsWithoutNextStep,
+            label: "Deals with no next step",
+            hint: "Open, no task or call planned",
+            href: listOf("/deals", pipelineId ? { pipelineId } : {}),
+        },
         { count: attention.overdueTasks, label: "Overdue tasks", hint: "Past their due day", href: `/tasks?view=table&scope=overdue${whose}` },
         { count: attention.missedActivities, label: "Missed calls & meetings", hint: "Time passed, not marked done", href: `/activities?view=table&scope=overdue${whose}` },
     ].filter((row) => row !== false);

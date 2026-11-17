@@ -107,6 +107,8 @@ export interface LeadFilters {
     updatedTo?: string;
     // only open leads that share a phone or email with another open lead
     duplicates?: boolean;
+    // only open leads with no open task and no booked call or meeting
+    noNextStep?: boolean;
     // values for fields marked "show in filter", keyed by CustomFieldDefinition.key
     customFields?: Record<string, unknown>;
     sortBy: "createdAt" | "updatedAt" | "name" | "source";

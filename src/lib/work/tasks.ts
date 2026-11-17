@@ -47,3 +47,11 @@ export async function addTaskToTimeline(
         metadata: { taskId: task.id },
     });
 }
+
+// "No next step": nothing planned for a lead or deal, no open task and no booked call or meeting.
+// The dashboard's Needs attention counts and the Leads / Deals "No next step" filter both use this
+// (with "still open"), so a count and the list it links to always agree.
+export const noNextStep = {
+    tasks: { none: { status: { not: "COMPLETED" as const } } },
+    scheduledActivities: { none: { status: "SCHEDULED" as const } },
+};

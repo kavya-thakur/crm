@@ -114,6 +114,8 @@ export interface DealFilters {
     updatedBy?: string;
     updatedFrom?: string; // "YYYY-MM-DD"
     updatedTo?: string;
+    // only open deals with no open task and no booked call or meeting
+    noNextStep?: boolean;
     // values for fields marked "show in filter", keyed by CustomFieldDefinition.key
     customFields?: Record<string, unknown>;
     sortBy: "title" | "amount" | "expectedCloseDate" | "createdAt" | "updatedAt";

@@ -6,7 +6,8 @@ import { createLeadSchema, listLeadsQuerySchema } from "@/lib/validations/leads"
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
-import { alreadyALead, duplicateLeadsWhere, findOpenCopy, withDuplicateHints } from "@/lib/leads/duplicates";
+import { noNextStep } from "@/lib/work/tasks";
+import { alreadyALead, duplicateLeadsWhere, findOpenCopy, OPEN_STAGE, withDuplicateHints } from "@/lib/leads/duplicates";
 import { firstName, notify } from "@/lib/realtime/notify";
 import { startAutomations } from "@/lib/automations/engine";
 import { linkToCompany } from "@/lib/companies";
@@ -233,7 +234,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, duplicates, customFields: customFieldsParam, sortBy, sortOrder, format } =
+        const { page, limit, search, stageId, stageIds, sourceId, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, duplicates, noNextStep: nothingPlanned, customFields: customFieldsParam, sortBy, sortOrder, format } =
             query.data;
 
         const term = search && escapeLike(search);
@@ -267,7 +268,12 @@ export async function GET(req: NextRequest) {
         }
 
         // "Possible duplicates": open leads that share a phone or email with another open one
-        const andFilters = duplicates ? [...customFieldFilters, await duplicateLeadsWhere(leadScope(user))] : customFieldFilters;
+        const andFilters = [
+            ...customFieldFilters,
+            ...(duplicates ? [await duplicateLeadsWhere(leadScope(user))] : []),
+            // "No next step": still open, nothing planned
+            ...(nothingPlanned ? [{ stage: OPEN_STAGE, ...noNextStep }] : []),
+        ];
 
         const where: Prisma.LeadWhereInput = {
             ...(andFilters.length > 0 && { AND: andFilters }),

@@ -19,6 +19,8 @@ export const listDealsQuerySchema = paginationSchema.extend({
         .optional(),
     createdFrom: z.iso.date().optional(),
     createdTo: z.iso.date().optional(),
+    // only open deals with nothing planned (no open task, no booked call or meeting)
+    noNextStep: z.stringbool().optional(),
     // a JSON-encoded { [customFieldKey]: value } object — parsed in the route,
     // since what counts as valid depends on this org's field definitions
     customFields: z.string().optional(),
