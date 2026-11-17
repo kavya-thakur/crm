@@ -193,6 +193,14 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       customer from the deal's lead, the lines and totals, number Q-<id>, valid 30 days, and a
       "Print or save as PDF" button (the browser's own print dialog, so no PDF library). Lines go to
       the recycle bin with their deal. The demo has a catalogue and six quoted deals
+- [x] **Fuller timelines** (2026-11-16): a lead, deal or contact's timeline also shows notes added
+      ("Note added: ...") and calls/meetings scheduled (linked to the activity); "Lead converted to a
+      deal" links to the deal; leads from an integration say "Lead integration", not "Web form".
+      One helper, `src/lib/work/timeline.ts` (found by a live-site QA run)
+      A pinned **Next steps** block heads each timeline: the record's scheduled calls/meetings and
+      open tasks, soonest first, overdue in red, each labelled Task/Call/Meeting with when, length or
+      priority and owner, ticked off in place; five shown (`shared/comingUp.tsx`); hidden when
+      nothing is pending
 - [x] **Activities board by due date** (2026-11-14): Overdue, Today, Upcoming, Done, Cancelled.
       The first three are scheduled ones split by their time ("today" ends at midnight in the
       viewer's browser); dragging to Done/Cancelled sets the status, dragging back schedules it

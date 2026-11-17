@@ -107,6 +107,8 @@ describe("lead integrations (webhooks)", () => {
         const lead = await prisma.lead.findFirstOrThrow({ where: { organizationId }, include: { timeline: true } });
         expect(lead).toMatchObject({ name: "09876543210", phone: "09876543210" });
         expect(lead.timeline[0].message).toContain("CallTo: 08047112233");
+        // shown as the integration's doing on the timeline, not a web form's
+        expect(lead.timeline[0].metadata).toMatchObject({ integration: true });
 
         // the same caller again, as a GET with the call in the address: their lead's timeline, not a second lead
         const again = await viaGet("CallSid=def456&From=09876543210&CallTo=08047112233");

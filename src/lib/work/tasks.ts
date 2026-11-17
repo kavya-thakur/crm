@@ -1,4 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
+import { addToTimeline } from "./timeline";
 
 // What every task response carries: who has to do it, and the record it's about
 export const taskInclude = {
@@ -39,18 +40,10 @@ export async function addTaskToTimeline(
     userId: number,
     event: "created" | "completed"
 ) {
-    const entry = {
+    await addToTimeline(tx, task, {
         userId,
         type: event === "created" ? "TASK_CREATED" : "TASK_COMPLETED",
         message: `Task ${event}: ${task.title}`,
         metadata: { taskId: task.id },
-    };
-
-    if (task.leadId) {
-        await tx.leadTimeline.create({ data: { ...entry, leadId: task.leadId } });
-    } else if (task.dealId) {
-        await tx.dealTimeline.create({ data: { ...entry, dealId: task.dealId } });
-    } else if (task.contactId) {
-        await tx.contactTimeline.create({ data: { ...entry, contactId: task.contactId } });
-    }
+    });
 }

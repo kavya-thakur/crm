@@ -6,6 +6,7 @@ import { createNoteSchema } from "@/lib/validations/notes";
 import { idParamSchema, paginationSchema, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { firstName, notify } from "@/lib/realtime/notify";
+import { notePreview } from "@/lib/work/timeline";
 
 const authorSelect = { select: { id: true, name: true, email: true } };
 
@@ -99,15 +100,19 @@ export async function POST(
             })
             : [];
 
-        const note = await prisma.contactNote.create({
-            data: {
-                contactId: contact.id,
-                authorId: user.id,
-                body: text,
-                mentionedUserIds: mentioned.map((agent) => agent.id),
-            },
-            include: { author: authorSelect },
-        });
+        // the note, and a line on the contact's timeline saying it was added
+        const [note] = await prisma.$transaction([
+            prisma.contactNote.create({
+                data: {
+                    contactId: contact.id,
+                    authorId: user.id,
+                    body: text,
+                    mentionedUserIds: mentioned.map((agent) => agent.id),
+                },
+                include: { author: authorSelect },
+            }),
+            prisma.contactTimeline.create({ data: { contactId: contact.id, userId: user.id, type: "NOTE_ADDED", message: notePreview(text) } }),
+        ]);
 
         // everyone @-mentioned hears about it
         await notify(note.mentionedUserIds, {

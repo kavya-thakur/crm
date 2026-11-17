@@ -134,10 +134,11 @@ export async function captureLead(formKey: string, input: FormSubmission) {
 
     // A timeline entry belongs to a person, but a website visitor isn't one: entries are
     // filed under the form's owner (or, without one, the workspace's first member) and
-    // marked as the form's, so the timeline shows "Web form" rather than their name
+    // marked as the form's, so the timeline shows "Web form" (or "Lead integration") rather than their name
     const actor = form.ownerId ?? (await prisma.user.findFirst({ where: { organizationId }, orderBy: { id: "asc" }, select: { id: true } }))?.id;
     if (!actor) return { ok: false as const, reason: "missing" as const };
-    const fromForm = { formId: form.id };
+    // an integration's entries say so, rather than "Web form"
+    const fromForm = { formId: form.id, integration: form.kind === "WEBHOOK" };
 
     const existing = await findOpenCopy(organizationId, input);
 

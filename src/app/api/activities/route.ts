@@ -2,6 +2,7 @@ import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { activityScope, contactScope, dealScope, leadScope } from "@/lib/auth/requirePermission";
 import { activityInclude, allAgentsInOrganization } from "@/lib/work/activities";
+import { addToTimeline } from "@/lib/work/timeline";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { createScheduledActivitySchema, listScheduledActivitiesQuerySchema } from "@/lib/validations/scheduledActivities";
@@ -59,19 +60,29 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false, message: "Invalid attendee" }, { status: 400 });
         }
 
-        const activity = await prisma.scheduledActivity.create({
-            data: {
-                ...fields,
-                leadId: leadId ?? null,
-                dealId: dealId ?? null,
-                contactId: contactId ?? null,
-                assignedToId: assignedToId ?? user.id,
-                attendees: { connect: [...new Set(attendeeIds)].map((id) => ({ id })) },
-                organizationId: user.organizationId,
-                createdById: user.id,
-            },
-            include: activityInclude,
-        })
+        const activity = await prisma.$transaction(async (tx) => {
+            const activity = await tx.scheduledActivity.create({
+                data: {
+                    ...fields,
+                    leadId: leadId ?? null,
+                    dealId: dealId ?? null,
+                    contactId: contactId ?? null,
+                    assignedToId: assignedToId ?? user.id,
+                    attendees: { connect: [...new Set(attendeeIds)].map((id) => ({ id })) },
+                    organizationId: user.organizationId,
+                    createdById: user.id,
+                },
+                include: activityInclude,
+            });
+            // on the timeline of the lead, deal or contact it's about, linking to it
+            await addToTimeline(tx, activity, {
+                userId: user.id,
+                type: "ACTIVITY_SCHEDULED",
+                message: `${activity.type === "OTHER" ? "Activity" : activity.type.charAt(0) + activity.type.slice(1).toLowerCase()} scheduled: ${activity.title}`,
+                metadata: { activityId: activity.id },
+            });
+            return activity;
+        });
 
         // whoever it's for, and everyone tagged on it, hear about it (not the person booking it)
         await notify([activity.assignedToId, ...attendeeIds], {
