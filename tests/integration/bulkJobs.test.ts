@@ -138,6 +138,30 @@ describe("bulk delete in the background", () => {
         expect(await prisma.notification.findMany({ where: { userId: colleague.id } })).toMatchObject([{ title: expect.stringContaining("assigned you 600 leads") }]);
     });
 
+    it("sets a field on thousands in the background, the same way a small bulk edit does", async () => {
+        const { org, user, colleague, make } = await setUp(["lead:read", "lead:update"]);
+        const source = await prisma.leadSource.create({ data: { ...org, name: "Google Ads", order: 0 } });
+        const mine = await make(600, {});
+        const [theirs] = await make(1, { assignedToId: colleague.id });
+        const send = (changes: object) =>
+            startBulkJob(new NextRequest("http://localhost/api/bulk-jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ entity: "lead", action: "update", ids: [theirs.id, ...mine.map((lead) => lead.id)], changes }) }));
+
+        // checked before it's queued: a source from another workspace (or none at all) is refused
+        expect((await send({ sourceId: 999999 })).status).toBe(400);
+        expect((await send({})).status).toBe(400);
+        expect(await send({ sourceId: source.id })).toMatchObject({ status: 201 });
+        const job = await prisma.bulkJob.findFirstOrThrow({ where: { ...org, action: "update" } });
+
+        await runBulkJob(job.id);
+
+        expect(await prisma.lead.count({ where: { ...org, sourceId: source.id } })).toBe(600);
+        // each one's timeline says what it was set to (two batches of 500 and 100)
+        expect(await prisma.leadTimeline.count({ where: { lead: org, message: { contains: "Google Ads" } } })).toBe(600);
+        // a colleague's lead is out of reach without lead:all
+        expect((await prisma.lead.findUniqueOrThrow({ where: { id: theirs.id } })).sourceId).toBeNull();
+        expect(await prisma.bulkJob.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "DONE", affected: 600 });
+    });
+
     it("checks the stage, the teammate and the right to reassign before queueing", async () => {
         const { user, make } = await setUp(["lead:read", "lead:update"]);
         const [lead] = await make(1, {});

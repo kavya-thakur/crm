@@ -3,7 +3,7 @@
 How Flash does work that's too big for a web request (CSV imports), and how it limits
 abuse (rate limits). Written to be learned from, like [REALTIME.md](REALTIME.md).
 
-_Last updated: 2026-11-02_
+_Last updated: 2026-11-17_
 
 ---
 
@@ -40,7 +40,7 @@ Browser                 POST /api/imports                Redis (queue)          
   │                      queue.add({ importJobId: 12 }) ──► waiting: [12]
   │ ◄── 201 { id: 12 }   (answers in milliseconds)                    ◄── takes job 12
   │                                                                       reads the CSV from Postgres
-  │ ◄════════ Socket.IO "import-progress" (every 200 rows) ══════════════ imports 200 rows at a time
+  │ ◄════════ Socket.IO "import-progress" (every 1,000 rows) ════════════ imports 1,000 rows at a time
   │ ◄════════ notification "Import finished: 980 leads added" ═══════════ done
 ```
 
@@ -64,7 +64,7 @@ two workers.
 **Only the id goes in the job.** `{ importJobId: 12 }`. The CSV, the mapping, the counts
 and the problem rows are all in the `ImportJob` row in Postgres. Redis only says what to work on.
 
-**Batches with their own bookkeeping.** `runImport` (`src/lib/jobs/leadImport.ts`) handles 200 rows
+**Batches with their own bookkeeping.** `runImport` (`src/lib/jobs/leadImport.ts`) handles 1,000 rows
 at a time. Each batch is **one database transaction** that creates its leads, contacts,
 notes and timeline entries *and* moves the job's counters on (`processed`, `created`,
 `skipped`, `failed`). Either the whole batch and its counts are saved, or neither is.
@@ -86,10 +86,185 @@ cache, so the bar moves without refetching. Everyone's lead lists refresh as row
 
 ---
 
-## 4. Big bulk actions (deleting, moving, assigning thousands)
+## 3b. How an import stays fast (2026-11-17)
 
-The same idea as imports, for "delete / move to Lost / assign to Priya all 4,230 leads that match
-my filters". It works on leads, deals and contacts (contacts have no stages):
+Importing 10,000 leads used to take about a minute on a Mac and several minutes on the live
+site. It now takes about 8 seconds on a Mac. This section explains why it was slow, what changed,
+and how the new version works, step by step. The code is `runImport` in
+`src/lib/jobs/leadImport.ts` and `linkManyToCompanies` in `src/lib/companies.ts`.
+
+### Words used below
+
+| Word | What it means here |
+|---|---|
+| **Query** | One message the app sends to Postgres ("insert this row", "find these leads") and the answer that comes back |
+| **Round trip** | The time for that message to travel to the database and the answer to travel back, on top of the work itself |
+| **Batch** | A slice of the file handled together: 1,000 rows (`BATCH` in `leadImport.ts`) |
+| **Transaction** | A group of queries that are saved all together or not at all (`prisma.$transaction`) |
+| **`createMany`** | Prisma's "insert all of these in one query" (Mongo's `insertMany`) |
+| **`createManyAndReturn`** | The same, and it gives back the new rows (so we learn their ids) |
+| **`unnest`** | A Postgres function that turns two lists into rows: `[5, 6]` and `[2, 9]` become (5, 2) and (6, 9) |
+
+### Why it was slow
+
+**The time went into waiting, not working.** Postgres saves one row in well under a millisecond.
+What costs time is the **round trip** around it:
+
+| Where the app runs | One round trip | 70,000 of them, one after another |
+|---|---|---|
+| Your Mac, Postgres on the same Mac | ~0.1–0.5 ms | ~30–60 s |
+| Render (the live site) → Neon | a few ms, more if they're in different regions | several minutes |
+
+The old import saved **one row at a time**, and every row needed about 7 round trips:
+
+```
+for each of the 10,000 rows:
+  create its contact                     1 round trip
+  look that contact up again             1   (does it already have a company?)
+  find its company by name               1
+  (create the company, the first time)  (1)
+  put the contact under the company      1
+  create the lead, with its "Imported
+  from…" timeline line and its note     2–3  (Prisma runs a nested create as several queries)
+                                        ───
+                                        ~7 per row  →  ~70,000 for the file
+```
+
+Each query waited for the one before it to come back. In Express + Mongo terms, it was this:
+
+```js
+for (const row of rows) {
+  await Contact.create(...)   // wait
+  await Lead.create(...)      // wait
+  ...
+}
+```
+
+instead of `await Lead.insertMany(rows)`.
+
+**Measured** (10,000 rows, each with a company and a note, on a Mac): **56 seconds**.
+
+### What we changed
+
+Nothing about *what* an import does. Only *how it saves*: instead of one query per row per thing,
+**one query per kind of thing, per batch**.
+
+| Saving… | Before (per batch of 1,000) | Now (per batch of 1,000) |
+|---|---|---|
+| Contacts | 1,000 inserts | 1 insert (`createManyAndReturn`) |
+| Companies | ~3,000 lookups, inserts and updates | 3 queries (`linkManyToCompanies`) |
+| Leads | 1,000 inserts | 1 insert (`createManyAndReturn`) |
+| Timeline lines | 1,000 inserts | 1 insert (`createMany`) |
+| Notes | up to 1,000 inserts | 1 insert (`createMany`) |
+| **Total** | **~7,000 round trips** | **~10 round trips** |
+
+The batch also went from 200 rows to 1,000, since a batch is now cheap. That's still far below
+Postgres's limit on how many values one query can carry (65,535): 1,000 leads × 13 columns = 13,000.
+
+**Measured** on the same Mac and file: **56 s → 7.8 s**. On the live site the gain is bigger,
+because there each round trip is longer, and round trips were the slow part.
+
+### How one batch works now, step by step
+
+Take a small file, with a lead already in Flash for 98111 22222:
+
+```
+Name,  Phone,       Company, Note
+Asha,  98000 11111, Acme,    Wants a demo
+Ravi,  98111 22222, ACME,
+Meera, 98222 33333, Globex,  Call after 5
+Bad,   12,          ,
+```
+
+**Step 1. Two lookups for the whole batch** (outside the transaction, they only read):
+
+- *Which of these people are already open leads?* One query by phone and email.
+  → Ravi (98111 22222) is.
+- *Which of these phones already have a contact?* One query.
+  → none.
+
+**Step 2. Check every row in memory** (no database at all):
+
+- `rowReader` (`src/lib/imports/rows.ts`) checks each row with the same rules as adding a lead by
+  hand: name, phone, email, stage, source, owner, custom fields.
+  → "Bad" fails (phone too short) and goes to the problems file.
+- `duplicateOf` skips anyone who is already an open lead, or appeared earlier in this file.
+  → Ravi is skipped ("already a lead").
+- The rest are **ready**: Asha and Meera.
+
+**Step 3. Save the ready ones, all in one transaction:**
+
+```
+a) contacts   INSERT Asha's and Meera's contacts in one query, ids come back      → 101, 102
+b) companies  find "Acme", "Globex" (ignoring case)             1 query  → Acme is id 7
+              create the missing one: Globex                    1 query  → id 8
+              put 101 under 7 and 102 under 8                   1 query (UPDATE … FROM unnest)
+c) leads      INSERT both leads in one query, ids come back                       → 501, 502
+d) timeline   INSERT "Imported from leads.csv" for 501 and 502  1 query
+   notes      INSERT "Wants a demo" (501), "Call after 5" (502) 1 query
+e) counters   processed +4, created +2, skipped +1, failed +1   1 query
+```
+
+If anything in step 3 fails, **none of it is saved**: not the contacts, the leads, or the counters.
+That's what keeps "carry on after a crash" safe (§3): the job restarts from the first row whose
+batch wasn't saved, and nothing is imported twice.
+
+**Step 4. Tell people.** The progress bar gets the new counts over Socket.IO, and everyone's lead
+lists refresh.
+
+### Details worth knowing
+
+**Matching the new ids back to their rows.** One insert creates 1,000 leads, and Postgres gives
+back 1,000 ids. The timeline lines and notes need to know *which* id belongs to *which* row. They're
+matched by **phone**: the duplicate check means one file can't add two leads with the same number.
+The only exception is a number under 7 digits (too short to compare); two such rows get their ids
+in the order the rows were sent.
+
+**Companies, the same as one lead at a time.** "Acme", "ACME" and " acme " are one company, found
+ignoring case, or made with the first spelling the file used. A contact already under a company
+keeps it.
+
+**Contacts remembered across batches.** `contactByPhone` remembers every contact the import has
+found or made, so a phone seen in batch 1 isn't looked up or created again in batch 5.
+
+**The problems file is written as it goes.** It's saved with each batch, so after a crash it still
+has every row that couldn't be added.
+
+### What didn't change
+
+- **The rules:** the same checks as adding a lead by hand, the same "one open lead per person"
+  rule, and "your own leads only" without `lead:all`.
+- **The import screen's check** (`/api/imports/check`) still uses the same `rowReader`, so what it
+  predicts is what the import does.
+- **Live progress, retries, resuming after a crash, the problems file.**
+- **What gets created:** a lead, its contact, its company link, an "Imported from …" timeline line,
+  and its note. Tested in `tests/integration/imports.test.ts`: a 1,500-row file (two batches)
+  checks that contacts, companies, notes and timelines all line up.
+
+### Questions
+
+**Is 1,000 rows in one transaction risky?** No. A batch takes under a second now (7.8 s ÷ 10 batches). The
+transaction timeout is 2 minutes, kept from when batches were slow.
+
+**Why not one batch of 10,000?** Smaller batches keep the progress bar moving, keep each
+transaction short, and mean a crash only redoes up to 1,000 rows.
+
+**Does this make the server busier?** Less busy. It sends ~100 queries for the whole file instead of
+~70,000, so the database and the free Render server do far less work.
+
+**Could it be faster still?** Yes, if files ever reach hundreds of thousands of rows:
+- Postgres `COPY`, which streams rows in instead of building an INSERT;
+- checking the next batch while the current one saves.
+
+Neither is worth it at 10,000 rows. The remaining 7.8 s hasn't been broken down yet; it's likely
+reading and checking the rows, plus Postgres updating its indexes and the match-key trigger.
+
+---
+
+## 4. Big bulk actions (deleting, moving, assigning, editing thousands)
+
+The same idea as imports, for "delete / move to Lost / assign to Priya / set Source to Google Ads
+on all 4,230 leads that match my filters". It works on leads, deals and contacts (contacts have no stages):
 
 1. **Select all matching.** Ticking the header checkbox selects the rows loaded so far; a bar
    then offers *"Select all 4,230 matching leads"*. The page asks the list endpoint for every
@@ -98,12 +273,13 @@ my filters". It works on leads, deals and contacts (contacts have no stages):
    before. More become a **BulkJob** row holding the ids, a *snapshot* of what was selected, so
    leads added a second later aren't swept up. Its id goes on the `bulk` queue.
 3. **The worker** (`runBulkJob`, `src/lib/jobs/bulkActions.ts`) works 500 at a time. The functions
-   that change a batch (`moveLeads`, `assignLeads`, `moveDeals`, `assignDeals`, `assignContacts`)
-   are the *same ones* the bulk routes use for a small selection, so timeline entries, lost reasons
+   that change a batch (`moveLeads`, `assignLeads`, `moveDeals`, `assignDeals`, `assignContacts`,
+   and `prepareEdit` + `applyEdit` for a field edit, 2026-11-17) are the *same ones* the bulk routes use for a small selection, so timeline entries, lost reasons
    and won/lost dates come out identical either way; an assignment sends one notification for the
    whole job. Each batch
    and the job's counters (`processed`, `affected`) are one transaction, so a retry resumes. It
-   re-checks the person's permission (and that the stage or teammate still exists) first, and acts
+   re-checks the person's permission (and that the stage, teammate, source or custom field still
+   exists) first, and acts
    only within their scope, so records that became out of reach, were already deleted or were
    already that way are skipped, and `affected` says how many really changed.
 4. **Progress anywhere.** Each batch emits `bulk-progress` to the person's room; a small card in
@@ -161,7 +337,7 @@ at hundreds of thousands of rows.
 | `src/lib/jobs/queues.ts` | The queues (`importsQueue()`) and their retry settings |
 | `src/lib/jobs/worker.ts` | `startWorkers()`: runs jobs, marks failed ones; started by `server.ts` |
 | `src/lib/jobs/leadImport.ts` | `runImport()` / `failImport()`: the import itself, batch by batch |
-| `src/lib/jobs/bulkActions.ts` | `runBulkJob()` / `failBulkJob()`: big bulk deletes, batch by batch |
+| `src/lib/jobs/bulkActions.ts` | `runBulkJob()` / `failBulkJob()`: big bulk deletes, moves, assigns and field edits, batch by batch |
 | `src/app/api/bulk-jobs/route.ts` | Start a bulk job; list your running ones |
 | `src/app/(dashboard)/BackgroundJobs.tsx` | The progress card in the corner |
 | `src/lib/validations/imports.ts` | Import fields, column guessing, file limits (shared with the browser) |

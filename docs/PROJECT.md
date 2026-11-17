@@ -146,7 +146,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       charging would be Razorpay Subscriptions
 - [x] **Leads**: table + kanban by stage, filters (multi-stage, source, owner, created/modified
       by and date, custom fields, possible duplicates), saved filters, inline edit, bulk
-      stage/assign/edit/merge/delete, side panel with timeline, notes, tasks, activities
+      stage/assign/edit/merge/delete, side panel with timeline, notes, tasks, activities. Every bulk
+      action, field edits included (2026-11-17), works on "Select all N matching" too, as a
+      background job for leads, deals and contacts
 - [x] **Deals**: the same, with amount, probability, expected close, pipeline value per column
 - [x] **Several pipelines** (2026-11-13): deal boards with their own stages ("New sales", "Renewals"),
       managed in their own Settings → Pipelines page (a card per pipeline with its stages and deal
@@ -323,7 +325,10 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       workspace's own fields): column mapping with automatic guesses (incl. every custom field;
       teammates by name or email for "Assigned to" and Agent fields), defaults
       for stage/source/owner, preview, background job (BullMQ on Redis) with live progress, retries
-      that resume where they stopped, duplicate checks, and a downloadable file of rows not added
+      that resume where they stopped, duplicate checks, and a downloadable file of rows not added.
+      **Saved in bulk** (2026-11-17): each batch of 1,000 rows is ~10 queries, not ~7,000 (one insert
+      for the contacts, companies, leads, timelines and notes each); 10,000 rows 56 s → 7.8 s on a
+      Mac. Why and how: [QUEUES.md §3b](QUEUES.md)
 - [x] **CSV export** of leads, deals and contacts: streamed, follows the filters on screen,
       safe against spreadsheet formula injection, re-importable
 - [x] **Bulk actions on thousands** (leads, deals, contacts): "select all N matching" the filters,

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { handleRouteError, parseBody } from "@/lib/api/http";
 import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { tooManyAttempts } from "@/lib/api/rateLimit";
-import { bulkJobSelect, findAgent, findStage, MAX_BULK, mayDo } from "@/lib/jobs/bulkActions";
+import { bulkJobSelect, findAgent, findStage, MAX_BULK, mayDo, prepareEdit } from "@/lib/jobs/bulkActions";
 import { bulkQueue } from "@/lib/jobs/queues";
 
 const ids = z.array(dbIdSchema).min(1).max(MAX_BULK);
@@ -17,6 +18,8 @@ const startBulkJobSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("stage"), entity: z.enum(["lead", "deal"]), ids, stageId: dbIdSchema, lostReason: optionalText(200) }),
     // null = unassign
     z.object({ action: z.literal("assign"), entity, ids, assignedToId: dbIdSchema.nullable() }),
+    // one field (or custom field) set to the same value; which fields depends on the entity (prepareEdit checks)
+    z.object({ action: z.literal("update"), entity, ids, changes: z.record(z.string(), z.unknown()) }),
 ]);
 
 async function signedInUser() {
@@ -43,7 +46,7 @@ export async function GET() {
 }
 
 /**
- * Starts a big bulk action (deleting, moving or assigning thousands of records): saves which
+ * Starts a big bulk action (deleting, moving, assigning or editing thousands of records): saves which
  * ones (the ids, a snapshot of what was selected) and what to do, and queues it. The worker
  * works through them in batches, only among the records this person may touch, and reports
  * progress live.
@@ -59,12 +62,23 @@ export async function POST(req: NextRequest) {
         if (!mayDo(user, data.entity, data.action)) throw new Error("FORBIDDEN");
 
         // what the action needs, checked now so a mistake is told straight away, not later
-        const params = data.action === "stage" ? { stageId: data.stageId, lostReason: data.lostReason } : data.action === "assign" ? { assignedToId: data.assignedToId } : {};
+        const params =
+            data.action === "stage"
+                ? { stageId: data.stageId, lostReason: data.lostReason }
+                : data.action === "assign"
+                  ? { assignedToId: data.assignedToId }
+                  : data.action === "update"
+                    ? { changes: data.changes as Prisma.InputJsonValue }
+                    : {};
         if (data.action === "stage" && !(await findStage(user.organizationId, data.entity, data.stageId))) {
             return NextResponse.json({ ok: false, message: "Invalid stage" }, { status: 400 });
         }
         if (data.action === "assign" && (await findAgent(user.organizationId, data.assignedToId)) === undefined) {
             return NextResponse.json({ ok: false, message: "Agent not found in your organization" }, { status: 404 });
+        }
+        if (data.action === "update") {
+            const prepared = await prepareEdit(user, data.entity, data.changes);
+            if (!prepared.ok) return NextResponse.json({ ok: false, message: prepared.message, errors: prepared.errors }, { status: 400 });
         }
 
         if (await tooManyAttempts(`bulk:${user.id}`, 20, 60 * 60 * 1000)) {

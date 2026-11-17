@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { bulkHistoryRows, customFieldBulkValues } from "@/lib/history";
-import { companyNamed } from "@/lib/companies";
 import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
 
@@ -8,9 +6,8 @@ import { prisma } from "@/lib/db/prisma";
 import { contactScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
-import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkContactChangesSchema } from "@/lib/validations/contact";
-import { assignContacts } from "@/lib/jobs/bulkActions";
+import { applyEdit, assignContacts, prepareEdit } from "@/lib/jobs/bulkActions";
 
 const contactIdsSchema = z.array(dbIdSchema).min(1).max(500);
 
@@ -125,51 +122,13 @@ export async function PATCH(req: NextRequest) {
          * UPDATE: the same value for one field (or custom field) on every selected contact
          */
         if (data.action === "update") {
-            const { customFields: submittedCustomFields, companyName, ...plain } = data.changes;
-            // a company by its name: found (or made); empty takes them out of their company
-            const fields = {
-                ...plain,
-                ...(companyName !== undefined && { companyId: companyName ? (await companyNamed(prisma, user.organizationId, companyName)).id : null }),
-            };
-
-            let customFields: Record<string, unknown> | undefined;
-
-            if (submittedCustomFields) {
-                const result = await validateCustomFieldEdit(user.organizationId, "contact", submittedCustomFields);
-
-                if (!result.ok) {
-                    return NextResponse.json(
-                        { ok: false, message: "Invalid custom field values", errors: result.errors },
-                        { status: 400 }
-                    );
-                }
-
-                customFields = result.data;
+            const prepared = await prepareEdit(user, "contact", data.changes);
+            if (!prepared.ok) {
+                return NextResponse.json({ ok: false, message: prepared.message, errors: prepared.errors }, { status: 400 });
             }
 
-            // the activity history: on each contact's timeline, what it was set to
-            const history = [
-                ...(plain.jobTitle !== undefined ? [{ field: "jobTitle", label: "Job title", to: plain.jobTitle }] : []),
-                ...(companyName !== undefined ? [{ field: "company", label: "Company", to: companyName }] : []),
-                ...(customFields ? await customFieldBulkValues(user.organizationId, "contact", customFields) : []),
-            ];
-
-            // one statement for the plain fields and one for the custom fields, however many
-            // contacts are selected; together, so either all of them change or none do
-            await prisma.$transaction(async (tx) => {
-                await tx.contactTimeline.createMany({ data: contactIds.flatMap((contactId) => bulkHistoryRows(history, user.id).map((row) => ({ ...row, contactId }))) });
-
-                if (Object.keys(fields).length > 0) {
-                    await tx.contact.updateMany({
-                        where: { id: { in: contactIds }, organizationId: user.organizationId },
-                        data: { ...fields, updatedById: user.id },
-                    });
-                }
-
-                if (customFields) {
-                    await tx.$executeRaw(mergeCustomFieldsSql("Contact", contactIds, user, customFields));
-                }
-            });
+            // together, so either all of them change or none do
+            await prisma.$transaction((tx) => applyEdit(tx, user, "contact", contactIds, prepared.edit));
 
             return NextResponse.json({
                 ok: true,

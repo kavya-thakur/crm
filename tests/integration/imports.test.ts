@@ -184,4 +184,30 @@ describe("CSV import", () => {
         // an owner who isn't in the team: the lead still comes in, for the default owner (here the importer)
         expect(await prisma.lead.findFirstOrThrow({ where: { ...org, name: "Kabir Rao" } })).toMatchObject({ assignedToId: user.id });
     });
+
+    it("saves a big file a batch at a time: contacts, companies, notes and timelines all in step", async () => {
+        const { org, user } = await setUp();
+        // a contact who's already under a company keeps it; one company already exists (any case)
+        const kept = await prisma.company.create({ data: { ...org, name: "Old Co" } });
+        await prisma.contact.create({ data: { ...org, name: "Known", phone: "9100000000", companyId: kept.id } });
+        await prisma.company.create({ data: { ...org, name: "acme" } });
+
+        // 1,500 rows = two batches; "Acme" and "ACME" are one company, row 1 says "Ignored Co"
+        const rows = Array.from({ length: 1500 }, (_, i) => `Person ${i},91${String(i).padStart(8, "0")},${i === 0 ? "Ignored Co" : i % 2 ? "Acme" : "ACME"},Note ${i}`);
+        const csv = ["Full Name,Mobile No.,Company,Remarks", ...rows].join("\n");
+        const job = await importJob(org, user.id, csv, { mapping: { "Full Name": "name", "Mobile No.": "phone", Company: "company", Remarks: "note" } });
+
+        await runImport(job.id);
+
+        expect(await prisma.importJob.findUniqueOrThrow({ where: { id: job.id } })).toMatchObject({ status: "DONE", processed: 1500, created: 1500, failed: 0 });
+        const lead = await prisma.lead.findFirstOrThrow({ where: { ...org, name: "Person 1234" }, include: { notes: true, timeline: true, contact: { include: { company: true } } } });
+        expect(lead.notes.map((note) => note.body)).toEqual(["Note 1234"]);
+        expect(lead.timeline.map((entry) => entry.message)).toEqual(["Imported from leads.csv"]);
+        expect(lead.contact).toMatchObject({ name: "Person 1234", phone: "9100001234", company: { name: "acme" } });
+        // no second "Acme": all 1,499 joined the one that was there
+        expect(await prisma.company.count({ where: org })).toBe(2);
+        expect(await prisma.contact.count({ where: { ...org, companyId: { not: null } } })).toBe(1500);
+        expect((await prisma.contact.findFirstOrThrow({ where: { ...org, phone: "9100000000" } })).companyId).toBe(kept.id);
+        expect(await prisma.leadNote.count({ where: { lead: org } })).toBe(1500);
+    });
 });

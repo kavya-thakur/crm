@@ -6,10 +6,17 @@ import { OPEN_STAGE } from "@/lib/leads/duplicates";
 import { closedAtFor } from "@/lib/deals/stages";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
 import { deleteToBin, restoreMany } from "@/lib/recycleBin";
+import { bulkHistoryRows, customFieldBulkValues } from "@/lib/history";
+import { companyNamed, moveToCompany } from "@/lib/companies";
+import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
+import { formatMoneyExact } from "@/lib/utils/format";
+import { bulkLeadChangesSchema } from "@/lib/validations/leads";
+import { bulkDealChangesSchema } from "@/lib/validations/deals";
+import { bulkContactChangesSchema } from "@/lib/validations/contact";
 import type { Prisma } from "@/generated/prisma/client";
 
 /*
- * Bulk actions on leads, deals and contacts: delete, move to a stage, assign.
+ * Bulk actions on leads, deals and contacts: delete, move to a stage, assign, set a field.
  *
  * The functions that change one batch (moveLeads, assignDeals...) are used two ways: by the
  * bulk routes for a small selection, in the request itself, and by runBulkJob for thousands,
@@ -27,11 +34,13 @@ export { MAX_BULK } from "@/lib/validations/common";
 const BATCH = 500;
 
 export type BulkEntity = "lead" | "deal" | "contact";
-export type BulkAction = "delete" | "stage" | "assign";
+export type BulkAction = "delete" | "stage" | "assign" | "update";
 export interface BulkParams {
     stageId?: number;
     lostReason?: string | null;
     assignedToId?: number | null;
+    // "update": the field (or custom field) and the value every record gets, as the person sent it
+    changes?: unknown;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -145,6 +154,102 @@ export async function assignContacts<T extends { id: number; assignedToId: numbe
     return changed;
 }
 
+// --- Setting one field (or custom field) to the same value on many records
+
+const CHANGES_SCHEMAS = { lead: bulkLeadChangesSchema, deal: bulkDealChangesSchema, contact: bulkContactChangesSchema };
+
+// What to write, checked and worked out once: the plain fields, the custom fields to merge in,
+// and the line each record's timeline gets ("Source set to Google Ads")
+export type BulkEdit = { fields: Record<string, unknown>; customFields?: Record<string, unknown>; history: Parameters<typeof bulkHistoryRows>[0] };
+
+/**
+ * Checks a field edit for this workspace (a source of its own, valid custom field values) and works
+ * out what to write. Run by the bulk routes for a small selection, and by the job, again, for a
+ * big one (fields and sources can change in between).
+ */
+export async function prepareEdit(
+    user: CurrentUser,
+    entity: BulkEntity,
+    changes: unknown,
+): Promise<{ ok: true; edit: BulkEdit } | { ok: false; message: string; errors?: unknown }> {
+    const parsed = CHANGES_SCHEMAS[entity].safeParse(changes);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Pick a field to change" };
+    const { customFields: submitted, ...fields } = parsed.data as Record<string, unknown> & { customFields?: Record<string, unknown> };
+
+    let customFields: Record<string, unknown> | undefined;
+    if (submitted) {
+        const result = await validateCustomFieldEdit(user.organizationId, entity, submitted);
+        if (!result.ok) return { ok: false, message: "Invalid custom field values", errors: result.errors };
+        customFields = result.data;
+    }
+    const customHistory = customFields ? await customFieldBulkValues(user.organizationId, entity, customFields) : [];
+
+    if (entity === "lead") {
+        // a source has to be one of this workspace's
+        let sourceName: string | null = null;
+        if (fields.sourceId) {
+            const source = await prisma.leadSource.findFirst({ where: { id: fields.sourceId as number, organizationId: user.organizationId }, select: { name: true } });
+            if (!source) return { ok: false, message: "Invalid lead source" };
+            sourceName = source.name;
+        }
+        const history = [
+            ...(fields.companyName !== undefined ? [{ field: "companyName", label: "Company", to: fields.companyName as string | null }] : []),
+            ...(fields.sourceId !== undefined ? [{ field: "source", label: "Source", to: sourceName }] : []),
+            ...customHistory,
+        ];
+        return { ok: true, edit: { fields, customFields, history } };
+    }
+
+    if (entity === "deal") {
+        const closeDate = fields.expectedCloseDate as string | null | undefined;
+        const history = [
+            ...(fields.amount !== undefined ? [{ field: "amount", label: "Amount", to: formatMoneyExact(fields.amount as number, user.organization.currency) }] : []),
+            ...(fields.probability !== undefined ? [{ field: "probability", label: "Probability", to: `${fields.probability}%` }] : []),
+            ...(closeDate !== undefined
+                ? [{ field: "expectedCloseDate", label: "Expected close", to: closeDate && new Date(closeDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) }]
+                : []),
+            ...customHistory,
+        ];
+        return { ok: true, edit: { fields, customFields, history } };
+    }
+
+    // a contact's company is picked by name: found (or made); empty takes them out of their company
+    const { companyName, ...plain } = fields as { companyName?: string | null; jobTitle?: string | null };
+    const history = [
+        ...(plain.jobTitle !== undefined ? [{ field: "jobTitle", label: "Job title", to: plain.jobTitle }] : []),
+        ...(companyName !== undefined ? [{ field: "company", label: "Company", to: companyName }] : []),
+        ...customHistory,
+    ];
+    const companyId = companyName === undefined ? undefined : companyName ? (await companyNamed(prisma, user.organizationId, companyName)).id : null;
+    return { ok: true, edit: { fields: { ...plain, ...(companyId !== undefined && { companyId }) }, customFields, history } };
+}
+
+// Writes an edit to these records (already checked to be within the person's reach): the
+// timeline lines, one statement for the plain fields and one for the custom fields
+export async function applyEdit(tx: Tx, user: CurrentUser, entity: BulkEntity, ids: number[], edit: BulkEdit) {
+    if (ids.length === 0) return;
+    const where = { id: { in: ids }, organizationId: user.organizationId };
+    const rows = bulkHistoryRows(edit.history, user.id);
+    const hasFields = Object.keys(edit.fields).length > 0;
+    const data = { ...edit.fields, updatedById: user.id };
+
+    if (entity === "lead") {
+        await tx.leadTimeline.createMany({ data: ids.flatMap((leadId) => rows.map((row) => ({ ...row, leadId }))) });
+        if (hasFields) await tx.lead.updateMany({ where, data });
+        if (edit.customFields) await tx.$executeRaw(mergeCustomFieldsSql("Lead", ids, user, edit.customFields));
+        // their contacts move to that company too, so they show on the Companies page
+        if (edit.fields.companyName !== undefined) await moveToCompany(tx, user.organizationId, ids, edit.fields.companyName as string | null);
+    } else if (entity === "deal") {
+        await tx.dealTimeline.createMany({ data: ids.flatMap((dealId) => rows.map((row) => ({ ...row, dealId }))) });
+        if (hasFields) await tx.deal.updateMany({ where, data });
+        if (edit.customFields) await tx.$executeRaw(mergeCustomFieldsSql("Deal", ids, user, edit.customFields));
+    } else {
+        await tx.contactTimeline.createMany({ data: ids.flatMap((contactId) => rows.map((row) => ({ ...row, contactId }))) });
+        if (hasFields) await tx.contact.updateMany({ where, data });
+        if (edit.customFields) await tx.$executeRaw(mergeCustomFieldsSql("Contact", ids, user, edit.customFields));
+    }
+}
+
 // --- What an action needs, looked up and checked once (by the route that starts a job, and
 // --- again by the job itself: things can change in between)
 
@@ -173,7 +278,7 @@ export function mayDo(user: CurrentUser, entity: BulkEntity, action: BulkAction)
 
 // --- The job
 
-type Plan = { stage: Awaited<ReturnType<typeof findStage>>; agent: Agent; lostReason?: string | null };
+type Plan = { stage: Awaited<ReturnType<typeof findStage>>; agent: Agent; lostReason?: string | null; edit?: BulkEdit };
 
 // One batch of a job: only among the records this person may still touch (the same scope as the
 // lists); anything already gone or now out of reach is skipped. Returns how many it changed, and
@@ -186,6 +291,15 @@ async function runBatch(tx: Tx, user: CurrentUser, entity: BulkEntity, action: B
     if (action === "delete") {
         const scope = entity === "lead" ? leadScope(user) : entity === "deal" ? dealScope(user) : contactScope(user);
         return { affected: await deleteToBin(tx, user, entity, { ...where, ...scope }), moved: [] };
+    }
+
+    // the same edit on every record of the batch this person can still reach
+    if (action === "update") {
+        const scope = entity === "lead" ? leadScope(user) : entity === "deal" ? dealScope(user) : contactScope(user);
+        const query = { where: { ...where, ...scope }, select: { id: true } };
+        const reachable = entity === "lead" ? await tx.lead.findMany(query) : entity === "deal" ? await tx.deal.findMany(query) : await tx.contact.findMany(query);
+        await applyEdit(tx, user, entity, reachable.map((record) => record.id), plan.edit!);
+        return { affected: reachable.length, moved: [] };
     }
 
     if (entity === "lead") {
@@ -224,6 +338,8 @@ export async function runBulkJob(bulkJobId: number) {
     if (action === "stage" && !stage) throw new Error("That stage no longer exists");
     const agent = await findAgent(user.organizationId, params.assignedToId);
     if (agent === undefined) throw new Error("That teammate is no longer in the workspace");
+    const prepared = action === "update" ? await prepareEdit(user, entity, params.changes) : null;
+    if (prepared && !prepared.ok) throw new Error(prepared.message);
 
     report(user.id, await prisma.bulkJob.update({ where: { id: job.id }, data: { status: "RUNNING" }, select: progressSelect }));
 
@@ -232,7 +348,7 @@ export async function runBulkJob(bulkJobId: number) {
 
         const { progress, moved } = await prisma.$transaction(
             async (tx) => {
-                const { affected, moved } = await runBatch(tx, user, entity, action, batch, { stage, agent, lostReason: params.lostReason });
+                const { affected, moved } = await runBatch(tx, user, entity, action, batch, { stage, agent, lostReason: params.lostReason, edit: prepared?.edit });
                 const progress = await tx.bulkJob.update({
                     where: { id: job.id },
                     data: { processed: { increment: batch.length }, affected: { increment: affected } },
