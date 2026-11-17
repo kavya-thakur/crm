@@ -6,6 +6,7 @@ import { createDealSchema, listDealsQuerySchema } from "@/lib/validations/deals"
 import { dayRange, escapeLike, searchParamsToObject } from "@/lib/validations/common";
 import { validateCustomFieldValues } from "@/lib/settings/customFields";
 import { closedAtFor } from "@/lib/deals/stages";
+import { noNextStep } from "@/lib/work/tasks";
 import { startAutomations } from "@/lib/automations/engine";
 import { NextRequest, NextResponse } from "next/server";
 import { firstName, notify } from "@/lib/realtime/notify";
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { page, limit, search, pipelineId, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, customFields: customFieldsParam, sortBy, sortOrder, format } =
+        const { page, limit, search, pipelineId, pipelineStageId, pipelineStageIds, assignedTo, createdBy, updatedBy, createdFrom, createdTo, updatedFrom, updatedTo, noNextStep: nothingPlanned, customFields: customFieldsParam, sortBy, sortOrder, format } =
             query.data;
 
         const term = search && escapeLike(search);
@@ -59,7 +60,11 @@ export async function GET(req: NextRequest) {
         }
 
         const where: Prisma.DealWhereInput = {
-            ...(customFieldFilters.length > 0 && { AND: customFieldFilters }),
+            AND: [
+                ...customFieldFilters,
+                // "No next step": still open, nothing planned
+                ...(nothingPlanned ? [{ pipelineStage: { isWon: false, isLost: false }, ...noNextStep }] : []),
+            ],
             ...(term && {
                 title: { contains: term, mode: "insensitive" },
             }),

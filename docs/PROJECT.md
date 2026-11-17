@@ -296,7 +296,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       (leads → conversion → revenue), **campaign performance** (the same per ad campaign), **lost reasons**, my tasks and upcoming calls, filters by
       period and agent. **Needs attention** (2026-11-17): right now, whatever the period, open leads
       and deals with no next step (no open task, no booked call), overdue tasks and missed calls and
-      meetings, for the team (or the picked agent) or your own, each linking to its list
+      meetings, for the team (or the picked agent) or your own, each linking to its list. The lead
+      and deal counts open Leads / Deals with the new **No next step** filter (2026-11-17), which uses
+      the same rule (`noNextStep` in `src/lib/work/tasks.ts`)
 - [x] **Web forms**: embed on any site; leads arrive with source, owner and a reply task;
       spam trap and rate limit; **round-robin** assignment; Book a demo page on the marketing site
 - [x] **Form builder + hosted form page**: set the title, intro, button, thank-you message or
