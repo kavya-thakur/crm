@@ -20,6 +20,7 @@ import { oneOf, PAGE_SIZES, usePaging, useUrlState } from "../shared/useUrlState
 
 
 const SCOPES: { value: ActivityScope; label: string }[] = [
+    { value: "today", label: "Today" },
     { value: "upcoming", label: "Upcoming" },
     { value: "overdue", label: "Overdue" },
     { value: "completed", label: "Completed" },
@@ -49,12 +50,17 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
 
     // one page of the list at a time; which one, and its size, are in the URL (the Pagination bar)
     const paging = usePaging();
+    // Today = still to come before this browser's midnight, the same split as the board's column.
+    // A day's worth comes whole (one page), so it has no pagination bar.
+    const endOfToday = new Date();
+    endOfToday.setHours(24, 0, 0, 0);
+    const today = scope === "today" ? { scope: "upcoming", to: endOfToday.toISOString() } : null;
     const activitiesQuery = useQuery({
-        queryKey: ["activities", "list", scope, mineOnly, paging.page, paging.size],
+        queryKey: ["activities", "list", scope, mineOnly, paging.page, paging.size, today?.to],
         queryFn: () =>
             api
                 .get<Paginated<Activity>>("/activities", {
-                    params: { scope, assignedTo: mineOnly ? "me" : undefined, page: paging.page, limit: paging.size },
+                    params: { scope, assignedTo: mineOnly ? "me" : undefined, page: paging.page, limit: paging.size, ...today },
                 })
                 .then((res) => res.data),
         placeholderData: keepPreviousData,
@@ -189,7 +195,7 @@ export default function ActivitiesView({ seeAgents }: { seeAgents: boolean }) {
             </div>
 
             {/* which page of the list, and how many rows a page */}
-            {view === "table" && <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />}
+            {view === "table" && !today && <Pagination page={paging.page} size={paging.size} total={total} sizes={PAGE_SIZES} onPage={paging.setPage} onSize={paging.setSize} />}
         </div>
     );
 }

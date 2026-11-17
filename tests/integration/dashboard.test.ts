@@ -181,6 +181,30 @@ describe("GET /api/dashboard", () => {
         expect(data.leads.lostReasons).toEqual([{ reason: "No budget", count: 1 }]);
     });
 
+    it("counts what needs attention: leads and deals with no next step, overdue tasks, missed calls", async () => {
+        const { user, org, open } = await setUp(["deal:read", "deal:all", "lead:read", "lead:all", "task:all", "activity:all"]);
+        const mine = { ...org, assignedToId: user.id, createdById: user.id };
+        const stage = await prisma.leadStage.create({ data: { ...org, name: "New", order: 0 } });
+        const [planned] = await prisma.lead.createManyAndReturn({
+            data: [
+                { ...mine, name: "Has a call booked", stageId: stage.id },
+                { ...mine, name: "Nothing planned", stageId: stage.id },
+            ],
+        });
+        const deal = await prisma.deal.create({ data: { ...mine, title: "Nothing planned", pipelineStageId: open.id } });
+        await prisma.scheduledActivity.createMany({
+            data: [
+                { ...mine, title: "Call booked", type: "CALL", scheduledAt: new Date(Date.now() + DAY), leadId: planned.id },
+                { ...mine, title: "Missed", type: "CALL", scheduledAt: daysAgo(1) },
+            ],
+        });
+        await prisma.task.create({ data: { ...mine, title: "Late", dueDate: daysAgo(3), dealId: deal.id } });
+
+        const { data } = await load();
+        // the late task still counts as the deal's next step
+        expect(data.attention).toEqual({ leadsWithoutNextStep: 1, dealsWithoutNextStep: 0, overdueTasks: 1, missedActivities: 1 });
+    });
+
     it("rejects an unknown range", async () => {
         await setUp([]);
 

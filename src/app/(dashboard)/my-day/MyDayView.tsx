@@ -79,7 +79,7 @@ const filtered = (path: string, filters: object) => `${path}?filters=${encodeURI
 const LINKS = {
     overdue: "/tasks?view=table&scope=overdue",
     today: "/tasks?view=table",
-    activities: "/activities?view=table",
+    activities: "/activities?view=table&scope=today",
     missed: "/activities?view=table&scope=overdue",
     leads: (stageId: number) => filtered("/leads", { stageIds: [stageId], assignedTo: "me" }),
     deals: filtered("/deals", { assignedTo: "me", sortBy: "expectedCloseDate", sortOrder: "asc" }),
@@ -129,8 +129,8 @@ export default function MyDayView({ firstName }: { firstName: string }) {
                 <h1 className="font-semibold">My day</h1>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-paper">
+                <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-7 lg:px-8">
                     <h2 className="text-[22px] leading-7 font-semibold tracking-[-0.02em]">
                         {greeting}, {firstName}
                     </h2>
@@ -139,8 +139,11 @@ export default function MyDayView({ firstName }: { firstName: string }) {
                         {day && ` · ${summary(day)}`}
                     </p>
 
+                    {day && <Counts day={day} />}
+
                     {query.isPending && (
-                        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                        <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                            <SkeletonList rows={5} />
                             <SkeletonList rows={5} />
                             <SkeletonList rows={5} />
                         </div>
@@ -148,21 +151,25 @@ export default function MyDayView({ firstName }: { firstName: string }) {
                     {query.isError && <ErrorState title="Couldn't load your day" error={query.error} onRetry={() => query.refetch()} retrying={query.isFetching} />}
 
                     {day && (
-                        <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
+                        <div className="mt-6 grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-3">
                             <div className="flex min-w-0 flex-col gap-4">
                                 {day.overdueTasks.total > 0 && (
-                                    <Card icon={IconAlertTriangle} danger title="Overdue" list={day.overdueTasks} href={LINKS.overdue} more="overdue tasks" empty="">
+                                    <Card id="overdue" icon={IconAlertTriangle} danger title="Overdue" list={day.overdueTasks} href={LINKS.overdue} more="overdue tasks" empty="">
                                         {day.overdueTasks.items.map((task) => (
                                             <TaskRow key={task.id} task={task} late={-daysFromToday(task.dueDate, now)} />
                                         ))}
                                     </Card>
                                 )}
-                                <Card icon={IconCheckbox} title="Due today" list={day.todayTasks} href={LINKS.today} more="tasks due today" empty="No tasks due today.">
+                                <Card id="tasks" icon={IconCheckbox} title="Due today" list={day.todayTasks} href={LINKS.today} more="tasks due today" empty="No tasks due today.">
                                     {day.todayTasks.items.map((task) => (
                                         <TaskRow key={task.id} task={task} />
                                     ))}
                                 </Card>
+                            </div>
+
+                            <div className="flex min-w-0 flex-col gap-4">
                                 <Card
+                                    id="calls"
                                     icon={IconCalendarEvent}
                                     title="Calls & meetings"
                                     list={day.activities}
@@ -183,9 +190,10 @@ export default function MyDayView({ firstName }: { firstName: string }) {
                                 </Card>
                             </div>
 
-                            <div className="flex min-w-0 flex-col gap-4">
+                            <div className="flex min-w-0 flex-col gap-4 lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-start xl:col-span-1 xl:flex">
                                 {day.newLeads && (
                                     <Card
+                                        id="leads"
                                         icon={IconUserPlus}
                                         title="Waiting for first contact"
                                         list={day.newLeads}
@@ -201,6 +209,7 @@ export default function MyDayView({ firstName }: { firstName: string }) {
                                 )}
                                 {day.closingDeals && (
                                     <Card
+                                        id="deals"
                                         icon={IconBriefcase}
                                         title="Closing this week"
                                         list={day.closingDeals}
@@ -233,8 +242,43 @@ function summary(day: MyDay) {
     return parts.length > 0 ? parts.join(" · ") : "You're all caught up";
 }
 
+// The day at a glance: one count per card, each jumping down to its card. Red when something's late.
+function Counts({ day }: { day: MyDay }) {
+    const tiles = [
+        { id: "overdue", label: "Overdue tasks", count: day.overdueTasks.total, danger: true },
+        { id: "tasks", label: "Due today", count: day.todayTasks.total },
+        { id: "calls", label: "Calls & meetings", count: day.activities.total },
+        day.activities.missed > 0 && { id: "calls", label: "Not marked done", count: day.activities.missed, danger: true },
+        day.newLeads && { id: "leads", label: "Leads waiting", count: day.newLeads.total },
+        day.closingDeals && { id: "deals", label: "Closing this week", count: day.closingDeals.total },
+    ].filter((tile) => tile !== false && tile !== null);
+
+    return (
+        <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {tiles.map((tile) => {
+                const late = tile.danger && tile.count > 0;
+                return (
+                    <li key={tile.label}>
+                        {/* overdue tasks have no card when there are none, so that tile isn't a link */}
+                        <a
+                            href={tile.count > 0 || tile.id !== "overdue" ? `#${tile.id}` : undefined}
+                            className={`block rounded-xl border bg-surface px-4 py-3 ${late ? "border-danger/30" : "border-line"} [&[href]]:hover:bg-app`}
+                        >
+                            <span className={`block font-display text-[24px] leading-8 font-semibold tabular-nums ${late ? "text-danger" : tile.count > 0 ? "text-ink" : "text-faint"}`}>
+                                {count(tile.count)}
+                            </span>
+                            <span className="block truncate text-sm text-muted">{tile.label}</span>
+                        </a>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
 // A card: its title and total, up to 5 rows, and "+N more" leading to the full list
 function Card({
+    id,
     icon: Icon,
     title,
     list,
@@ -246,6 +290,8 @@ function Card({
     extra,
     children,
 }: {
+    // what the counts at the top jump to
+    id: string;
     icon: Icon;
     title: string;
     list: Few<unknown>;
@@ -262,7 +308,7 @@ function Card({
     const hidden = list.total - list.items.length;
 
     return (
-        <section className={`min-w-0 rounded-xl border bg-surface ${danger ? "border-danger/30" : "border-line"}`}>
+        <section id={id} className={`min-w-0 scroll-mt-4 rounded-xl border bg-surface ${danger ? "border-danger/30" : "border-line"}`}>
             <header className="flex h-11 items-center gap-2 border-b border-line-light px-4">
                 <Icon size={16} className={`shrink-0 ${danger ? "text-danger" : "text-faint"}`} />
                 <h3 className="truncate font-semibold">{title}</h3>

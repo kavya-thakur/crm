@@ -10,7 +10,8 @@ export function refreshActivities(queryClient: QueryClient) {
 
 export type ActivityType = "CALL" | "MEETING" | "OTHER";
 export type ActivityStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
-export type ActivityScope = "upcoming" | "overdue" | "completed" | "cancelled" | "all";
+// "today" is the rest of today, like the board's Today column (the API gets it as upcoming up to midnight)
+export type ActivityScope = "today" | "upcoming" | "overdue" | "completed" | "cancelled" | "all";
 
 interface Agent {
     id: number;
