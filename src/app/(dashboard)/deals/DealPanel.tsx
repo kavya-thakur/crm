@@ -36,8 +36,11 @@ import {
     IconLinkOff,
     IconMail,
     IconPhone,
+    IconNote,
+    IconCalendarEvent,
 } from "@tabler/icons-react";
 
+import { timelineHref, type TimelineMetadata } from "@/lib/work/timeline";
 import { api, errorMessage } from "@/lib/api/client";
 import { Dropdown, MenuItem, SearchableItems } from "@/components/Dropdown";
 import { ErrorState } from "@/components/ErrorState";
@@ -54,6 +57,7 @@ import { usePanelEnter } from "../shared/usePanelEnter";
 import { NotesTab } from "../shared/notes";
 import { ActivitiesTab } from "../shared/activities";
 import { TasksTab } from "../shared/tasks";
+import { ComingUp } from "../shared/comingUp";
 import { EmailsTab } from "../shared/emails";
 import { WhatsAppButton } from "../shared/whatsapp";
 import { DealProducts } from "./DealProducts";
@@ -75,7 +79,7 @@ interface TimelineEntry {
     message: string;
     createdAt: string;
     // task events carry the task they are about
-    metadata: { taskId?: number } | null;
+    metadata: TimelineMetadata | null;
     user: {
         id: number;
         name: string;
@@ -91,6 +95,8 @@ const TIMELINE_ICONS: Record<string, typeof IconTargetArrow> = {
     UNASSIGNED: IconUserCircle,
     TASK_CREATED: IconChecklist,
     TASK_COMPLETED: IconChecklist,
+    NOTE_ADDED: IconNote,
+    ACTIVITY_SCHEDULED: IconCalendarEvent,
     MERGED: IconGitMerge,
     EMAIL_SENT: IconMailFast,
     WHATSAPP: IconBrandWhatsapp,
@@ -621,6 +627,8 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                     </div>
                                 )}
 
+                                {/* what's still to do, pinned above the history */}
+                                <ComingUp entity="deal" recordId={deal.id} />
                                 {timelineQuery.isPending && <SkeletonList rows={3} />}
 
                                 {timelineQuery.isSuccess && timeline.length === 0 && (
@@ -650,8 +658,8 @@ export default function DealPanel({ dealId, can, agents, meId, onClose }: DealPa
                                                             {entry.user.name}
                                                         </span>
                                                         {" · "}
-                                                        {entry.metadata?.taskId ? (
-                                                            <Link href={`/tasks?open=${entry.metadata.taskId}`} className="text-accent hover:underline">
+                                                        {timelineHref(entry.metadata) ? (
+                                                            <Link href={timelineHref(entry.metadata)!} className="text-accent hover:underline">
                                                                 {entry.message}
                                                             </Link>
                                                         ) : (

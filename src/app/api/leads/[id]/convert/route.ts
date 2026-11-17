@@ -93,8 +93,8 @@ export async function POST(
 
         // One transaction: either both the deal exists and the lead is marked
         // converted, or neither does.
-        const [deal] = await prisma.$transaction([
-            prisma.deal.create({
+        const deal = await prisma.$transaction(async (tx) => {
+            const deal = await tx.deal.create({
                 data: {
                     ...body.data,
                     closedAt: closedAtFor(stage),
@@ -116,9 +116,9 @@ export async function POST(
                     assignedTo: { select: { id: true, name: true, email: true } },
                     pipelineStage: true,
                 },
-            }),
+            });
 
-            prisma.lead.update({
+            await tx.lead.update({
                 where: { id: lead.id },
                 data: {
                     stageId: convertedStage.id,
@@ -129,11 +129,14 @@ export async function POST(
                             userId: user.id,
                             type: "CONVERTED",
                             message: "Lead converted to a deal",
+                            // the entry links to the deal it became
+                            metadata: { dealId: deal.id },
                         },
                     },
                 },
-            }),
-        ]);
+            });
+            return deal;
+        });
 
         // a new deal, and a lead that moved to its converted stage
         await startAutomations(

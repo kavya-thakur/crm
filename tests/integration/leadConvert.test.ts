@@ -53,7 +53,8 @@ describe("POST /api/leads/:id/convert", () => {
         expect(updatedLead.stageId).toBe(convertedStage.id);
 
         const activity = await prisma.leadTimeline.findFirst({ where: { leadId: lead.id, type: "CONVERTED" } });
-        expect(activity).not.toBeNull();
+        // it links to the deal the lead became
+        expect(activity?.metadata).toEqual({ dealId: json.data.id });
     });
 
     it("rejects converting a lead twice", async () => {

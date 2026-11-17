@@ -83,6 +83,21 @@ describe("notifications", () => {
         expect(await bellOf(colleague.id)).toMatchObject([{ type: "MENTIONED", title: expect.stringContaining("mentioned you on Rahul Mehta") }]);
     });
 
+    it("puts a note and a meeting on the lead's timeline, the meeting linked", async () => {
+        const { org, user, stage } = await setUp();
+        const lead = await prisma.lead.create({ data: { ...org, name: "Rahul Mehta", stageId: stage.id, assignedToId: user.id } });
+
+        await addLeadNote(json("POST", { body: "Wants a demo next week", mentionedUserIds: [] }), params(lead.id));
+        const res = await createActivity(json("POST", { type: "MEETING", title: "Demo with Rahul", scheduledAt: inMinutes(120).toISOString(), leadId: lead.id }));
+        const activity = (await res.json()).data;
+
+        const entries = await prisma.leadTimeline.findMany({ where: { leadId: lead.id }, orderBy: { id: "asc" } });
+        expect(entries.map(({ type, message, metadata }) => ({ type, message, metadata }))).toEqual([
+            { type: "NOTE_ADDED", message: "Note added: Wants a demo next week", metadata: null },
+            { type: "ACTIVITY_SCHEDULED", message: "Meeting scheduled: Demo with Rahul", metadata: { activityId: activity.id } },
+        ]);
+    });
+
     it("tells people added to a meeting, only once, and re-arms the reminder when it moves", async () => {
         const { user, colleague } = await setUp();
 
