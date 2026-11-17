@@ -206,7 +206,8 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Activities board by due date** (2026-11-14): Overdue, Today, Upcoming, Done, Cancelled.
       The first three are scheduled ones split by their time ("today" ends at midnight in the
       viewer's browser); dragging to Done/Cancelled sets the status, dragging back schedules it
-      again, and between the first three the time decides (a toast says to change the date)
+      again, and between the first three the time decides (a toast says to change the date).
+      The list has the same **Today** tab (2026-11-17): the rest of today, all of it on one page
 - [x] **Activities calendar** (2026-11-07): a third view on Activities beside List and Kanban;
       **Month** (up to 3 a day, "+2 more", a count on phones; the day number opens its week) and
       **Week** (a column a day, stacked on phones). Today, back and forward; mine or everyone's; the
@@ -285,11 +286,15 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       Every card shows its **top 5 and a total** ("+995 more overdue tasks" → the filtered list), so
       it's one screen with 10 tasks or 1,000; overdue is most important first, missed calls are a
       count with a link. Tick tasks and calls done, call or WhatsApp a lead, or open anything. Works
-      at phone width. Live: refreshes when leads, deals, tasks or activities change
+      at phone width. Live: refreshes when leads, deals, tasks or activities change.
+      (2026-11-17) As wide as the dashboard, a row of counts at the top that jump to their card,
+      and three columns on a wide screen (tasks | calls and meetings | leads and deals)
 - [x] **Dashboard**: revenue won and trend, win rate, weighted pipeline, closing soon, lead
       funnel, **team performance table** (who's doing well), **source performance**
       (leads → conversion → revenue), **campaign performance** (the same per ad campaign), **lost reasons**, my tasks and upcoming calls, filters by
-      period and agent
+      period and agent. **Needs attention** (2026-11-17): right now, whatever the period, open leads
+      and deals with no next step (no open task, no booked call), overdue tasks and missed calls and
+      meetings, for the team (or the picked agent) or your own, each linking to its list
 - [x] **Web forms**: embed on any site; leads arrive with source, owner and a reply task;
       spam trap and rate limit; **round-robin** assignment; Book a demo page on the marketing site
 - [x] **Form builder + hosted form page**: set the title, intro, button, thank-you message or

@@ -26,6 +26,7 @@ import { ActivityTypeLabel, AttendeeStack, DURATION_OPTIONS, StatusBadge, TYPE_O
 import { durationLabel, fromDateTimeLocal, isOverdue, toDateTimeLocal, type Activity, type ActivityScope } from "./shared";
 
 const EMPTY_STATE: Record<ActivityScope, { title: string; hint: string }> = {
+    today: { title: "Nothing else today", hint: "Calls and meetings booked for later today show up here." },
     upcoming: { title: "Nothing scheduled", hint: "Book a call or meeting and it shows up here." },
     overdue: { title: "Nothing is overdue", hint: "Activities past their time that aren't done show up here." },
     completed: { title: "No completed activities yet", hint: "Tick an activity off and it moves here." },

@@ -95,6 +95,8 @@ interface Dashboard {
         items: { id: number; title: string; dueDate: string; priority: TaskPriority }[];
     };
     activities: { id: number; title: string; type: ActivityType; scheduledAt: string; durationMinutes: number | null }[];
+    // right now, not over the period; null where this person can't see leads / deals
+    attention: { leadsWithoutNextStep: number | null; dealsWithoutNextStep: number | null; overdueTasks: number; missedActivities: number };
 }
 
 type LostReason = { reason: string; count: number };
@@ -302,6 +304,8 @@ function Overview({
             {deals && <DealTiles deals={deals} against={against} />}
             {!deals && leads && <LeadTiles leads={leads} against={against} />}
 
+            <AttentionCard attention={data.attention} team={data.scope === "team"} />
+
             {deals && <RevenueCard deals={deals} range={range} against={against} />}
             {deals && <ClosingSoonCard closing={deals.closing} />}
 
@@ -438,6 +442,38 @@ function tooltipLabel(point: TrendPoint, range: DashboardRange) {
     return utcDate(point.start, { weekday: "short", month: "short", day: "numeric" });
 }
 
+// What's slipping right now, each a count that links to the list it's in (red when it isn't zero)
+function AttentionCard({ attention, team }: { attention: Dashboard["attention"]; team: boolean }) {
+    const whose = team ? "&whose=team" : "";
+    const rows = [
+        attention.leadsWithoutNextStep !== null && { count: attention.leadsWithoutNextStep, label: "Leads with no next step", hint: "Open, no task or call planned", href: "/leads" },
+        attention.dealsWithoutNextStep !== null && { count: attention.dealsWithoutNextStep, label: "Deals with no next step", hint: "Open, no task or call planned", href: "/deals" },
+        { count: attention.overdueTasks, label: "Overdue tasks", hint: "Past their due day", href: `/tasks?view=table&scope=overdue${whose}` },
+        { count: attention.missedActivities, label: "Missed calls & meetings", hint: "Time passed, not marked done", href: `/activities?view=table&scope=overdue${whose}` },
+    ].filter((row) => row !== false);
+
+    return (
+        <Card title="Needs attention" description="Right now, whatever the period" icon={IconAlertTriangle} tone="red" className="lg:col-span-3">
+            <ul className={`grid gap-2 sm:grid-cols-2 ${rows.length === 4 ? "xl:grid-cols-4" : ""}`}>
+                {rows.map((row) => (
+                    <li key={row.label}>
+                        <Link href={row.href} className="flex items-center gap-3 rounded-lg border border-line-light px-3 py-2.5 hover:bg-paper">
+                            <span className={`min-w-8 font-display text-[22px] leading-none font-semibold tabular-nums ${row.count > 0 ? "text-danger" : "text-faint"}`}>
+                                {row.count.toLocaleString("en-IN")}
+                            </span>
+                            <span className="min-w-0 flex-1 text-sm">
+                                <span className="block truncate font-medium text-ink">{row.label}</span>
+                                <span className="block truncate text-faint">{row.hint}</span>
+                            </span>
+                            <IconArrowRight size={14} className="shrink-0 text-faint" />
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </Card>
+    );
+}
+
 // Open deals expected to close in the next 30 days, soonest first
 function ClosingSoonCard({ closing }: { closing: Deals["closing"] }) {
     return (
@@ -497,7 +533,7 @@ function PipelineCard({ open, pipelines, className }: { open: Deals["open"]; pip
             action={<CardLink href="/deals">Open board</CardLink>}
         >
             {open.stages.length === 0 ? (
-                <Empty>No open stages. Add some in Settings → Stages &amp; sources.</Empty>
+                <Empty>No open stages. Add some in Settings → Pipelines.</Empty>
             ) : (
                 <ul className="flex flex-col gap-3.5">
                     {open.stages.map((stage) => (
