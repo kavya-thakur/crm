@@ -10,6 +10,9 @@ export interface TimelineMetadata {
     activityId?: number;
     dealId?: number;
     formId?: number;
+    // a note on the timeline: which one, and who it @-mentions (its text is the entry's message)
+    noteId?: number;
+    mentionedUserIds?: number[];
     // came in through a lead integration (Google Ads, IVR...), not a web form
     integration?: boolean;
 }
@@ -28,8 +31,16 @@ export function timelineActor(entry: { type: string; metadata?: TimelineMetadata
     return entry.metadata?.integration ? "Lead integration" : "Web form";
 }
 
-// "Note added: Called, they want a demo next week…" — enough of it to recognise
-export const notePreview = (text: string) => `Note added: ${text.length > 80 ? `${text.slice(0, 80)}…` : text}`;
+// A note's line on its record's timeline: the whole note, so the timeline shows it as a card.
+// Rewritten when the note is edited, removed when it's deleted (noteEntry finds it).
+export const noteOnTimeline = (note: { id: number; body: string; mentionedUserIds: number[] }) => ({
+    type: "NOTE_ADDED",
+    message: note.body,
+    metadata: { noteId: note.id, mentionedUserIds: note.mentionedUserIds },
+});
+
+// The timeline entry of one note (a JSON match on its metadata)
+export const noteEntry = (noteId: number) => ({ type: "NOTE_ADDED", metadata: { path: ["noteId"], equals: noteId } });
 
 /**
  * One entry on the timeline of the lead, deal or contact something belongs to (the first one

@@ -194,7 +194,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       "Print or save as PDF" button (the browser's own print dialog, so no PDF library). Lines go to
       the recycle bin with their deal. The demo has a catalogue and six quoted deals
 - [x] **Fuller timelines** (2026-11-16): a lead, deal or contact's timeline also shows notes added
-      ("Note added: ...") and calls/meetings scheduled (linked to the activity); "Lead converted to a
+      (the whole note as a card under "… added a note", rewritten when the note is edited and
+      removed when it's deleted; notes in the Notes tab are the same cards, @mentions as chips,
+      long ones cut to six lines with Show more, delete asks first) and calls/meetings scheduled (linked to the activity); "Lead converted to a
       deal" links to the deal; leads from an integration say "Lead integration", not "Web form".
       One helper, `src/lib/work/timeline.ts` (found by a live-site QA run)
       A pinned **Next steps** block heads each timeline: the record's scheduled calls/meetings and

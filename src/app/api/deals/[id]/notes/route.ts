@@ -6,7 +6,7 @@ import { createNoteSchema } from "@/lib/validations/notes";
 import { idParamSchema, paginationSchema, searchParamsToObject } from "@/lib/validations/common";
 import { handleRouteError, parseBody, validationError } from "@/lib/api/http";
 import { firstName, notify } from "@/lib/realtime/notify";
-import { notePreview } from "@/lib/work/timeline";
+import { noteOnTimeline } from "@/lib/work/timeline";
 
 const authorSelect = { select: { id: true, name: true, email: true } };
 
@@ -100,9 +100,9 @@ export async function POST(
             })
             : [];
 
-        // the note, and a line on the deal's timeline saying it was added
-        const [note] = await prisma.$transaction([
-            prisma.dealNote.create({
+        // the note, and the same note on the deal's timeline (kept in step when it's edited or deleted)
+        const note = await prisma.$transaction(async (tx) => {
+            const note = await tx.dealNote.create({
                 data: {
                     dealId: deal.id,
                     authorId: user.id,
@@ -110,9 +110,10 @@ export async function POST(
                     mentionedUserIds: mentioned.map((agent) => agent.id),
                 },
                 include: { author: authorSelect },
-            }),
-            prisma.dealTimeline.create({ data: { dealId: deal.id, userId: user.id, type: "NOTE_ADDED", message: notePreview(text) } }),
-        ]);
+            });
+            await tx.dealTimeline.create({ data: { dealId: deal.id, userId: user.id, ...noteOnTimeline(note) } });
+            return note;
+        });
 
         // everyone @-mentioned hears about it
         await notify(note.mentionedUserIds, {

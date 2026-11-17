@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { GET as getBell, PATCH as markRead } from "@/app/api/notifications/route";
 import { POST as assignLead } from "@/app/api/leads/[id]/assign/route";
 import { POST as addLeadNote } from "@/app/api/leads/[id]/notes/route";
+import { PATCH as editLeadNote, DELETE as deleteLeadNote } from "@/app/api/leads/[id]/notes/[noteId]/route";
 import { POST as createActivity } from "@/app/api/activities/route";
 import { PUT as updateActivity } from "@/app/api/activities/[id]/route";
 
@@ -87,15 +88,24 @@ describe("notifications", () => {
         const { org, user, stage } = await setUp();
         const lead = await prisma.lead.create({ data: { ...org, name: "Rahul Mehta", stageId: stage.id, assignedToId: user.id } });
 
-        await addLeadNote(json("POST", { body: "Wants a demo next week", mentionedUserIds: [] }), params(lead.id));
+        const note = (await (await addLeadNote(json("POST", { body: "Wants a demo next week", mentionedUserIds: [] }), params(lead.id))).json()).data;
         const res = await createActivity(json("POST", { type: "MEETING", title: "Demo with Rahul", scheduledAt: inMinutes(120).toISOString(), leadId: lead.id }));
         const activity = (await res.json()).data;
 
-        const entries = await prisma.leadTimeline.findMany({ where: { leadId: lead.id }, orderBy: { id: "asc" } });
-        expect(entries.map(({ type, message, metadata }) => ({ type, message, metadata }))).toEqual([
-            { type: "NOTE_ADDED", message: "Note added: Wants a demo next week", metadata: null },
+        const entries = async () =>
+            (await prisma.leadTimeline.findMany({ where: { leadId: lead.id }, orderBy: { id: "asc" } })).map(({ type, message, metadata }) => ({ type, message, metadata }));
+        // the whole note, so the timeline can show it as a card
+        expect(await entries()).toEqual([
+            { type: "NOTE_ADDED", message: "Wants a demo next week", metadata: { noteId: note.id, mentionedUserIds: [] } },
             { type: "ACTIVITY_SCHEDULED", message: "Meeting scheduled: Demo with Rahul", metadata: { activityId: activity.id } },
         ]);
+
+        // editing the note rewrites its card; deleting it takes the card away
+        const noteParams = { params: Promise.resolve({ id: String(lead.id), noteId: String(note.id) }) };
+        await editLeadNote(json("PATCH", { body: "Wants a demo on Friday", mentionedUserIds: [] }), noteParams);
+        expect((await entries())[0].message).toBe("Wants a demo on Friday");
+        await deleteLeadNote(json("DELETE", {}), noteParams);
+        expect((await entries()).map((entry) => entry.type)).toEqual(["ACTIVITY_SCHEDULED"]);
     });
 
     it("tells people added to a meeting, only once, and re-arms the reminder when it moves", async () => {
