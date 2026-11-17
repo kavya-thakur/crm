@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { bulkHistoryRows, customFieldBulkValues } from "@/lib/history";
-import { formatMoneyExact } from "@/lib/utils/format";
 import { deleteToBin } from "@/lib/recycleBin";
 import { z } from "zod";
 
@@ -8,10 +6,9 @@ import { prisma } from "@/lib/db/prisma";
 import { dealScope, hasPermission, requirePermission } from "@/lib/auth/requirePermission";
 import { dbIdSchema, optionalText } from "@/lib/validations/common";
 import { handleRouteError, parseBody } from "@/lib/api/http";
-import { mergeCustomFieldsSql, validateCustomFieldEdit } from "@/lib/settings/customFields";
 import { bulkDealChangesSchema } from "@/lib/validations/deals";
 import { firstName, notify } from "@/lib/realtime/notify";
-import { assignDeals, moveDeals } from "@/lib/jobs/bulkActions";
+import { applyEdit, assignDeals, moveDeals, prepareEdit } from "@/lib/jobs/bulkActions";
 import { stageEvents, startAutomations } from "@/lib/automations/engine";
 
 const dealIdsSchema = z.array(dbIdSchema).min(1).max(500);
@@ -188,49 +185,13 @@ export async function PATCH(req: NextRequest) {
          * UPDATE: the same value for one field (or custom field) on every selected deal
          */
         if (data.action === "update") {
-            const { customFields: submittedCustomFields, ...fields } = data.changes;
-
-            let customFields: Record<string, unknown> | undefined;
-
-            if (submittedCustomFields) {
-                const result = await validateCustomFieldEdit(user.organizationId, "deal", submittedCustomFields);
-
-                if (!result.ok) {
-                    return NextResponse.json(
-                        { ok: false, message: "Invalid custom field values", errors: result.errors },
-                        { status: 400 }
-                    );
-                }
-
-                customFields = result.data;
+            const prepared = await prepareEdit(user, "deal", data.changes);
+            if (!prepared.ok) {
+                return NextResponse.json({ ok: false, message: prepared.message, errors: prepared.errors }, { status: 400 });
             }
 
-            // the activity history: on each deal's timeline, what it was set to
-            const history = [
-                ...(fields.amount !== undefined ? [{ field: "amount", label: "Amount", to: formatMoneyExact(fields.amount, user.organization.currency) }] : []),
-                ...(fields.probability !== undefined ? [{ field: "probability", label: "Probability", to: `${fields.probability}%` }] : []),
-                ...(fields.expectedCloseDate !== undefined
-                    ? [{ field: "expectedCloseDate", label: "Expected close", to: fields.expectedCloseDate && new Date(fields.expectedCloseDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) }]
-                    : []),
-                ...(customFields ? await customFieldBulkValues(user.organizationId, "deal", customFields) : []),
-            ];
-
-            // one statement for the plain fields and one for the custom fields, however many
-            // deals are selected; together, so either all of them change or none do
-            await prisma.$transaction(async (tx) => {
-                await tx.dealTimeline.createMany({ data: dealIds.flatMap((dealId) => bulkHistoryRows(history, user.id).map((row) => ({ ...row, dealId }))) });
-
-                if (Object.keys(fields).length > 0) {
-                    await tx.deal.updateMany({
-                        where: { id: { in: dealIds }, organizationId: user.organizationId },
-                        data: { ...fields, updatedById: user.id },
-                    });
-                }
-
-                if (customFields) {
-                    await tx.$executeRaw(mergeCustomFieldsSql("Deal", dealIds, user, customFields));
-                }
-            });
+            // together, so either all of them change or none do
+            await prisma.$transaction((tx) => applyEdit(tx, user, "deal", dealIds, prepared.edit));
 
             return NextResponse.json({
                 ok: true,

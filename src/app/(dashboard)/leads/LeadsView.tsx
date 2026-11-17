@@ -512,13 +512,13 @@ export default function LeadsView({ can, meId }: { can: Permissions; meId: numbe
                     </button>
                 )}
 
-                {/* editing a field runs in the request, so only for a selection that fits in one */}
-                {!selection.big && can.update && (
+                {/* in the request for a small selection, a background job for a big one (like the others) */}
+                {can.update && (
                     <BulkEditButton
-                        count={selected.size}
+                        count={selection.count}
                         noun="lead"
-                        pending={bulk.isPending}
-                        onApply={(changes) => bulk.mutate({ action: "update", changes })}
+                        pending={bulk.isPending || bulkJob.isPending}
+                        onApply={(changes) => runBulk({ action: "update", changes })}
                         fields={[
                             ...(sourcesQuery.data
                                 ? [

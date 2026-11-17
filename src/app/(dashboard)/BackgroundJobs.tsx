@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { IconArrowBackUp, IconCircleCheckFilled, IconProgress, IconTrash, IconUserCircle } from "@tabler/icons-react";
+import { IconArrowBackUp, IconCircleCheckFilled, IconPencil, IconProgress, IconTrash, IconUserCircle } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
 import { Spinner } from "@/components/Loader";
@@ -26,13 +26,14 @@ const WORDS: Record<string, { running: string; done: string; icon: typeof IconTr
     delete: { running: "Deleting", done: "Deleted", icon: IconTrash, tone: "text-danger" },
     stage: { running: "Moving", done: "Moved", icon: IconProgress, tone: "text-accent" },
     assign: { running: "Assigning", done: "Assigned", icon: IconUserCircle, tone: "text-accent" },
+    update: { running: "Updating", done: "Updated", icon: IconPencil, tone: "text-accent" },
     restore: { running: "Restoring", done: "Restored", icon: IconArrowBackUp, tone: "text-accent" },
 };
 
 /**
  * Starts a big bulk action as a background job and puts its card up straight away. `ids` are
  * the records picked; the rest says what to do: { action: "delete" }, { action: "stage",
- * stageId, lostReason } or { action: "assign", assignedToId }.
+ * stageId, lostReason }, { action: "assign", assignedToId } or { action: "update", changes }.
  */
 export async function startBulkJob(queryClient: QueryClient, body: { entity: BulkProgress["entity"]; action: string; ids: number[] } & Record<string, unknown>) {
     const job = (await api.post<{ data: BulkProgress }>("/bulk-jobs", body)).data.data;
@@ -118,7 +119,7 @@ export function BackgroundJobs() {
                                 ? job.affected < job.total
                                     ? job.action === "restore"
                                         ? `${(job.total - job.affected).toLocaleString()} couldn't go back (a duplicate now, or already restored)`
-                                        : `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" ? "gone" : "that way"} or out of reach${job.action === "stage" && job.entity === "lead" ? ", or the person already has an open lead" : ""}`
+                                        : `${(job.total - job.affected).toLocaleString()} were already ${job.action === "delete" || job.action === "update" ? "gone" : "that way"} or out of reach${job.action === "stage" && job.entity === "lead" ? ", or the person already has an open lead" : ""}`
                                     : "All done"
                                 : failed
                                   ? (job.error ?? "Something went wrong")

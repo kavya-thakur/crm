@@ -442,7 +442,7 @@ export function BulkEditButton({
             {/* SidePanel mounts its content fresh each time it opens, so the form always starts at step 1 */}
             <SidePanel open={open} onClose={() => setOpen(false)}>
                 <BulkEditForm
-                    nouns={`${count} ${count === 1 ? noun : `${noun}s`}`}
+                    nouns={`${count.toLocaleString()} ${count === 1 ? noun : `${noun}s`}`}
                     noun={noun}
                     fields={fields}
                     pending={pending}
