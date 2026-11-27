@@ -294,7 +294,7 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
 - [x] **Dashboard**: revenue won and trend, win rate, weighted pipeline, closing soon, lead
       funnel, **team performance table** (who's doing well), **source performance**
       (leads → conversion → revenue), **campaign performance** (the same per ad campaign), **lost reasons**, my tasks and upcoming calls, filters by
-      period and agent. **Needs attention** (2026-11-17): right now, whatever the period, open leads
+      period and agent (kept in the URL since 2026-11-19, days in the browser's time zone). **Needs attention** (2026-11-17): right now, whatever the period, open leads
       and deals with no next step (no open task, no booked call), overdue tasks and missed calls and
       meetings, for the team (or the picked agent) or your own, each linking to its list. The lead
       and deal counts open Leads / Deals with the new **No next step** filter (2026-11-17), which uses
@@ -312,7 +312,9 @@ npm run dev                       # Next.js + Socket.IO on http://localhost:3000
       Facebook/Typeform/Sheets via Zapier, Make or Pabbly, or any code); leads go through the same
       rules as web forms; a log of what arrived and why anything was rejected; test button; new
       link on demand. See [INTEGRATIONS.md](INTEGRATIONS.md)
-- [x] `/api/health` for the host's health check and a free uptime ping (keeps a sleeping free server awake)
+- [x] `/api/health` for the host's health check and a free uptime ping (keeps a sleeping free server awake).
+      (2026-11-27) No database query in it, reminders only checked while someone is online, billing
+      reminders daily: together they kept Neon awake 24/7 and used up its free month by the 27th
 - [x] **Production server compiled at build** (2026-11-08): `npm run build` bundles `server.ts` with
       esbuild into `dist/server.cjs` and `npm start` runs it with node (no tsx at runtime): about 2×
       faster to start and ~90 MB less memory, which matters on Render's free 512 MB / 0.1 CPU,
@@ -486,6 +488,8 @@ Newest first. The reason matters more than the choice.
 | 2026-10 | Integration tests on a real database, not mocks | the queries and permissions *are* the product |
 | 2026-11-13 | A deal's pipeline is **its stage's** (no `Deal.pipelineId`) | one source of truth: a deal can never sit in one pipeline with another's stage, and moving pipelines is just picking a stage, through every existing route (board, panel, bulk, automations) unchanged |
 | 2026-11-13 | Existing stages became **one "Sales pipeline"** in the migration; pipeline controls show only with 2+ | nobody's data or screens change until they add a second pipeline |
+| 2026-11-19 | Dashboard days use the **browser's time zone** (sent with each request), not a workspace setting | no migration, and matches My Day; task lists and background jobs still use the UTC day for now |
+| 2026-11-27 | **Health check doesn't touch the database**; reminder loop only runs with someone connected; billing reminders daily | Neon's free plan ran out of compute hours: the uptime ping and a 30 s query loop kept it from ever sleeping. A DB-checking health check also let a database outage take the whole site offline on Render |
 | 2026-11-11 | Bulk reopen **skips** a lead that would be a second open lead (doesn't refuse the whole batch) | a background job of thousands can't stop at the first duplicate; the rest are fine to move, and the toast/job card says how many stayed lost |
 | 2026-11-11 | Two admins at once: **row locks** (`SELECT … FOR UPDATE`, id order) and a re-check of both roles | a check-then-write lets both demotions pass; locking just the two rows serialises them without a table lock or serializable transactions |
 | 2026-11-11 | Team email: **Connect with Google** (Gmail API) next to app passwords, not instead of them | Render's free plan blocks SMTP, so app passwords only work locally or on a paid host; Gmail's API is HTTPS. Until Google verifies the app, people see an "unverified app" screen once and at most 100 Google accounts can connect, fine for now. Other providers still use app passwords |

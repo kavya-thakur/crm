@@ -778,8 +778,10 @@ both up from the repo:
    DATABASE_URL="<neon connection string>" npm run db:demo
    ```
 5. **Keep it awake:** a free UptimeRobot (or cron-job.org) monitor on `https://….onrender.com/api/health`
-   every 5 minutes. It checks the database too, so the nightly demo reset runs and webhooks never
-   wait for a sleeping server.
+   every 5 minutes, so the nightly demo reset runs and webhooks never wait for a sleeping server.
+   It doesn't query the database, so Neon still sleeps when nobody is using the app (the
+   reminder loop also only queries while someone is online, and billing reminders run daily):
+   a database kept awake all month runs out of Neon's free compute hours.
 
 ---
 

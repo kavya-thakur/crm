@@ -6,7 +6,7 @@ import { accessOf } from "./plans";
 /*
  * "Your trial ends in 3 days" / "Your Pro plan ends in 7 days" / "...has ended": to the workspace
  * owner, in the bell and by email (Flash's own mailbox, when it's set up), so the lock is never a
- * surprise. Checked every hour by the server (startRealtime). Each reminder goes once: the
+ * surprise. Checked once a day by the server (startRealtime). Each reminder goes once: the
  * workspace keeps the last one sent (billingReminderKey), and a new trial end or paid period
  * starts a fresh set.
  */

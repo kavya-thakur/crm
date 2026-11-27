@@ -24,7 +24,7 @@ describe("dashboardPeriod", () => {
     const today = new Date("2026-11-01T00:00:00.000Z");
 
     it("covers 30 days ending today, one slice a day, and the 30 days before", () => {
-        const { start, end, previousStart, buckets } = dashboardPeriod("30d", today);
+        const { start, end, previousStart, buckets } = dashboardPeriod("30d", "UTC", today);
 
         expect(buckets).toHaveLength(30);
         expect(start.toISOString()).toBe("2026-10-03T00:00:00.000Z");
@@ -34,11 +34,30 @@ describe("dashboardPeriod", () => {
     });
 
     it("uses months for a year, starting 11 months back", () => {
-        const { buckets } = dashboardPeriod("12m", today);
+        const { buckets } = dashboardPeriod("12m", "UTC", today);
 
         expect(buckets).toHaveLength(12);
         expect(buckets[0].toISOString()).toBe("2025-12-01T00:00:00.000Z");
         expect(buckets[11].toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    });
+
+    it("starts days and months at the person's own midnight", () => {
+        // 1:30 AM on Nov 2 in India is still Nov 1 in UTC
+        const { today, end, buckets } = dashboardPeriod("30d", "Asia/Kolkata", new Date("2026-11-01T20:00:00.000Z"));
+
+        expect(today.toISOString()).toBe("2026-11-02T00:00:00.000Z");
+        expect(buckets[29].toISOString()).toBe("2026-11-01T18:30:00.000Z");
+        expect(end.toISOString()).toBe("2026-11-02T18:30:00.000Z");
+        // a deal won at 2 AM India time lands on Nov 2, not Nov 1
+        expect(bucketIndex(buckets, new Date("2026-11-01T20:30:00.000Z"))).toBe(29);
+
+        const months = dashboardPeriod("12m", "Asia/Kolkata", new Date("2026-11-01T20:00:00.000Z")).buckets;
+        expect(months[11].toISOString()).toBe("2026-10-31T18:30:00.000Z");
+
+        // a clock change: New York's Nov 1 midnight is 4 AM UTC, the next one 5 AM
+        const ny = dashboardPeriod("7d", "America/New_York", new Date("2026-11-02T12:00:00.000Z")).buckets;
+        expect(ny[5].toISOString()).toBe("2026-11-01T04:00:00.000Z");
+        expect(ny[6].toISOString()).toBe("2026-11-02T05:00:00.000Z");
     });
 });
 
@@ -220,6 +239,7 @@ describe("GET /api/dashboard", () => {
         await setUp([]);
 
         expect((await load("range=5y")).status).toBe(400);
+        expect((await load("timeZone=Mars/Olympus")).status).toBe(400);
     });
 });
 

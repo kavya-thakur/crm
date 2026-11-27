@@ -14,13 +14,14 @@ export function dueDateToDb(dueDate: string) {
     return new Date(`${dueDate}T00:00:00.000Z`);
 }
 
-// ponytail: "today" is the UTC day, so for a few hours around midnight a task can
-// look overdue (or not yet) a few hours off for users far from UTC; store each
-// user's timezone if that ever matters
-export function startOfToday() {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    return today;
+// Today's date where the person is, as a date-only column stores it (midnight UTC of that day),
+// so it compares straight against due dates. Pass the browser's time zone ("Asia/Kolkata").
+// ponytail: without one it's the UTC day, which jobs and the task list still use; for a few
+// hours around midnight they can be a day off for someone far from UTC
+export function startOfToday(timeZone = "UTC", now = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const part = (type: string) => parts.find((item) => item.type === type)!.value;
+    return dueDateToDb(`${part("year")}-${part("month")}-${part("day")}`);
 }
 
 interface TimelineTask {

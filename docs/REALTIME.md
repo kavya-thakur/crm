@@ -218,7 +218,9 @@ and the tests still pass.
 
 ## 7. Flow 3: reminders
 
-`startRealtime` starts `setInterval(sendReminders, 30_000)`. Every 30 seconds:
+`startRealtime` starts `setInterval(sendReminders, 30_000)`. Every 30 seconds, **while at least one
+browser is connected** (`io.engine.clientsCount > 0`; with nobody online there's nobody to pop up for,
+and skipping the query lets a free Neon database sleep instead of staying awake all month):
 
 1. Find activities that are `SCHEDULED`, start within the next 10 minutes, and have no
    `reminderSentAt`.

@@ -75,8 +75,10 @@ A repeat caller with an open lead gets a timeline note, not a second lead.
 - **Free servers that sleep** (Render's free web service sleeps after ~15 idle minutes): a
   sleeping server can take most of a minute to wake, and Google Ads or Zapier may give up
   first. Point a free uptime monitor (UptimeRobot, cron-job.org) at **`/api/health`** every
-  5–10 minutes to keep it awake. `/api/health` also checks the database, so it doubles as the
-  host's health check.
+  5–10 minutes to keep it awake. `/api/health` is also the host's health check. It deliberately
+  doesn't touch the database: pinging one every few minutes keeps a free Neon database awake
+  around the clock and uses up its monthly hours, and a database outage would make the host
+  take the whole site (landing page too) offline.
 
 ## Files
 

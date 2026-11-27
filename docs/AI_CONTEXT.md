@@ -295,7 +295,7 @@ Key facts:
 - `notify(recipients, { organizationId, actorId, type, title, body?, link? })` **saves first, then pushes**
   (skips the actor). Types: `LEAD_ASSIGNED, DEAL_ASSIGNED, TASK_ASSIGNED, ACTIVITY_INVITED, MENTIONED,
   REMINDER, IMPORT_FINISHED, EMAIL_OPENED, EMAIL_FAILED, AUTOMATION, LOGGED_IN_AS, BILLING`.
-- **Reminders**: a 30 s loop notifies people 10 minutes before calls/meetings, claimed atomically via
+- **Reminders**: a 30 s loop (only while someone is connected, so a free DB can sleep) notifies people 10 minutes before calls/meetings, claimed atomically via
   `reminderSentAt`. At the start time the **browser** opens a popup (1 s clock check, chime).
 - The tab that makes a change also hears its own `changed` (keeps its other views current).
 
@@ -371,7 +371,7 @@ tasks, today's calls, leads waiting for first contact, deals closing this week; 
 - Templates with `{{lead.firstName}}`, `{{deal.amount}}`, `{{me.name}}`, `{{workspace.name}}`, filled **in the browser**.
 - WhatsApp: `wa.me` link with template text, noted on the timeline (no API).
 
-**Insight**: dashboard (`/api/dashboard?range=&agentId=`, parallel `groupBy`/`aggregate`): revenue won
+**Insight**: dashboard (`/api/dashboard?range=&agentId=&pipelineId=&timeZone=`, browser's time zone for days, filters in the page URL, parallel `groupBy`/`aggregate`): revenue won
 + trend, open pipeline, weighted forecast, win rate, avg deal, days to close, closing soon, lead funnel,
 source & campaign performance, lost reasons, team table (drill into an agent). ⌘K search over
 leads, deals, contacts, tasks, activities (trigram indexes).

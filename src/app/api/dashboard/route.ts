@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 import { activityScope, dealScope, hasPermission, leadScope, taskScope, type CurrentUser } from "@/lib/auth/requirePermission";
 import { handleRouteError, validationError } from "@/lib/api/http";
 import { searchParamsToObject } from "@/lib/validations/common";
-import { noNextStep, startOfToday } from "@/lib/work/tasks";
+import { noNextStep } from "@/lib/work/tasks";
 import { bucketIndex, dashboardPeriod, dashboardQuerySchema } from "@/lib/dashboard/periods";
 
 type Period = ReturnType<typeof dashboardPeriod>;
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
             return validationError(query.error);
         }
 
-        const { range, agentId, pipelineId } = query.data;
+        const { range, agentId, pipelineId, timeZone } = query.data;
         const seesTeam = hasPermission(user, "deal:all") || hasPermission(user, "lead:all");
 
         // picking an agent only makes sense if you can see other people's work
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
             throw new Error("FORBIDDEN");
         }
 
-        const period = dashboardPeriod(range);
+        const period = dashboardPeriod(range, timeZone);
         // AND-ed with the usual scope, so the agent filter can only ever narrow it
         const agent = agentId ? { assignedToId: agentId } : {};
         // a pipeline's stages, for every deal figure (deals, and the team's won/lost/open columns)
@@ -48,8 +48,8 @@ export async function GET(req: NextRequest) {
             hasPermission(user, "lead:read") ? leadNumbers({ AND: [leadScope(user), agent] }, user, period) : null,
             seesTeam ? teamPerformance(user, period, inPipeline) : null,
             // the team's (or the picked agent's) when you see the team, your own otherwise
-            needsAttention(user, agentId ? { assignedToId: agentId } : seesTeam ? {} : { assignedToId: user.id }, inPipeline),
-            myTasks(user),
+            needsAttention(user, agentId ? { assignedToId: agentId } : seesTeam ? {} : { assignedToId: user.id }, inPipeline, period.today),
+            myTasks(user, period.today),
             myUpcomingActivities(user),
         ]);
 
@@ -84,8 +84,7 @@ function perBucket<T>(buckets: Date[], rows: T[], dateOf: (row: T) => Date, valu
 }
 
 async function dealNumbers(where: Prisma.DealWhereInput, user: CurrentUser, period: Period, inPipeline: { pipelineId?: number }) {
-    const { start, end, previousStart, buckets, previousBuckets } = period;
-    const today = startOfToday();
+    const { today, start, end, previousStart, buckets, previousBuckets } = period;
     const isOpen = { isWon: false, isLost: false };
 
     const open = { ...where, pipelineStage: isOpen };
@@ -335,8 +334,7 @@ async function teamPerformance(user: CurrentUser, { start, end }: Period, inPipe
 // What's slipping right now, whatever the period: open leads and deals nobody has planned a next
 // step for (no open task, no booked call or meeting), tasks past their due day, and calls and
 // meetings whose time passed without being marked done. Each within what this person may see.
-async function needsAttention(user: CurrentUser, whose: { assignedToId?: number }, inPipeline: { pipelineId?: number }) {
-
+async function needsAttention(user: CurrentUser, whose: { assignedToId?: number }, inPipeline: { pipelineId?: number }, today: Date) {
     const [leads, deals, tasks, activities] = await Promise.all([
         hasPermission(user, "lead:read")
             ? prisma.lead.count({ where: { AND: [leadScope(user), whose], stage: { isConverted: false, isLost: false }, ...noNextStep } })
@@ -344,7 +342,7 @@ async function needsAttention(user: CurrentUser, whose: { assignedToId?: number 
         hasPermission(user, "deal:read")
             ? prisma.deal.count({ where: { AND: [dealScope(user), whose], pipelineStage: { isWon: false, isLost: false, ...inPipeline }, ...noNextStep } })
             : null,
-        prisma.task.count({ where: { AND: [taskScope(user), whose], status: { not: "COMPLETED" }, dueDate: { lt: startOfToday() } } }),
+        prisma.task.count({ where: { AND: [taskScope(user), whose], status: { not: "COMPLETED" }, dueDate: { lt: today } } }),
         prisma.scheduledActivity.count({ where: { AND: [activityScope(user), whose], status: "SCHEDULED", scheduledAt: { lt: new Date() } } }),
     ]);
 
@@ -352,8 +350,7 @@ async function needsAttention(user: CurrentUser, whose: { assignedToId?: number 
 }
 
 // My open tasks that need attention: overdue or due today, most urgent first
-async function myTasks(user: CurrentUser) {
-    const today = startOfToday();
+async function myTasks(user: CurrentUser, today: Date) {
     const mine = { organizationId: user.organizationId, assignedToId: user.id, status: { not: "COMPLETED" as const } };
 
     const [overdue, dueToday, items] = await Promise.all([
