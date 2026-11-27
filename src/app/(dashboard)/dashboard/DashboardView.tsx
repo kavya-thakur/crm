@@ -29,7 +29,7 @@ import {
 } from "@tabler/icons-react";
 
 import { api } from "@/lib/api/client";
-import type { DashboardRange } from "@/lib/dashboard/periods";
+import { DASHBOARD_RANGES, type DashboardRange } from "@/lib/dashboard/periods";
 import { formatDay, formatMoney, formatMoneyShort } from "@/lib/utils/format";
 import { ErrorState } from "@/components/ErrorState";
 import { Skeleton } from "@/components/Loader";
@@ -37,6 +37,7 @@ import { SectionIcon, TONES, type Tone } from "@/components/SectionIcon";
 import { Select } from "@/components/Select";
 import { Avatar } from "@/components/Avatar";
 import { PriorityBadge } from "../shared/tasks";
+import { oneOf, useUrlState } from "../shared/useUrlState";
 import { ACTIVITY_TYPES, durationLabel, type ActivityType } from "../activities/shared";
 import { stageName, usePipelines, type Pipeline } from "../deals/shared";
 import type { TaskPriority } from "../tasks/shared";
@@ -112,9 +113,14 @@ const RANGES: Record<DashboardRange, { short: string; long: string }> = {
     "12m": { short: "12M", long: "12 months" },
 };
 
-// The chart's slices start at UTC midnight (see lib/dashboard), so label them in UTC too
+// A date-only value (a deal's expected close date) is stored as midnight UTC, so it's labelled in UTC
 function utcDate(iso: string, options: Intl.DateTimeFormatOptions) {
     return new Date(iso).toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
+}
+
+// The chart's slices start at this browser's midnight (it sends its time zone), so they're labelled here
+function localDate(iso: string, options: Intl.DateTimeFormatOptions) {
+    return new Date(iso).toLocaleDateString("en-US", options);
 }
 
 function percent(part: number, whole: number) {
@@ -130,29 +136,43 @@ function greeting() {
     return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
-export default function DashboardView({ firstName, userId }: { firstName: string; userId: number }) {
-    const [range, setRange] = useState<DashboardRange>("30d");
-    const [agentId, setAgentId] = useState<number | null>(null);
-    // null is every pipeline
-    const [pipelineId, setPipelineId] = useState<number | null>(null);
+export default function DashboardView({ firstName, userId, seesTeam, seesDeals }: { firstName: string; userId: number; seesTeam: boolean; seesDeals: boolean }) {
+    // The filters live in the URL (?range=90d&agent=4&pipeline=2), so a refresh or a shared link
+    // shows the same numbers; the defaults (30 days, everyone, every pipeline) stay out of it
+    const url = useUrlState();
+    const range = oneOf(url.get("range"), DASHBOARD_RANGES, "30d");
+    const setRange = (next: DashboardRange) => url.set({ range: next === "30d" ? null : next });
+    // only someone who sees the team may pick an agent; a link from a manager just shows your own
+    const agentId = seesTeam ? Number(url.get("agent")) || null : null;
+    const setAgentId = (id: number | null) => url.set({ agent: id ? String(id) : null });
+
+    // only someone who sees deals has pipelines to pick from
+    const pipelinesQuery = usePipelines(seesDeals);
+    const pipelines = pipelinesQuery.data ?? [];
+    // null is every pipeline, also when the link names one that's since been deleted
+    const linkedPipeline = Number(url.get("pipeline")) || null;
+    const pipelineId = pipelinesQuery.data && !pipelines.some((pipeline) => pipeline.id === linkedPipeline) ? null : linkedPipeline;
+    const setPipelineId = (id: number | null) => url.set({ pipeline: id ? String(id) : null });
 
     const dashboardQuery = useQuery({
         queryKey: ["dashboard", range, agentId, pipelineId],
         queryFn: () =>
             api
-                .get<{ data: Dashboard }>("/dashboard", { params: { range, ...(agentId && { agentId }), ...(pipelineId && { pipelineId }) } })
+                .get<{ data: Dashboard }>("/dashboard", {
+                    params: {
+                        range,
+                        // so "today" and each day on the charts are this person's days, not UTC's
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        ...(agentId && { agentId }),
+                        ...(pipelineId && { pipelineId }),
+                    },
+                })
                 .then((res) => res.data.data),
         // switching a filter keeps the old numbers on screen (dimmed) until the new ones land
         placeholderData: keepPreviousData,
     });
 
     const data = dashboardQuery.data;
-    // only someone who sees deals has pipelines to pick from
-    const pipelinesQuery = usePipelines(Boolean(data?.deals));
-    const pipelines = pipelinesQuery.data ?? [];
-    // the picked pipeline was deleted meanwhile: back to every pipeline (adjusting state while
-    // rendering, React's own pattern for this, so no request goes out for the deleted one)
-    if (pipelineId !== null && pipelinesQuery.data && !pipelines.some((pipeline) => pipeline.id === pipelineId)) setPipelineId(null);
     const agent = data?.team?.people.find((person) => person.id === agentId);
     const whose = agent ? `${agent.name.split(" ")[0]} is` : data?.scope === "team" ? "the team is" : "you're";
 
@@ -434,13 +454,13 @@ function RevenueCard({ deals, range, against }: { deals: Deals; range: Dashboard
 }
 
 function axisLabel(point: TrendPoint, range: DashboardRange) {
-    return utcDate(point.start, range === "12m" ? { month: "short" } : { month: "short", day: "numeric" });
+    return localDate(point.start, range === "12m" ? { month: "short" } : { month: "short", day: "numeric" });
 }
 
 function tooltipLabel(point: TrendPoint, range: DashboardRange) {
-    if (range === "12m") return utcDate(point.start, { month: "long", year: "numeric" });
-    if (range === "90d") return `Week of ${utcDate(point.start, { month: "short", day: "numeric" })}`;
-    return utcDate(point.start, { weekday: "short", month: "short", day: "numeric" });
+    if (range === "12m") return localDate(point.start, { month: "long", year: "numeric" });
+    if (range === "90d") return `Week of ${localDate(point.start, { month: "short", day: "numeric" })}`;
+    return localDate(point.start, { weekday: "short", month: "short", day: "numeric" });
 }
 
 // What's slipping right now, each a count that links to the list it's in (red when it isn't zero)
@@ -811,8 +831,9 @@ function LostReasonsCard({ deals, leads, period, className }: { deals?: LostReas
 
 function TasksCard({ tasks }: { tasks: Dashboard["tasks"] }) {
     const extra = tasks.overdue + tasks.dueToday - tasks.items.length;
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    // today's date here, the way a due date is stored (midnight UTC), to tell overdue from today
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 
     return (
         <Card title="My tasks" icon={IconListCheck} tone="teal" action={<CardLink href="/tasks">All tasks</CardLink>}>

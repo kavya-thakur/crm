@@ -290,11 +290,14 @@ keeps the campaign it first came from (first touch). The dashboard groups leads 
 imported file's "Campaign" column fills it too.
 
 ### Dashboard
-`GET /api/dashboard?range=30d&agentId=` computes everything with `groupBy`/`aggregate` in
+`GET /api/dashboard?range=30d&agentId=&pipelineId=&timeZone=` computes everything with `groupBy`/`aggregate` in
 parallel: revenue won and its trend vs the previous period, win rate, weighted pipeline,
 deals closing soon, lead funnel, sources and ad campaigns (leads, conversion, revenue), lost reasons, the
 team table (per agent) and your own tasks and upcoming calls. Managers see the team;
-others see their own numbers.
+others see their own numbers. Days start at the person's own midnight: the page sends the
+browser's time zone, and `lib/dashboard/periods.ts` builds the slices and "today" in it. The
+period, agent and pipeline sit in the page's URL (`/dashboard?range=90d&agent=4`), so a refresh
+or a shared link shows the same numbers.
 
 ### Global search (⌘K)
 `GET /api/search?q=` searches leads, deals, contacts, tasks and activities you're allowed

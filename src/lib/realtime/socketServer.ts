@@ -47,10 +47,15 @@ export function startRealtime(httpServer: HttpServer) {
         socket.join([orgRoom(organizationId), userRoom(id)]);
     });
 
-    setInterval(() => void sendReminders(), 30_000);
-    // "your trial / Pro plan ends soon", to workspace owners: hourly is plenty for days-ahead notice
+    // Only while someone has the app open: a "meeting in 10 minutes" pop-up is for them, and
+    // skipping it otherwise lets a free database sleep when nobody's around
+    setInterval(() => {
+        if (io.engine.clientsCount > 0) void sendReminders();
+    }, 30_000);
+    // "your trial / Pro plan ends soon", to workspace owners: once a day is plenty for days-ahead
+    // notice (each is sent once, and "it has ended" catches up for two days), and the database sleeps between
     setTimeout(() => void sendBillingReminders(), 60_000);
-    setInterval(() => void sendBillingReminders(), 60 * 60_000);
+    setInterval(() => void sendBillingReminders(), 24 * 60 * 60_000);
 
     return io;
 }
