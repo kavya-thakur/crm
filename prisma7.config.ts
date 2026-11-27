@@ -10,10 +10,10 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    // Migrations take a Postgres advisory lock (one migration at a time), which a connection pooler
-    // (Neon's "-pooler" address, PgBouncer) can't hold properly: the lock stays stuck on a pooled
-    // connection and the next deploy times out (P1002). So the CLI uses Neon's direct address, the
-    // same one without "-pooler"; the app itself keeps the pooled one (src/lib/db/prisma.ts).
-    url: process.env["DATABASE_URL"]?.replace("-pooler.", "."),
+    // Migrations take a Postgres advisory lock (one migration at a time), which Supabase's
+    // transaction pooler (port 6543) can't hold: the deploy hangs. So the CLI uses the session
+    // pooler (same address, port 5432); the app itself keeps 6543, which shares its 15 connections
+    // across requests instead of holding one each (src/lib/db/prisma.ts).
+    url: process.env["DATABASE_URL"]?.replace(":6543/", ":5432/"),
   },
 });
